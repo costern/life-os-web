@@ -427,7 +427,7 @@ async function renderLivePos(){
         const pct = avg ? dir*(last-avg)/avg*100 : 0;
         pnlHtml = '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(pnl)+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</span>';
       } else allPriced = false;
-      const beSchon = o.sl != null && avg > 0 && Math.abs(o.sl - avg) < avg*0.0008;
+      const beSchon = o.sl != null && avg > 0 && (dir > 0 ? o.sl >= avg : o.sl <= avg);
       const slTxt = o.sl == null ? '<span class="muted">SL –</span>'
         : beSchon ? '<span class="badge amber">BE</span> '+o.sl
         : '<span class="badge red">SL</span> '+o.sl;
