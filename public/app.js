@@ -405,10 +405,24 @@ async function ladePreis(ticker){
   catch(e){ return null; }
 }
 
+let letzterPreisCheck = null;
+
+function zeigePreisStamp(){
+  const el = document.getElementById('preisStamp');
+  if (!el) return;
+  if (!letzterPreisCheck){ el.textContent = ''; return; }
+  const sek = Math.max(0, Math.round((Date.now() - letzterPreisCheck) / 1000));
+  const zeit = letzterPreisCheck.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  const vor = sek < 5 ? 'gerade eben' : sek < 60 ? 'vor '+sek+'s' : 'vor '+Math.floor(sek/60)+' Min';
+  el.textContent = 'Kurse zuletzt aktualisiert: '+zeit+' ('+vor+')';
+}
+setInterval(zeigePreisStamp, 1000);
+
 async function renderLivePos(){
   const el = document.getElementById('livepos');
   try {
     openTrades = await api('/trades/open');
+    letzterPreisCheck = new Date(); zeigePreisStamp();
     if (!openTrades.length){ el.innerHTML = '<div class="empty">Keine offenen Positionen</div>'; ov.unreal = 0; renderOverview(); return; }
 
     let total = 0, allPriced = true;
