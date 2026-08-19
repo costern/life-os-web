@@ -224,7 +224,28 @@ async function ladeKalender(){
   const elBeob = document.getElementById('beob');
   const elOvTodos = document.getElementById('ovTodos');
   const elOvBeob = document.getElementById('ovBeobachten');
+  const THEMEN_LISTE = ['Trading','Beobachten','Sport','Arbeit','Privat','Sonstiges'];
   let rows = [];
+
+  function panel(r){
+    const themaOpts = '<option value="">Thema…</option>' + THEMEN_LISTE.map(th =>
+      '<option'+(r.thema===th?' selected':'')+'>'+th+'</option>').join('');
+    const prioOpts = '<option value="">Priorität…</option>' + ['Hoch','Mittel','Niedrig'].map(p =>
+      '<option'+(r.prio===p?' selected':'')+'>'+p+'</option>').join('');
+    return '<div class="todo-panel" data-id="'+r.id+'">' +
+      '<div class="tp-line"><input type="text" class="te-text" maxlength="200" value="'+esc(r.text)+'" placeholder="Aufgabe"></div>' +
+      '<div class="tp-line">' +
+        '<input type="date" class="te-due" value="'+(r.due ? String(r.due).slice(0,10) : '')+'">' +
+        '<select class="te-thema">'+themaOpts+'</select>' +
+        '<select class="te-prio">'+prioOpts+'</select>' +
+      '</div>' +
+      '<div class="tp-line">' +
+        '<button type="button" class="te-save">Speichern</button>' +
+        '<button type="button" class="te-cancel ghost">Abbrechen</button>' +
+        '<span class="te-msg"></span>' +
+      '</div>' +
+    '</div>';
+  }
 
   function zeile(r){
     return '<div class="row" data-id="'+r.id+'">' +
@@ -233,7 +254,11 @@ async function ladeKalender(){
       (r.prio ? '<span class="badge'+(r.prio==='Hoch'?' red':r.prio==='Mittel'?' amber':'')+'">'+esc(r.prio)+'</span>' : '') +
       (r.thema ? '<span class="badge">'+esc(r.thema)+'</span>' : '') +
       (r.due ? '<span class="muted">'+new Date(r.due).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</span>' : '') +
-    '</div>';
+      '<span class="row-actions">' +
+        '<span class="icon-btn todo-edit-toggle" role="button" title="Bearbeiten">✎</span>' +
+        '<span class="icon-btn del todo-del" role="button" title="Löschen">🗑</span>' +
+      '</span>' +
+    '</div>' + panel(r);
   }
 
   const PRIO_RANK = { Hoch:0, Mittel:1, Niedrig:2 };
@@ -271,13 +296,63 @@ async function ladeKalender(){
   laden();
 
   document.addEventListener('click', async ev => {
-    const cb = ev.target.closest('.tcb'); if (!cb) return;
-    if (!cb.closest('#todos, #beob, #ovTodos, #ovBeobachten')) return;
-    const id = +cb.closest('.row').dataset.id;
-    const r = rows.find(x => x.id === id); if (!r) return;
-    cb.textContent = '…';
-    try { await api('/todos/'+id, { method:'PATCH', body: JSON.stringify({ done: !r.done }) }); await laden(); }
-    catch(e){ alert('Fehler: ' + e.message); await laden(); }
+    if (!ev.target.closest('#todos, #beob, #ovTodos, #ovBeobachten')) return;
+
+    const cb = ev.target.closest('.tcb');
+    if (cb){
+      const id = +cb.closest('.row').dataset.id;
+      const r = rows.find(x => x.id === id); if (!r) return;
+      cb.textContent = '…';
+      try { await api('/todos/'+id, { method:'PATCH', body: JSON.stringify({ done: !r.done }) }); await laden(); }
+      catch(e){ alert('Fehler: ' + e.message); await laden(); }
+      return;
+    }
+
+    const editTgl = ev.target.closest('.todo-edit-toggle');
+    if (editTgl){
+      const id = editTgl.closest('.row').dataset.id;
+      const p = document.querySelector('.todo-panel[data-id="'+id+'"]');
+      if (p) p.classList.toggle('on');
+      return;
+    }
+
+    const del = ev.target.closest('.todo-del');
+    if (del){
+      const id = +del.closest('.row').dataset.id;
+      if (del.dataset.confirm !== '1'){
+        del.dataset.confirm = '1'; del.textContent = '⚠️';
+        setTimeout(() => { if (del.dataset.confirm==='1'){ delete del.dataset.confirm; del.textContent='🗑'; } }, 4000);
+        return;
+      }
+      delete del.dataset.confirm;
+      try { await api('/todos/'+id, { method:'DELETE' }); await laden(); }
+      catch(e){ alert('Konnte nicht gelöscht werden: ' + e.message); }
+      return;
+    }
+
+    const cancel = ev.target.closest('.te-cancel');
+    if (cancel){ cancel.closest('.todo-panel').classList.remove('on'); return; }
+
+    const save = ev.target.closest('.te-save');
+    if (save){
+      const p = save.closest('.todo-panel');
+      const id = p.dataset.id;
+      const text = p.querySelector('.te-text').value.trim();
+      const due = p.querySelector('.te-due').value;
+      const thema = p.querySelector('.te-thema').value;
+      const prio = p.querySelector('.te-prio').value;
+      const msg = p.querySelector('.te-msg');
+      if (!text){ msg.textContent = 'Text darf nicht leer sein'; msg.className = 'te-msg bad'; return; }
+      save.disabled = true; save.textContent = 'speichert…';
+      try {
+        await api('/todos/'+id, { method:'PATCH', body: JSON.stringify({ text, due: due||null, thema: thema||null, prio: prio||null }) });
+        await laden();
+      } catch(e){
+        msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg bad';
+        save.disabled = false; save.textContent = 'Speichern';
+      }
+      return;
+    }
   });
 
   document.getElementById('todoAdd').addEventListener('submit', async ev => {
