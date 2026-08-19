@@ -85,3 +85,7 @@ a { color:var(--accent); }
   nav.side .brand { display:none; }
   nav.side button { width:auto; white-space:nowrap; margin:0; }
 }
+.quote-card { background:#1a1d23; color:#fff; border-radius:14px; padding:18px 22px; margin-bottom:16px; }
+.q-text { font-size:16px; line-height:1.5; font-style:italic; }
+.q-author { font-size:12px; color:#9ca3af; margin-top:8px; }
+.row.today-mark .t { font-weight:700; }

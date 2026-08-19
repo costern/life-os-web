@@ -34,6 +34,70 @@ async function api(path, opts) {
   document.getElementById('dateline').textContent = now.toLocaleDateString('de-DE',{weekday:'long', day:'2-digit', month:'long', year:'numeric'});
 })();
 
+/* ---------- Quote of the Day ---------- */
+(function(){
+  const QUOTES = [
+    ["The market is a device for transferring money from the impatient to the patient.","Warren Buffett"],
+    ["Discipline equals freedom.","Jocko Willink"],
+    ["It's not whether you're right or wrong that's important, but how much money you make when you're right and how much you lose when you're wrong.","George Soros"],
+    ["We are what we repeatedly do. Excellence, then, is not an act, but a habit.","Will Durant"],
+    ["You do not rise to the level of your goals. You fall to the level of your systems.","James Clear"],
+    ["Amateurs think about how much money they can make. Professionals think about how much money they could lose.","Jack Schwager"],
+    ["Waste no more time arguing what a good man should be. Be one.","Marcus Aurelius"],
+    ["Losers average losers.","Paul Tudor Jones"],
+    ["The obstacle is the way.","Marcus Aurelius"],
+    ["Motivation gets you going, but discipline keeps you growing.","John C. Maxwell"],
+    ["Risk comes from not knowing what you're doing.","Warren Buffett"],
+    ["It is not that we have a short time to live, but that we waste a lot of it.","Seneca"],
+    ["The goal of a successful trader is to make the best trades. Money is secondary.","Alexander Elder"],
+    ["Hard choices, easy life. Easy choices, hard life.","Jerzy Gregorek"],
+    ["Every battle is won before it is ever fought.","Sun Tzu"],
+    ["The person who says it cannot be done should not interrupt the person doing it.","Chinese proverb"],
+    ["Do not pray for an easy life, pray for the strength to endure a difficult one.","Bruce Lee"],
+    ["Patience is not the ability to wait, but the ability to keep a good attitude while waiting.","Joyce Meyer"],
+    ["The trend is your friend until the end when it bends.","Ed Seykota"],
+    ["Success is the sum of small efforts repeated day in and day out.","Robert Collier"],
+    ["Know what you own, and know why you own it.","Peter Lynch"],
+    ["A goal without a plan is just a wish.","Antoine de Saint-Exupéry"],
+    ["The four most dangerous words in investing are: this time it's different.","Sir John Templeton"],
+    ["Fall seven times, stand up eight.","Japanese proverb"],
+    ["Don't find fault, find a remedy.","Henry Ford"],
+    ["The market can remain irrational longer than you can remain solvent.","attributed to John Maynard Keynes"],
+    ["What stands in the way becomes the way.","Marcus Aurelius"],
+    ["Be fearful when others are greedy and greedy when others are fearful.","Warren Buffett"],
+    ["Comparison is the thief of joy.","Theodore Roosevelt"],
+    ["The first principle is that you must not fool yourself, and you are the easiest person to fool.","Richard Feynman"],
+    ["Cut your losses short and let your winners run.","Trading proverb"],
+    ["Energy and persistence conquer all things.","Benjamin Franklin"],
+    ["It's not the daily increase but daily decrease. Hack away at the unessential.","Bruce Lee"],
+    ["The two most powerful warriors are patience and time.","Leo Tolstoy"],
+    ["An investment in knowledge pays the best interest.","Benjamin Franklin"],
+    ["Wide diversification is only required when investors do not understand what they are doing.","Warren Buffett"],
+    ["You miss 100% of the shots you don't take.","Wayne Gretzky"],
+    ["Simplicity is the ultimate sophistication.","Leonardo da Vinci"],
+    ["What we fear doing most is usually what we most need to do.","Tim Ferriss"],
+    ["The best time to plant a tree was 20 years ago. The second best time is now.","Chinese proverb"],
+    ["Slow is smooth, smooth is fast.","Military adage"],
+    ["Time in the market beats timing the market.","Investing proverb"],
+    ["Rule number one: never lose money. Rule number two: never forget rule number one.","Warren Buffett"],
+    ["Nothing in the world is worth having or worth doing unless it means effort.","Theodore Roosevelt"],
+    ["The successful warrior is the average man with laser-like focus.","Bruce Lee"],
+    ["Adversity introduces a man to himself.","Anonymous"],
+    ["The way to get started is to quit talking and begin doing.","Walt Disney"],
+    ["He who fears he shall suffer, already suffers what he fears.","Michel de Montaigne"],
+    ["Compound interest is the eighth wonder of the world.","attributed to Albert Einstein"],
+    ["The best swordsman does not fear the second best.","Nassim Taleb"],
+    ["In trading, the impossible happens about twice a year.","Henri M. Simoes"],
+    ["If you want to be a great trader, you have to be willing to be wrong.","Trading proverb"]
+  ];
+  const now = new Date();
+  const doy = Math.floor((now - new Date(now.getFullYear(),0,0)) / 864e5);
+  const q = QUOTES[doy % QUOTES.length];
+  const qt = document.getElementById('qText'), qa = document.getElementById('qAuthor');
+  if (qt) qt.textContent = '„' + q[0] + '"';
+  if (qa) qa.textContent = '— ' + q[1];
+})();
+
 function renderOverview(){
   const el = document.getElementById('ovStats');
   const parts = [];
@@ -103,6 +167,29 @@ async function ladeNews(){
   } catch(e){ el.innerHTML = '<div class="err">News nicht ladbar: '+esc(e.message)+'</div>'; }
 }
 
+async function ladeKalender(){
+  const el = document.getElementById('kalender');
+  if (!el) return;
+  try {
+    const d = await api('/calendar');
+    if (!d.configured){
+      el.innerHTML = '<div class="empty">Noch nicht verbunden – sag mir, dann richte ich deinen Google-Kalender ein.</div>';
+      return;
+    }
+    if (d.error){ el.innerHTML = '<div class="err">Kalender nicht erreichbar: '+esc(d.error)+'</div>'; return; }
+    const events = d.events || [];
+    if (!events.length){ el.innerHTML = '<div class="empty">Keine Termine in den nächsten 14 Tagen 🎉</div>'; return; }
+    const heute = new Date();
+    const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    el.innerHTML = events.map(ev => {
+      const dt = new Date(ev.start);
+      const when = days[dt.getDay()]+' '+dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) +
+        (ev.allDay ? '' : ', '+dt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}));
+      return '<div class="row'+(dt.toDateString()===heute.toDateString()?' today-mark':'')+'"><span class="t">'+esc(ev.title)+'</span><span class="muted">'+when+'</span></div>';
+    }).join('');
+  } catch(e){ el.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; }
+}
+
 (function(){
   const view = document.getElementById('readingView');
   const editBox = document.getElementById('readingEdit');
@@ -133,7 +220,10 @@ async function ladeNews(){
 })();
 
 (function(){
-  const el = document.getElementById('todos');
+  const elTodos = document.getElementById('todos');
+  const elBeob = document.getElementById('beob');
+  const elOvTodos = document.getElementById('ovTodos');
+  const elOvBeob = document.getElementById('ovBeobachten');
   let rows = [];
 
   function zeile(r){
@@ -146,18 +236,43 @@ async function ladeNews(){
     '</div>';
   }
 
+  const PRIO_RANK = { Hoch:0, Mittel:1, Niedrig:2 };
+  function sortiert(list){
+    return list.slice().sort((a,b) => {
+      if (!!a.due !== !!b.due) return a.due ? -1 : 1;
+      if (a.due && b.due && a.due !== b.due) return a.due < b.due ? -1 : 1;
+      return (PRIO_RANK[a.prio] ?? 3) - (PRIO_RANK[b.prio] ?? 3);
+    });
+  }
+
+  function zeichne(){
+    const normal = sortiert(rows.filter(r => r.thema !== 'Beobachten'));
+    const beob = sortiert(rows.filter(r => r.thema === 'Beobachten'));
+
+    ov.todos = rows.filter(r => !r.done).length; renderOverview();
+
+    if (elTodos) elTodos.innerHTML = normal.length ? normal.map(zeile).join('') : '<div class="empty">Keine To-Dos</div>';
+    if (elBeob) elBeob.innerHTML = beob.length ? beob.map(zeile).join('') : '<div class="empty">Nichts zu beobachten</div>';
+
+    const normalOffen = normal.filter(r => !r.done);
+    const beobOffen = beob.filter(r => !r.done);
+    if (elOvTodos) elOvTodos.innerHTML = normalOffen.length ? normalOffen.slice(0,6).map(zeile).join('') : '<div class="empty">Alles erledigt ✨</div>';
+    if (elOvBeob) elOvBeob.innerHTML = beobOffen.length ? beobOffen.slice(0,6).map(zeile).join('') : '<div class="empty">Nichts zu beobachten</div>';
+  }
+
   async function laden(){
-    try {
-      rows = await api('/todos');
-      ov.todos = rows.filter(r => !r.done).length; renderOverview();
-      el.innerHTML = rows.length ? rows.map(zeile).join('') : '<div class="empty">Keine To-Dos</div>';
-    } catch(e){ el.innerHTML = '<div class="err">To-Dos nicht ladbar: '+esc(e.message)+'</div>'; }
+    try { rows = await api('/todos'); zeichne(); }
+    catch(e){
+      const msg = '<div class="err">To-Dos nicht ladbar: '+esc(e.message)+'</div>';
+      [elTodos, elBeob, elOvTodos, elOvBeob].forEach(el => { if (el) el.innerHTML = msg; });
+    }
   }
   window.ladeTodos = laden;
   laden();
 
-  el.addEventListener('click', async ev => {
+  document.addEventListener('click', async ev => {
     const cb = ev.target.closest('.tcb'); if (!cb) return;
+    if (!cb.closest('#todos, #beob, #ovTodos, #ovBeobachten')) return;
     const id = +cb.closest('.row').dataset.id;
     const r = rows.find(x => x.id === id); if (!r) return;
     cb.textContent = '…';
@@ -383,13 +498,13 @@ function seiteAuffrischen(id){
   else if (id === 'todos'){ if (window.ladeTodos) window.ladeTodos(); }
   else if (id === 'disziplin'){ if (window.ladeReading) window.ladeReading(); }
   else if (id === 'news'){ ladeMacro(); ladeNews(); }
-  else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); }
+  else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); ladeKalender(); if (window.ladeTodos) window.ladeTodos(); }
 }
 
 document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });
 document.querySelectorAll('nav.side button[data-page]').forEach(b =>
   b.addEventListener('click', () => seiteAuffrischen(b.dataset.page)));
 
-ladeMacro(); ladeNews(); ladeHistorie();
+ladeMacro(); ladeNews(); ladeHistorie(); ladeKalender();
 renderLivePos().then(() => { letzteAktualisierung = Date.now(); });
 setInterval(() => vielleichtAuffrischen(), AKTUALISIERUNG_MS);
