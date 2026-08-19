@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life OS – Colin</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="shell">
+  <nav class="side">
+    <div class="brand">Life OS</div>
+    <button data-page="uebersicht" class="active"><span class="ico">🏠</span>Übersicht</button>
+    <button data-page="disziplin"><span class="ico">📖</span>Täglich lesen</button>
+    <button data-page="todos"><span class="ico">✅</span>To-Dos</button>
+    <button data-page="news"><span class="ico">📰</span>News</button>
+    <button data-page="trading"><span class="ico">📈</span>Trading</button>
+    <button id="logoutBtn" style="margin-top:16px;color:#9ca3af"><span class="ico">🚪</span>Abmelden</button>
+  </nav>
+
+  <main>
+    <header class="top">
+      <h1 id="greeting">Life OS<span>.</span></h1>
+      <div class="date" id="dateline"></div>
+    </header>
+
+    <section class="page active" id="page-uebersicht">
+      <div class="grid">
+        <div class="card wide">
+          <h2>Auf einen Blick</h2>
+          <div class="stats" id="ovStats"><div class="empty">Lade…</div></div>
+        </div>
+        <div class="card wide" id="tradingTotalCard" style="display:none">
+          <h2>Σ Gesamt <span class="sub">realisiert ± offene Positionen</span></h2>
+          <div id="tradingTotal"></div>
+        </div>
+        <div class="card wide">
+          <h2>🌍 Marktlage <span class="sub" id="macroStamp">von Claude recherchiert</span></h2>
+          <div id="macro"><div class="empty">Noch keine Marktlage eingetragen</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-disziplin">
+      <div class="grid">
+        <div class="card wide">
+          <h2>📖 Täglich lesen</h2>
+          <div id="readingView"></div>
+          <button class="btn" id="editReadingBtn" style="margin-top:10px">Bearbeiten</button>
+          <div id="readingEdit" style="display:none;margin-top:10px">
+            <textarea id="readingTa" style="width:100%;min-height:320px;font-family:inherit;font-size:14px;
+              padding:12px;border:1px solid var(--line);border-radius:10px"></textarea>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button class="btn" id="saveReadingBtn">Speichern</button>
+              <button class="btn ghost" id="cancelReadingBtn">Abbrechen</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-todos">
+      <div class="grid">
+        <div class="card wide">
+          <h2>✅ To-Dos</h2>
+          <form class="addbar" id="todoAdd" autocomplete="off">
+            <input type="text" id="ntText" placeholder="Neue Aufgabe…" maxlength="200">
+            <div class="addrow">
+              <input type="date" id="ntDue">
+              <select id="ntThema">
+                <option value="">Thema…</option>
+                <option>Trading</option><option>Beobachten</option><option>Sport</option>
+                <option>Arbeit</option><option>Privat</option><option>Sonstiges</option>
+              </select>
+              <button type="submit" id="ntBtn">Hinzufügen</button>
+            </div>
+          </form>
+          <div id="todos"><div class="empty">Lade…</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-news">
+      <div class="grid">
+        <div class="card wide">
+          <h2>🌍 Marktlage</h2>
+          <div id="macroFull"><div class="empty">Noch keine Marktlage eingetragen</div></div>
+        </div>
+        <div class="card wide">
+          <h2>📰 Markt-News</h2>
+          <div id="news"><div class="empty">Noch keine News eingetragen</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-trading">
+      <div class="grid">
+        <div class="card wide" id="tradingTotalCard2" style="display:none">
+          <h2>Σ Gesamt <span class="sub">realisiert ± offene Positionen</span></h2>
+          <div id="tradingTotal2"></div>
+        </div>
+        <div class="card wide">
+          <h2>🔴 Live-Positionen <button id="refreshPrices" class="btn">Kurse aktualisieren</button></h2>
+          <div id="livepos"><div class="empty">Lade…</div></div>
+        </div>
+        <div class="card wide">
+          <h2>➕ Trade eintragen</h2>
+          <div id="newTradeForm"></div>
+        </div>
+        <div class="card wide">
+          <h2>📈 Trade-Historie</h2>
+          <div class="stats" id="tstats"></div>
+          <div id="trades"><div class="empty">Lade…</div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
