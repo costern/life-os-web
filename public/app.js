@@ -428,12 +428,14 @@ async function renderLivePos(){
         pnlHtml = '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(pnl)+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</span>';
       } else allPriced = false;
       const beSchon = o.sl != null && avg > 0 && Math.abs(o.sl - avg) < avg*0.0008;
-      const slTxt = o.sl != null ? (beSchon ? o.sl + ' <span class="badge green">BE</span>' : String(o.sl)) : '–';
+      const slTxt = o.sl == null ? '<span class="muted">SL –</span>'
+        : beSchon ? '<span class="badge amber">BE</span> '+o.sl
+        : '<span class="badge red">SL</span> '+o.sl;
       parts.push(
         '<div class="row"><span class="t">'+esc(o.asset)+' '+esc(o.side)+' <span class="muted">@ '+
         avg.toLocaleString('de-DE',{maximumFractionDigits:4})+(last!=null?' → '+last.toLocaleString('de-DE',{maximumFractionDigits:4}):'')+
         '</span></span>'+pnlHtml+'</div>' +
-        '<div class="muted" style="padding:0 0 6px 0">'+esc(o.name||'')+' · SL '+slTxt+' · TP '+(o.tp??'–')+
+        '<div class="muted" style="padding:0 0 6px 0">'+esc(o.name||'')+' · '+slTxt+' · TP '+(o.tp??'–')+
         ' · <span class="lp-toggle" role="button" data-idx="'+idx+'">verwalten</span></div>' +
         '<div class="lp-panel" data-idx="'+idx+'">' +
           '<div class="lp-line">' +
