@@ -321,7 +321,7 @@ document.addEventListener('click', async ev => {
   }
 });
 
-document.getElementById('refreshPrices').addEventListener('click', renderLivePos);
+document.getElementById('refreshPrices').addEventListener('click', () => vielleichtAuffrischen(true));
 
 (function(){
   const el = document.getElementById('newTradeForm');
@@ -355,5 +355,28 @@ document.getElementById('refreshPrices').addEventListener('click', renderLivePos
   });
 })();
 
-ladeMacro(); ladeNews(); ladeHistorie(); renderLivePos();
-setInterval(renderLivePos, 20000);
+/* Auffrischen nur, wenn der Tab wirklich sichtbar ist und die Trading-Seite offen ist.
+   Sonst würde die Datenbank bei einem dauerhaft offenen Tab nie schlafen gehen und
+   unnötig Rechenstunden der Gratis-Stufe verbrauchen. */
+const AKTUALISIERUNG_MS = 60000;
+let letzteAktualisierung = 0;
+
+function tradingSichtbar(){
+  const p = document.getElementById('page-trading');
+  return document.visibilityState === 'visible' && p && p.classList.contains('active');
+}
+
+async function vielleichtAuffrischen(erzwingen){
+  if (!erzwingen && !tradingSichtbar()) return;
+  if (!erzwingen && Date.now() - letzteAktualisierung < AKTUALISIERUNG_MS - 1000) return;
+  letzteAktualisierung = Date.now();
+  await renderLivePos();
+}
+
+document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });
+document.querySelectorAll('nav.side button[data-page]').forEach(b =>
+  b.addEventListener('click', () => { if (b.dataset.page === 'trading') vielleichtAuffrischen(); }));
+
+ladeMacro(); ladeNews(); ladeHistorie();
+renderLivePos().then(() => { letzteAktualisierung = Date.now(); });
+setInterval(() => vielleichtAuffrischen(), AKTUALISIERUNG_MS);
