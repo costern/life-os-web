@@ -118,6 +118,7 @@ async function ladeNews(){
     try { const d = await api('/reading'); current = d.content_md || ''; renderView(current); }
     catch(e){ view.innerHTML = '<div class="err">Nicht ladbar: '+esc(e.message)+'</div>'; }
   }
+  window.ladeReading = laden;
   laden();
 
   document.getElementById('editReadingBtn').addEventListener('click', () => {
@@ -152,6 +153,7 @@ async function ladeNews(){
       el.innerHTML = rows.length ? rows.map(zeile).join('') : '<div class="empty">Keine To-Dos</div>';
     } catch(e){ el.innerHTML = '<div class="err">To-Dos nicht ladbar: '+esc(e.message)+'</div>'; }
   }
+  window.ladeTodos = laden;
   laden();
 
   el.addEventListener('click', async ev => {
@@ -373,9 +375,20 @@ async function vielleichtAuffrischen(erzwingen){
   await renderLivePos();
 }
 
+/* Beim Wechsel auf eine Seite deren Daten neu holen. Vorher wurden Historie,
+   To-Dos und Marktlage nur ein einziges Mal beim Laden geholt – wer die Seite
+   offen liegen liess, sah dort ewig den alten Stand. */
+function seiteAuffrischen(id){
+  if (id === 'trading'){ vielleichtAuffrischen(); ladeHistorie(); }
+  else if (id === 'todos'){ if (window.ladeTodos) window.ladeTodos(); }
+  else if (id === 'disziplin'){ if (window.ladeReading) window.ladeReading(); }
+  else if (id === 'news'){ ladeMacro(); ladeNews(); }
+  else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); }
+}
+
 document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });
 document.querySelectorAll('nav.side button[data-page]').forEach(b =>
-  b.addEventListener('click', () => { if (b.dataset.page === 'trading') vielleichtAuffrischen(); }));
+  b.addEventListener('click', () => seiteAuffrischen(b.dataset.page)));
 
 ladeMacro(); ladeNews(); ladeHistorie();
 renderLivePos().then(() => { letzteAktualisierung = Date.now(); });
