@@ -377,7 +377,8 @@ async function ladeHistorie(){
     const rows = await api('/trades');
     const closed = rows.filter(r => r.exit != null);
     const withPnl = closed.filter(r => r.pnl != null);
-    const sum = withPnl.reduce((a,r) => a + Number(r.pnl), 0);
+    const teilrealisiert = rows.reduce((a,r) => a + (r.realizedPnl ? Number(r.realizedPnl) : 0), 0);
+    const sum = withPnl.reduce((a,r) => a + Number(r.pnl), 0) + teilrealisiert;
     const wins = withPnl.filter(r => Number(r.pnl) > 0).length;
     ov.sumPnl = sum; renderOverview();
     document.getElementById('tstats').innerHTML =
@@ -387,7 +388,8 @@ async function ladeHistorie(){
     el.innerHTML = rows.slice(0,15).map(r => (
       '<div class="row"><span class="t">'+esc(r.name||r.asset)+'</span>' +
       '<span class="badge">'+esc(r.asset)+' '+esc(r.side)+'</span>' +
-      (r.exit==null ? '<span class="badge amber">LIVE</span>'
+      (r.exit==null
+        ? '<span class="badge amber">LIVE</span>' + (r.realizedPnl ? ' <span class="pnl-pos">Teilgewinn '+fmt(r.realizedPnl)+'</span>' : '')
         : (r.pnl!=null ? '<span class="'+(r.pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(r.pnl)+'</span>' : '<span class="muted">PnL fehlt</span>')) +
       '</div>'
     )).join('') || '<div class="empty">Noch keine Trades</div>';
@@ -450,6 +452,7 @@ async function renderLivePos(){
         avg.toLocaleString('de-DE',{maximumFractionDigits:4})+(last!=null?' → '+last.toLocaleString('de-DE',{maximumFractionDigits:4}):'')+
         '</span></span>'+pnlHtml+'</div>' +
         '<div class="muted" style="padding:0 0 6px 0">'+esc(o.name||'')+' · '+slTxt+' · TP '+(o.tp??'–')+
+        (o.realizedPnl ? ' · <span class="pnl-pos">realisiert '+fmt(o.realizedPnl)+'</span>' : '') +
         ' · <span class="lp-toggle" role="button" data-idx="'+idx+'">verwalten</span></div>' +
         '<div class="lp-panel" data-idx="'+idx+'">' +
           '<div class="lp-line">' +

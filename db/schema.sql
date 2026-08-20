@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS trades (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS realized_pnl NUMERIC DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_trades_open ON trades ((exit_price IS NULL));
 
 CREATE TABLE IF NOT EXISTS todos (

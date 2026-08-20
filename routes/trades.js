@@ -7,7 +7,7 @@ function rowOut(r) {
     id: r.id, asset: r.asset, ticker: r.ticker, name: r.trade_name, side: r.side,
     entry1: num(r.entry1), entry2: num(r.entry2), size1: num(r.size1), size2: num(r.size2),
     sl: num(r.sl), tp: num(r.tp), exit: num(r.exit_price), pnl: num(r.pnl),
-    fundingFees: num(r.funding_fees), strategy: r.strategy, riskUsd: num(r.risk_usd),
+    fundingFees: num(r.funding_fees), realizedPnl: num(r.realized_pnl), strategy: r.strategy, riskUsd: num(r.risk_usd),
     openedAt: r.opened_at, closedAt: r.closed_at, source: r.source
   };
 }
@@ -41,7 +41,9 @@ router.patch('/:id', async (req, res) => {
   const b = req.body || {};
   const fields = []; const vals = []; let i = 1;
   for (const [key, col] of [['sl','sl'],['tp','tp'],['exit','exit_price'],['pnl','pnl'],
-                             ['fundingFees','funding_fees'],['closedAt','closed_at']]) {
+                             ['fundingFees','funding_fees'],['closedAt','closed_at'],
+                             ['entry1','entry1'],['entry2','entry2'],['size1','size1'],['size2','size2'],
+                             ['realizedPnl','realized_pnl']]) {
     if (b[key] !== undefined) { fields.push(`${col} = $${i++}`); vals.push(b[key]); }
   }
   if (!fields.length) return res.status(400).json({ error: 'nichts zu ändern' });
