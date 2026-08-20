@@ -24,7 +24,10 @@ router.get('/:symbol', async (req, res) => {
 
     if (!d) return res.status(502).json({ error: 'Kein Kurs verfügbar für ' + symbol, raw: data });
 
-    const last = parseFloat(d.a ?? d.k ?? d.b ?? d.last);
+    // Bid/Ask-Mittelwert liegt in der Regel naeher am "Mark Price" von gehebelten
+    // Positionen als der letzte Trade, gerade bei duennerem Orderbuch/schnellen Bewegungen.
+    const bid = parseFloat(d.b), ask = parseFloat(d.k);
+    const last = (isFinite(bid) && isFinite(ask)) ? (bid + ask) / 2 : parseFloat(d.a ?? d.k ?? d.b ?? d.last);
     if (!isFinite(last)) return res.status(502).json({ error: 'Unerwartetes Kursformat', raw: d });
 
     res.json({
