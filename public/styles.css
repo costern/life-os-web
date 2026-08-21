@@ -103,3 +103,8 @@ a { color:var(--accent); }
   padding:6px 12px; cursor:pointer; background:var(--accent); color:#fff; }
 .todo-panel button.ghost { background:#e7e9ee; color:#4b5563; }
 .te-msg { font-size:12px; } .te-msg.bad { color:var(--red); }
+.tabbar { display:flex; gap:6px; margin-bottom:14px; }
+.tab { font-family:inherit; font-size:13px; font-weight:500; background:none; border:none;
+  color:var(--muted); padding:8px 14px; border-radius:99px; cursor:pointer; }
+.tab:hover { background:#eceef2; }
+.tab.active { background:var(--accent); color:#fff; }

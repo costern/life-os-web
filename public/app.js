@@ -226,6 +226,7 @@ async function ladeKalender(){
   const elOvBeob = document.getElementById('ovBeobachten');
   const THEMEN_LISTE = ['Trading','Beobachten','Sport','Arbeit','Privat','Sonstiges'];
   let rows = [];
+  let ansicht = 'offen';
 
   function panel(r){
     const themaOpts = '<option value="">Thema…</option>' + THEMEN_LISTE.map(th =>
@@ -271,13 +272,16 @@ async function ladeKalender(){
   }
 
   function zeichne(){
-    const normal = sortiert(rows.filter(r => r.thema !== 'Beobachten'));
-    const beob = sortiert(rows.filter(r => r.thema === 'Beobachten'));
+    const gefiltert = rows.filter(r => ansicht === 'erledigt' ? r.done : !r.done);
+    const normal = sortiert(gefiltert.filter(r => r.thema !== 'Beobachten'));
+    const beob = sortiert(gefiltert.filter(r => r.thema === 'Beobachten'));
 
     ov.todos = rows.filter(r => !r.done).length; renderOverview();
 
-    if (elTodos) elTodos.innerHTML = normal.length ? normal.map(zeile).join('') : '<div class="empty">Keine To-Dos</div>';
-    if (elBeob) elBeob.innerHTML = beob.length ? beob.map(zeile).join('') : '<div class="empty">Nichts zu beobachten</div>';
+    if (elTodos) elTodos.innerHTML = normal.length ? normal.map(zeile).join('')
+      : '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Keine offenen To-Dos')+'</div>';
+    if (elBeob) elBeob.innerHTML = beob.length ? beob.map(zeile).join('')
+      : '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Nichts zu beobachten')+'</div>';
 
     const normalOffen = normal.filter(r => !r.done);
     const beobOffen = beob.filter(r => !r.done);
@@ -294,6 +298,14 @@ async function ladeKalender(){
   }
   window.ladeTodos = laden;
   laden();
+
+  document.querySelectorAll('.tabbar .tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      ansicht = btn.dataset.ansicht;
+      document.querySelectorAll('.tabbar .tab').forEach(b => b.classList.toggle('active', b === btn));
+      zeichne();
+    });
+  });
 
   document.addEventListener('click', async ev => {
     if (!ev.target.closest('#todos, #beob, #ovTodos, #ovBeobachten')) return;
