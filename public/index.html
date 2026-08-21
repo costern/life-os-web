@@ -172,6 +172,15 @@
 
       <div id="tradingSub-portfolio" style="display:none">
         <div class="grid">
+          <div class="card wide" style="padding-bottom:6px">
+            <div class="tabbar" id="pfTabs"></div>
+            <form id="pfNewPortfolioForm" style="display:flex;gap:6px;margin-top:-6px">
+              <input type="text" id="pfNewPortfolioName" placeholder="Neues Portfolio…" maxlength="60"
+                style="font-family:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);
+                border-radius:8px;background:#fbfbfc;flex:0 0 200px">
+              <button type="submit" class="btn ghost">+ Portfolio anlegen</button>
+            </form>
+          </div>
           <div class="card wide">
             <h2>🥧 Portfolio-Verteilung <span class="sub" id="pfStamp"></span></h2>
             <div id="pfChart"><div class="empty">Lade…</div></div>

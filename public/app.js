@@ -660,7 +660,9 @@ document.getElementById('refreshPrices').addEventListener('click', () => viellei
   const elStamp = document.getElementById('pfStamp');
   const elForm = document.getElementById('pfForm');
   let holdings = [];
-  let geladen = false;
+  let portfolios = [];
+  let aktivesPortfolioId = null;
+  const elPfTabs = document.getElementById('pfTabs');
 
   if (tabs.length){
     tabs.forEach(btn => btn.addEventListener('click', () => {
@@ -668,9 +670,56 @@ document.getElementById('refreshPrices').addEventListener('click', () => viellei
       const sub = btn.dataset.sub;
       posEl.style.display = sub === 'positionen' ? '' : 'none';
       pfEl.style.display = sub === 'portfolio' ? '' : 'none';
-      if (sub === 'portfolio') ladePortfolio();
+      if (sub === 'portfolio') ladePortfolioListe();
     }));
   }
+
+  async function ladePortfolioListe(){
+    try { portfolios = await api('/portfolios'); }
+    catch(e){ if (elPfTabs) elPfTabs.innerHTML = '<div class="err">Portfolios nicht ladbar: '+esc(e.message)+'</div>'; return; }
+    if (!portfolios.some(p => p.id === aktivesPortfolioId)) {
+      aktivesPortfolioId = portfolios.length ? portfolios[0].id : null;
+    }
+    renderPfTabs();
+    ladePortfolio();
+  }
+
+  function renderPfTabs(){
+    if (!elPfTabs) return;
+    elPfTabs.innerHTML = portfolios.map(p =>
+      '<button type="button" class="tab'+(p.id===aktivesPortfolioId?' active':'')+'" data-id="'+p.id+'">'+esc(p.name)+'</button>'
+    ).join('') + (portfolios.length > 1
+      ? '<span class="icon-btn del" id="pfDelBtn" title="Aktives Portfolio löschen" style="margin-left:6px">🗑</span>' : '');
+    elPfTabs.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => {
+      aktivesPortfolioId = +btn.dataset.id;
+      renderPfTabs();
+      ladePortfolio();
+    }));
+    const delBtn = document.getElementById('pfDelBtn');
+    if (delBtn) delBtn.addEventListener('click', async () => {
+      if (delBtn.dataset.confirm !== '1'){
+        delBtn.dataset.confirm = '1'; delBtn.textContent = '⚠️';
+        setTimeout(() => { if (delBtn.dataset.confirm==='1'){ delete delBtn.dataset.confirm; delBtn.textContent='🗑'; } }, 4000);
+        return;
+      }
+      try { await api('/portfolios/'+aktivesPortfolioId, { method:'DELETE' }); await ladePortfolioListe(); }
+      catch(e){ alert('Konnte nicht gelöscht werden: '+e.message); }
+    });
+  }
+
+  const pfNewPortfolioForm = document.getElementById('pfNewPortfolioForm');
+  if (pfNewPortfolioForm) pfNewPortfolioForm.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const input = document.getElementById('pfNewPortfolioName');
+    const name = input.value.trim();
+    if (!name) return;
+    try {
+      const p = await api('/portfolios', { method:'POST', body: JSON.stringify({ name }) });
+      input.value = '';
+      aktivesPortfolioId = p.id;
+      await ladePortfolioListe();
+    } catch(e){ alert('Konnte nicht angelegt werden: '+e.message); }
+  });
 
   function panel(h){
     return '<div class="todo-panel" data-id="'+h.id+'">' +
@@ -709,10 +758,10 @@ document.getElementById('refreshPrices').addEventListener('click', () => viellei
   }
 
   async function ladePortfolio(){
-    geladen = true;
+    if (!aktivesPortfolioId) { elChart.innerHTML = ''; elList.innerHTML = ''; return; }
     elChart.innerHTML = '<div class="empty">Lade…</div>';
     elList.innerHTML = '<div class="empty">Lade…</div>';
-    try { holdings = await api('/portfolio'); }
+    try { holdings = await api('/portfolio?portfolioId='+aktivesPortfolioId); }
     catch(e){
       elChart.innerHTML = '<div class="err">Portfolio nicht ladbar: '+esc(e.message)+'</div>';
       elList.innerHTML = '';
@@ -790,6 +839,7 @@ document.getElementById('refreshPrices').addEventListener('click', () => viellei
     const ticker = document.getElementById('pfTicker').value.trim();
     try {
       await api('/portfolio', { method:'POST', body: JSON.stringify({
+        portfolioId: aktivesPortfolioId,
         asset, ticker: ticker || asset,
         amount: parseFloat(document.getElementById('pfAmount').value),
         buyPrice: parseFloat(document.getElementById('pfBuyPrice').value) || null,

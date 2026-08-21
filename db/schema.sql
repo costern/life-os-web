@@ -71,6 +71,13 @@ CREATE TABLE IF NOT EXISTS daily_reading (
 );
 INSERT INTO daily_reading (id, content_md) VALUES (1, '') ON CONFLICT (id) DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS portfolios (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO portfolios (name) SELECT 'Portfolio 1' WHERE NOT EXISTS (SELECT 1 FROM portfolios);
+
 CREATE TABLE IF NOT EXISTS portfolio (
   id SERIAL PRIMARY KEY,
   asset TEXT NOT NULL,
@@ -83,3 +90,4 @@ CREATE TABLE IF NOT EXISTS portfolio (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS portfolio_id INTEGER REFERENCES portfolios(id) DEFAULT 1;
