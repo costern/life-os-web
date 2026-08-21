@@ -322,9 +322,9 @@ async function ladeKalender(){
 
     const editTgl = ev.target.closest('.todo-edit-toggle');
     if (editTgl){
-      const id = editTgl.closest('.row').dataset.id;
-      const p = document.querySelector('.todo-panel[data-id="'+id+'"]');
-      if (p) p.classList.toggle('on');
+      const row = editTgl.closest('.row');
+      const p = row && row.nextElementSibling;
+      if (p && p.classList.contains('todo-panel')) p.classList.toggle('on');
       return;
     }
 
