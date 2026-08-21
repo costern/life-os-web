@@ -49,13 +49,14 @@
           <h2>✅ To-Dos <span class="sub">alles unter „To-Dos“</span></h2>
           <div id="ovTodos"><div class="empty">Lade…</div></div>
         </div>
-        <div class="card wide">
-          <h2>🌍 Marktlage <span class="sub" id="macroStamp">von Claude recherchiert</span></h2>
-          <div id="macro"><div class="empty">Noch keine Marktlage eingetragen</div></div>
-        </div>
-        <div class="card wide">
-          <h2>👁️ Beobachten <span class="sub">anlegen unter „To-Dos“ mit Thema „Beobachten“</span></h2>
+        <div class="card">
+          <h2>👁️ Beobachten <span class="sub">Thema „Beobachten“</span></h2>
           <div id="ovBeobachten"><div class="empty">Lade…</div></div>
+        </div>
+        <div class="card wide" id="macroCard">
+          <h2><span class="macro-toggle" id="macroToggle" role="button"><span class="macro-arrow">▾</span> 🌍 Marktlage</span>
+            <span class="sub" id="macroStamp">von Claude recherchiert</span></h2>
+          <div id="macro"><div class="empty">Noch keine Marktlage eingetragen</div></div>
         </div>
       </div>
     </section>
@@ -108,6 +109,21 @@
         <div class="card">
           <h2>👁️ Beobachten <span class="sub">Thema „Beobachten“ – links anlegen</span></h2>
           <div id="beob"><div class="empty">Lade…</div></div>
+        </div>
+        <div class="card wide">
+          <h2>🗓️ Kalender
+            <span class="cal-nav">
+              <button type="button" id="calPrev">‹</button>
+              <span id="calMonthLabel"></span>
+              <button type="button" id="calNext">›</button>
+            </span>
+          </h2>
+          <div class="cal-weekdays">
+            <div class="cal-weekday">Mo</div><div class="cal-weekday">Di</div><div class="cal-weekday">Mi</div>
+            <div class="cal-weekday">Do</div><div class="cal-weekday">Fr</div><div class="cal-weekday">Sa</div>
+            <div class="cal-weekday">So</div>
+          </div>
+          <div class="cal-grid" id="calGrid"><div class="empty">Lade…</div></div>
         </div>
       </div>
     </section>

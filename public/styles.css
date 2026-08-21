@@ -108,3 +108,20 @@ a { color:var(--accent); }
   color:var(--muted); padding:8px 14px; border-radius:99px; cursor:pointer; }
 .tab:hover { background:#eceef2; }
 .tab.active { background:var(--accent); color:#fff; }
+.macro-toggle { cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+.macro-arrow { display:inline-block; transition:transform .15s; font-size:10px; }
+#macroCard.collapsed .macro-arrow { transform:rotate(-90deg); }
+#macroCard.collapsed #macro { display:none; }
+.cal-nav { display:inline-flex; align-items:center; gap:8px; font-weight:400; letter-spacing:0; text-transform:none; font-size:13px; }
+.cal-nav button { font-family:inherit; font-size:13px; background:#e7e9ee; color:#4b5563; border:none;
+  border-radius:8px; padding:3px 10px; cursor:pointer; }
+.cal-nav button:hover { background:#dcdfe6; }
+.cal-weekdays { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+.cal-weekday { font-size:11px; color:var(--muted); text-align:center; padding:2px 0 6px; }
+.cal-day { min-height:82px; border:1px solid var(--line); border-radius:9px; padding:5px 6px; font-size:11.5px; background:#fff; }
+.cal-day.other { opacity:.35; }
+.cal-day.today { border-color:var(--accent); background:#eef2ff; }
+.cal-day .dnum { font-size:12px; font-weight:600; margin-bottom:3px; }
+.cal-ev { background:#eef2ff; color:var(--accent); border-radius:5px; padding:1px 5px; margin-top:2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

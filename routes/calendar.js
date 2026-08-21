@@ -92,10 +92,12 @@ router.get('/', async (req, res) => {
   try {
     const token = await holeAccessToken();
     const calendarId = encodeURIComponent(process.env.GOOGLE_CALENDAR_ID);
-    const timeMin = new Date().toISOString();
-    const timeMax = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    // Optionaler Zeitraum fuer z.B. eine Monatsansicht; sonst Standard: naechste 14 Tage.
+    const timeMin = req.query.start ? new Date(req.query.start).toISOString() : new Date().toISOString();
+    const timeMax = req.query.end ? new Date(req.query.end).toISOString() : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    const maxResults = req.query.start ? 250 : 15;
     const q = '?timeMin=' + encodeURIComponent(timeMin) + '&timeMax=' + encodeURIComponent(timeMax) +
-      '&singleEvents=true&orderBy=startTime&maxResults=15';
+      '&singleEvents=true&orderBy=startTime&maxResults=' + maxResults;
     const data = await googleFetch('/calendar/v3/calendars/' + calendarId + '/events' + q, token);
     const events = (data.items || []).map(e => ({
       id: e.id,

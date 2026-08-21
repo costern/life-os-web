@@ -98,6 +98,19 @@ async function api(path, opts) {
   if (qa) qa.textContent = '— ' + q[1];
 })();
 
+(function(){
+  const card = document.getElementById('macroCard');
+  const toggle = document.getElementById('macroToggle');
+  if (!card || !toggle) return;
+  let eingeklappt = false;
+  try { eingeklappt = localStorage.getItem('macro-collapsed') === '1'; } catch(e){}
+  if (eingeklappt) card.classList.add('collapsed');
+  toggle.addEventListener('click', () => {
+    card.classList.toggle('collapsed');
+    try { localStorage.setItem('macro-collapsed', card.classList.contains('collapsed') ? '1' : '0'); } catch(e){}
+  });
+})();
+
 function renderOverview(){
   const el = document.getElementById('ovStats');
   const parts = [];
@@ -189,6 +202,63 @@ async function ladeKalender(){
     }).join('');
   } catch(e){ el.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; }
 }
+
+/* ---------- Kalender: Monatsansicht auf der To-Dos-Seite ---------- */
+(function(){
+  const grid = document.getElementById('calGrid');
+  const label = document.getElementById('calMonthLabel');
+  if (!grid || !label) return;
+  let aktMonat = new Date(); aktMonat.setDate(1); aktMonat.setHours(0,0,0,0);
+
+  function montag(d){
+    const t = new Date(d);
+    const tag = (t.getDay() + 6) % 7; // 0 = Montag
+    t.setDate(t.getDate() - tag);
+    t.setHours(0,0,0,0);
+    return t;
+  }
+  function evDatum(ev){
+    if (ev.allDay){ const [y,m,d] = ev.start.split('-').map(Number); return new Date(y, m-1, d); }
+    return new Date(ev.start);
+  }
+
+  async function laden(){
+    grid.innerHTML = '<div class="empty">Lade…</div>';
+    const monatsStart = new Date(aktMonat.getFullYear(), aktMonat.getMonth(), 1);
+    const monatsEnde = new Date(aktMonat.getFullYear(), aktMonat.getMonth()+1, 0);
+    const gridStart = montag(monatsStart);
+    const gridEnde = new Date(montag(monatsEnde)); gridEnde.setDate(gridEnde.getDate()+6);
+    label.textContent = aktMonat.toLocaleDateString('de-DE',{month:'long', year:'numeric'});
+
+    let events = [];
+    try {
+      const q = '?start='+encodeURIComponent(gridStart.toISOString())+'&end='+encodeURIComponent(new Date(gridEnde.getTime()+864e5).toISOString());
+      const d = await api('/calendar'+q);
+      if (!d.configured){ grid.innerHTML = '<div class="empty">Kalender noch nicht verbunden – sag mir Bescheid, dann richte ich das ein.</div>'; return; }
+      if (d.error){ grid.innerHTML = '<div class="err">Kalender nicht erreichbar: '+esc(d.error)+'</div>'; return; }
+      events = d.events || [];
+    } catch(e){ grid.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; return; }
+
+    const heute = new Date(); heute.setHours(0,0,0,0);
+    const tage = [];
+    for (let d = new Date(gridStart); d <= gridEnde; d.setDate(d.getDate()+1)) tage.push(new Date(d));
+
+    grid.innerHTML = tage.map(tag => {
+      const inMonat = tag.getMonth() === aktMonat.getMonth();
+      const istHeute = tag.toDateString() === heute.toDateString();
+      const tagEvents = events.filter(ev => evDatum(ev).toDateString() === tag.toDateString());
+      const evHtml = tagEvents.slice(0,3).map(ev => '<div class="cal-ev" title="'+esc(ev.title)+'">'+esc(ev.title)+'</div>').join('') +
+        (tagEvents.length > 3 ? '<div class="muted">+'+(tagEvents.length-3)+' mehr</div>' : '');
+      return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
+    }).join('');
+  }
+
+  document.getElementById('calPrev').addEventListener('click', () => { aktMonat.setMonth(aktMonat.getMonth()-1); laden(); });
+  document.getElementById('calNext').addEventListener('click', () => { aktMonat.setMonth(aktMonat.getMonth()+1); laden(); });
+
+  window.ladeKalenderMonat = laden;
+  laden();
+})();
 
 (function(){
   const view = document.getElementById('readingView');
@@ -601,7 +671,7 @@ async function vielleichtAuffrischen(erzwingen){
    offen liegen liess, sah dort ewig den alten Stand. */
 function seiteAuffrischen(id){
   if (id === 'trading'){ vielleichtAuffrischen(); ladeHistorie(); }
-  else if (id === 'todos'){ if (window.ladeTodos) window.ladeTodos(); }
+  else if (id === 'todos'){ if (window.ladeTodos) window.ladeTodos(); if (window.ladeKalenderMonat) window.ladeKalenderMonat(); }
   else if (id === 'disziplin'){ if (window.ladeReading) window.ladeReading(); }
   else if (id === 'news'){ ladeMacro(); ladeNews(); }
   else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); ladeKalender(); if (window.ladeTodos) window.ladeTodos(); }
