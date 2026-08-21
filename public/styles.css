@@ -125,3 +125,13 @@ a { color:var(--accent); }
 .cal-day .dnum { font-size:12px; font-weight:600; margin-bottom:3px; }
 .cal-ev { background:#eef2ff; color:var(--accent); border-radius:5px; padding:1px 5px; margin-top:2px;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.donut-wrap { display:flex; align-items:center; gap:26px; flex-wrap:wrap; }
+.donut-outer { position:relative; width:170px; height:170px; flex:0 0 170px; }
+.donut { width:170px; height:170px; border-radius:50%; }
+.donut-hole { position:absolute; inset:24px; border-radius:50%; background:var(--card);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+.donut-hole .v { font-size:16px; font-weight:700; } .donut-hole .l { font-size:10.5px; color:var(--muted); margin-top:2px; }
+.pf-legend { flex:1; min-width:180px; display:flex; flex-direction:column; gap:8px; }
+.pf-legend-item { display:flex; align-items:center; gap:8px; font-size:13px; }
+.pf-legend-item .t { flex:1; }
+.pf-dot { width:10px; height:10px; border-radius:99px; flex:0 0 10px; }

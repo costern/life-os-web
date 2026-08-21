@@ -70,3 +70,16 @@ CREATE TABLE IF NOT EXISTS daily_reading (
   CONSTRAINT single_row_reading CHECK (id = 1)
 );
 INSERT INTO daily_reading (id, content_md) VALUES (1, '') ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS portfolio (
+  id SERIAL PRIMARY KEY,
+  asset TEXT NOT NULL,
+  ticker TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  buy_price NUMERIC,
+  wallet TEXT,
+  chain TEXT,
+  notiz TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -648,6 +648,209 @@ document.getElementById('refreshPrices').addEventListener('click', () => viellei
   });
 })();
 
+/* ---------- Portfolio: eigener Reiter auf der Trading-Seite fuer tatsaechlich
+   gehaltene Coins (Spot/Wallets) - getrennt von den gehebelten Positionen oben. ---------- */
+(function(){
+  const tabs = document.querySelectorAll('#tradingTabs .tab');
+  const posEl = document.getElementById('tradingSub-positionen');
+  const pfEl = document.getElementById('tradingSub-portfolio');
+  const FARBEN = ['#4f46e5','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#db2777','#65a30d','#0284c7','#ea580c'];
+  const elChart = document.getElementById('pfChart');
+  const elList = document.getElementById('pfList');
+  const elStamp = document.getElementById('pfStamp');
+  const elForm = document.getElementById('pfForm');
+  let holdings = [];
+  let geladen = false;
+
+  if (tabs.length){
+    tabs.forEach(btn => btn.addEventListener('click', () => {
+      tabs.forEach(b => b.classList.toggle('active', b === btn));
+      const sub = btn.dataset.sub;
+      posEl.style.display = sub === 'positionen' ? '' : 'none';
+      pfEl.style.display = sub === 'portfolio' ? '' : 'none';
+      if (sub === 'portfolio') ladePortfolio();
+    }));
+  }
+
+  function panel(h){
+    return '<div class="todo-panel" data-id="'+h.id+'">' +
+      '<div class="tp-line">' +
+        '<input type="number" step="any" class="pf-amount" value="'+(h.amount??'')+'" placeholder="Menge">' +
+        '<input type="number" step="any" class="pf-buy" value="'+(h.buyPrice??'')+'" placeholder="Kaufpreis Ø">' +
+      '</div>' +
+      '<div class="tp-line">' +
+        '<input type="text" class="pf-wallet" value="'+esc(h.wallet||'')+'" placeholder="Wallet (optional)">' +
+        '<input type="text" class="pf-chain" value="'+esc(h.chain||'')+'" placeholder="Chain (optional)">' +
+      '</div>' +
+      '<div class="tp-line">' +
+        '<button type="button" class="pf-save">Speichern</button>' +
+        '<button type="button" class="pf-cancel ghost">Abbrechen</button>' +
+        '<span class="te-msg"></span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function zeile(h, preis, farbe){
+    const last = preis && isFinite(preis.last) ? preis.last : null;
+    const wert = last!=null ? h.amount*last : null;
+    const kosten = h.buyPrice!=null ? h.amount*h.buyPrice : null;
+    const pnl = (wert!=null && kosten!=null) ? wert-kosten : null;
+    const pnlPct = (pnl!=null && kosten) ? pnl/kosten*100 : null;
+    return '<div class="row" data-id="'+h.id+'">' +
+      '<span class="pf-dot" style="background:'+farbe+'"></span>' +
+      '<span class="t">'+esc(h.asset)+' <span class="muted">'+h.amount+' '+esc(h.ticker)+'</span></span>' +
+      (wert!=null ? '<span>'+fmt(wert).replace('+','')+'</span>' : '<span class="muted">kein Kurs</span>') +
+      (pnlPct!=null ? '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+(pnlPct>=0?'+':'')+pnlPct.toFixed(1)+'%</span>' : '') +
+      '<span class="row-actions">' +
+        '<span class="icon-btn pf-edit-toggle" role="button" title="Bearbeiten">✎</span>' +
+        '<span class="icon-btn del pf-del" role="button" title="Löschen">🗑</span>' +
+      '</span>' +
+    '</div>' + panel(h);
+  }
+
+  async function ladePortfolio(){
+    geladen = true;
+    elChart.innerHTML = '<div class="empty">Lade…</div>';
+    elList.innerHTML = '<div class="empty">Lade…</div>';
+    try { holdings = await api('/portfolio'); }
+    catch(e){
+      elChart.innerHTML = '<div class="err">Portfolio nicht ladbar: '+esc(e.message)+'</div>';
+      elList.innerHTML = '';
+      return;
+    }
+    if (!holdings.length){
+      elChart.innerHTML = '<div class="empty">Noch keine Coins eingetragen – unten hinzufügen.</div>';
+      elList.innerHTML = '<div class="empty">Keine Holdings</div>';
+      elStamp.textContent = '';
+      return;
+    }
+    const preise = {};
+    await Promise.all(holdings.map(async h => { preise[h.id] = await ladePreis(h.ticker || h.asset); }));
+
+    let gesamt = 0, gesamtKosten = 0, allePreise = true;
+    holdings.forEach(h => {
+      const p = preise[h.id];
+      if (p && isFinite(p.last)) gesamt += h.amount*p.last; else allePreise = false;
+      if (h.buyPrice != null) gesamtKosten += h.amount*h.buyPrice;
+    });
+
+    let cursor = 0;
+    const stops = [];
+    holdings.forEach((h, idx) => {
+      const p = preise[h.id];
+      const wert = (p && isFinite(p.last)) ? h.amount*p.last : (h.buyPrice!=null ? h.amount*h.buyPrice : 0);
+      const anteil = gesamt>0 ? wert/gesamt*100 : (holdings.length ? 100/holdings.length : 0);
+      const farbe = FARBEN[idx % FARBEN.length];
+      stops.push(farbe+' '+cursor.toFixed(2)+'% '+(cursor+anteil).toFixed(2)+'%');
+      cursor += anteil;
+    });
+    const gradient = stops.length ? 'conic-gradient('+stops.join(', ')+')' : '#e5e7eb';
+
+    const pnlGesamt = gesamt - gesamtKosten;
+    const pnlPctGesamt = gesamtKosten ? pnlGesamt/gesamtKosten*100 : null;
+
+    elChart.innerHTML =
+      '<div class="donut-wrap">' +
+        '<div class="donut-outer"><div class="donut" style="background:'+gradient+'"></div>' +
+          '<div class="donut-hole"><div class="v">'+fmt(gesamt).replace('+','')+'</div><div class="l">Gesamtwert'+(allePreise?'':' (teilw.)')+'</div></div>' +
+        '</div>' +
+        '<div class="pf-legend">' +
+          holdings.map((h,idx) => {
+            const p = preise[h.id];
+            const wert = (p && isFinite(p.last)) ? h.amount*p.last : null;
+            const anteil = (gesamt>0 && wert!=null) ? (wert/gesamt*100).toFixed(1)+'%' : '–';
+            return '<div class="pf-legend-item"><span class="pf-dot" style="background:'+FARBEN[idx%FARBEN.length]+'"></span>' +
+              '<span class="t">'+esc(h.asset)+'</span><span class="muted">'+anteil+'</span></div>';
+          }).join('') +
+          (pnlPctGesamt!=null ? '<div class="muted" style="margin-top:6px">Ø PnL: <span class="'+(pnlGesamt>=0?'pnl-pos':'pnl-neg')+'">'+(pnlPctGesamt>=0?'+':'')+pnlPctGesamt.toFixed(1)+'%</span></div>' : '') +
+        '</div>' +
+      '</div>';
+
+    elStamp.textContent = holdings.length + ' Coin' + (holdings.length===1?'':'s');
+    elList.innerHTML = holdings.map((h,idx) => zeile(h, preise[h.id], FARBEN[idx%FARBEN.length])).join('');
+  }
+  window.ladePortfolio = ladePortfolio;
+
+  elForm.innerHTML =
+    '<form class="ntform" id="pfNewForm">' +
+      '<input type="text" id="pfAsset" placeholder="Asset (z.B. Solana)" required>' +
+      '<input type="text" id="pfTicker" placeholder="Ticker (z.B. SOL)">' +
+      '<input type="number" step="any" id="pfAmount" placeholder="Menge" required>' +
+      '<input type="number" step="any" id="pfBuyPrice" placeholder="Kaufpreis Ø">' +
+      '<input type="text" id="pfWallet" placeholder="Wallet (optional)">' +
+      '<input type="text" id="pfChain" placeholder="Chain (optional)">' +
+      '<button type="submit" class="btn">Hinzufügen</button>' +
+    '</form><div class="err" id="pfErr" style="display:none"></div>';
+
+  document.getElementById('pfNewForm').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const errEl = document.getElementById('pfErr');
+    errEl.style.display = 'none';
+    const asset = document.getElementById('pfAsset').value.trim();
+    const ticker = document.getElementById('pfTicker').value.trim();
+    try {
+      await api('/portfolio', { method:'POST', body: JSON.stringify({
+        asset, ticker: ticker || asset,
+        amount: parseFloat(document.getElementById('pfAmount').value),
+        buyPrice: parseFloat(document.getElementById('pfBuyPrice').value) || null,
+        wallet: document.getElementById('pfWallet').value.trim() || null,
+        chain: document.getElementById('pfChain').value.trim() || null
+      })});
+      document.getElementById('pfNewForm').reset();
+      ladePortfolio();
+    } catch(e){ errEl.textContent = e.message; errEl.style.display = 'block'; }
+  });
+
+  document.addEventListener('click', async ev => {
+    if (!ev.target.closest('#pfList')) return;
+
+    const editTgl = ev.target.closest('.pf-edit-toggle');
+    if (editTgl){
+      const row = editTgl.closest('.row');
+      const p = row && row.nextElementSibling;
+      if (p && p.classList.contains('todo-panel')) p.classList.toggle('on');
+      return;
+    }
+
+    const del = ev.target.closest('.pf-del');
+    if (del){
+      const id = +del.closest('.row').dataset.id;
+      if (del.dataset.confirm !== '1'){
+        del.dataset.confirm = '1'; del.textContent = '⚠️';
+        setTimeout(() => { if (del.dataset.confirm==='1'){ delete del.dataset.confirm; del.textContent='🗑'; } }, 4000);
+        return;
+      }
+      delete del.dataset.confirm;
+      try { await api('/portfolio/'+id, { method:'DELETE' }); await ladePortfolio(); }
+      catch(e){ alert('Konnte nicht gelöscht werden: '+e.message); }
+      return;
+    }
+
+    const cancel = ev.target.closest('.pf-cancel');
+    if (cancel){ cancel.closest('.todo-panel').classList.remove('on'); return; }
+
+    const save = ev.target.closest('.pf-save');
+    if (save){
+      const p = save.closest('.todo-panel');
+      const id = p.dataset.id;
+      const amount = parseFloat(p.querySelector('.pf-amount').value);
+      const buyPrice = parseFloat(p.querySelector('.pf-buy').value);
+      const wallet = p.querySelector('.pf-wallet').value.trim();
+      const chain = p.querySelector('.pf-chain').value.trim();
+      const msg = p.querySelector('.te-msg');
+      if (!isFinite(amount)){ msg.textContent = 'Menge fehlt'; msg.className = 'te-msg bad'; return; }
+      save.disabled = true; save.textContent = 'speichert…';
+      try {
+        await api('/portfolio/'+id, { method:'PATCH', body: JSON.stringify({
+          amount, buyPrice: isFinite(buyPrice)?buyPrice:null, wallet: wallet||null, chain: chain||null
+        })});
+        await ladePortfolio();
+      } catch(e){ msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg bad'; save.disabled=false; save.textContent='Speichern'; }
+      return;
+    }
+  });
+})();
+
 /* Auffrischen nur, wenn der Tab wirklich sichtbar ist und die Trading-Seite offen ist.
    Sonst würde die Datenbank bei einem dauerhaft offenen Tab nie schlafen gehen und
    unnötig Rechenstunden der Gratis-Stufe verbrauchen. */

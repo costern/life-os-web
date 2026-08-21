@@ -142,24 +142,48 @@
     </section>
 
     <section class="page" id="page-trading">
-      <div class="grid">
-        <div class="card wide" id="tradingTotalCard2" style="display:none">
-          <h2>Σ Gesamt <span class="sub">realisiert ± offene Positionen</span></h2>
-          <div id="tradingTotal2"></div>
+      <div class="tabbar" id="tradingTabs">
+        <button type="button" class="tab active" data-sub="positionen">Positionen</button>
+        <button type="button" class="tab" data-sub="portfolio">Portfolio</button>
+      </div>
+
+      <div id="tradingSub-positionen">
+        <div class="grid">
+          <div class="card wide" id="tradingTotalCard2" style="display:none">
+            <h2>Σ Gesamt <span class="sub">realisiert ± offene Positionen</span></h2>
+            <div id="tradingTotal2"></div>
+          </div>
+          <div class="card wide">
+            <h2>🔴 Live-Positionen <button id="refreshPrices" class="btn">Kurse aktualisieren</button></h2>
+            <div class="muted" id="preisStamp" style="margin-bottom:8px"></div>
+            <div id="livepos"><div class="empty">Lade…</div></div>
+          </div>
+          <div class="card wide">
+            <h2>➕ Trade eintragen</h2>
+            <div id="newTradeForm"></div>
+          </div>
+          <div class="card wide">
+            <h2>📈 Trade-Historie</h2>
+            <div class="stats" id="tstats"></div>
+            <div id="trades"><div class="empty">Lade…</div></div>
+          </div>
         </div>
-        <div class="card wide">
-          <h2>🔴 Live-Positionen <button id="refreshPrices" class="btn">Kurse aktualisieren</button></h2>
-          <div class="muted" id="preisStamp" style="margin-bottom:8px"></div>
-          <div id="livepos"><div class="empty">Lade…</div></div>
-        </div>
-        <div class="card wide">
-          <h2>➕ Trade eintragen</h2>
-          <div id="newTradeForm"></div>
-        </div>
-        <div class="card wide">
-          <h2>📈 Trade-Historie</h2>
-          <div class="stats" id="tstats"></div>
-          <div id="trades"><div class="empty">Lade…</div></div>
+      </div>
+
+      <div id="tradingSub-portfolio" style="display:none">
+        <div class="grid">
+          <div class="card wide">
+            <h2>🥧 Portfolio-Verteilung <span class="sub" id="pfStamp"></span></h2>
+            <div id="pfChart"><div class="empty">Lade…</div></div>
+          </div>
+          <div class="card wide">
+            <h2>➕ Coin hinzufügen</h2>
+            <div id="pfForm"></div>
+          </div>
+          <div class="card wide">
+            <h2>💼 Holdings</h2>
+            <div id="pfList"><div class="empty">Lade…</div></div>
+          </div>
         </div>
       </div>
     </section>

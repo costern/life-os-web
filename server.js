@@ -15,6 +15,7 @@ const pricesRoutes = require('./routes/prices');
 const readingRoutes = require('./routes/reading');
 const exportRoutes = require('./routes/export');
 const calendarRoutes = require('./routes/calendar');
+const portfolioRoutes = require('./routes/portfolio');
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -34,6 +35,7 @@ app.use('/api/reading', requireAuthOrClaude, readingRoutes);
 app.use('/api/prices', requireAuthOrClaude, pricesRoutes);
 app.use('/api/export', requireAuthOrClaude, exportRoutes);
 app.use('/api/calendar', requireAuthOrClaude, calendarRoutes);
+app.use('/api/portfolio', requireAuthOrClaude, portfolioRoutes);
 
 // Statische Seiten: login.html frei, alles andere hinter Login
 app.use('/login.html', express.static(path.join(__dirname, 'public', 'login.html')));
