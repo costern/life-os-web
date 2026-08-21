@@ -754,7 +754,11 @@ document.getElementById('refreshPrices').addEventListener('click', () => viellei
         '<span class="icon-btn pf-edit-toggle" role="button" title="Bearbeiten">✎</span>' +
         '<span class="icon-btn del pf-del" role="button" title="Löschen">🗑</span>' +
       '</span>' +
-    '</div>' + panel(h);
+    '</div>' +
+    (h.buyPrice != null
+      ? '<div class="muted" style="padding:0 0 6px 0">BE-Preis '+fmt(h.buyPrice).replace('+','')+' · Anfangswert '+fmt(kosten).replace('+','')+'</div>'
+      : '') +
+    panel(h);
   }
 
   async function ladePortfolio(){
