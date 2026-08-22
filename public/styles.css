@@ -135,3 +135,7 @@ a { color:var(--accent); }
 .pf-legend-item { display:flex; align-items:center; gap:8px; font-size:13px; }
 .pf-legend-item .t { flex:1; }
 .pf-dot { width:10px; height:10px; border-radius:99px; flex:0 0 10px; }
+.pos-hist-grid { grid-column:1/-1; display:grid; grid-template-columns:1fr; gap:16px; }
+@media (min-width:900px){
+  .pos-hist-grid { grid-template-columns:1fr 1fr; }
+}
