@@ -102,4 +102,14 @@ router.get('/debug-fills', async (req, res) => {
   }
 });
 
+
+router.get('/debug-convert', async (req, res) => {
+  try {
+    const json = await bitget.debugConvertRecord(req.query);
+    res.json(json);
+  } catch (e) {
+    res.status(502).json({ error: e.message, detail: e.detail || null });
+  }
+});
+
 module.exports = router;
