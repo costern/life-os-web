@@ -112,4 +112,15 @@ router.get('/debug-convert', async (req, res) => {
   }
 });
 
+
+router.get('/debug-convert-all', async (req, res) => {
+  try {
+    const windowsBack = Math.min(Number(req.query.windowsBack) || 12, 20);
+    const result = await bitget.fetchAllConvertHistory(windowsBack);
+    res.json(result);
+  } catch (e) {
+    res.status(502).json({ error: e.message, detail: e.detail || null });
+  }
+});
+
 module.exports = router;
