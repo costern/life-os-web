@@ -614,7 +614,16 @@ document.addEventListener('click', async ev => {
   }
 });
 
-document.getElementById('refreshPrices').addEventListener('click', () => vielleichtAuffrischen(true));
+document.getElementById('refreshPrices').addEventListener('click', async (ev) => {
+  const btn = ev.currentTarget;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'lädt…';
+  try { await vielleichtAuffrischen(true); }
+  finally {
+    btn.textContent = 'aktualisiert ✓';
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1200);
+  }
+});
 
 (function(){
   const el = document.getElementById('newTradeForm');
