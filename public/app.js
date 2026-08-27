@@ -798,23 +798,45 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
 
     let cursor = 0;
     const stops = [];
+    const segmente = [];
     holdings.forEach((h, idx) => {
       const p = preise[h.id];
       const wert = (p && isFinite(p.last)) ? h.amount*p.last : (h.buyPrice!=null ? h.amount*h.buyPrice : 0);
       const anteil = gesamt>0 ? wert/gesamt*100 : (holdings.length ? 100/holdings.length : 0);
       const farbe = FARBEN[idx % FARBEN.length];
       stops.push(farbe+' '+cursor.toFixed(2)+'% '+(cursor+anteil).toFixed(2)+'%');
+      segmente.push({ h, anteil, farbe, mitte: cursor + anteil/2 });
       cursor += anteil;
     });
     const gradient = stops.length ? 'conic-gradient('+stops.join(', ')+')' : '#e5e7eb';
+
+    // Ring-Beschriftung: kleine Linien vom Ring nach außen zu Asset+Prozent, wie bei
+    // klassischen Asset-Allocation-Grafiken. Sehr kleine Anteile (<2%) werden übersprungen,
+    // sonst überlappt sich der Text bei vielen Coins.
+    const cx = 150, cy = 150, rRing = 85, rLinie = 95, rText = 122;
+    const beschriftungen = segmente.filter(s => s.anteil >= 2).map(s => {
+      const winkel = (s.mitte / 100) * 2 * Math.PI;
+      const sin = Math.sin(winkel), cos = Math.cos(winkel);
+      const x1 = cx + rRing*sin, y1 = cy - rRing*cos;
+      const x2 = cx + rLinie*sin, y2 = cy - rLinie*cos;
+      const xt = cx + rText*sin, yt = cy - rText*cos;
+      const anchor = xt > cx + 4 ? 'start' : xt < cx - 4 ? 'end' : 'middle';
+      const dx = anchor === 'start' ? 4 : anchor === 'end' ? -4 : 0;
+      return '<line class="donut-label-line" x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'"/>' +
+        '<text class="donut-label-text" x="'+(xt+dx).toFixed(1)+'" y="'+(yt-2).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(s.h.asset)+'</text>' +
+        '<text class="donut-label-pct" x="'+(xt+dx).toFixed(1)+'" y="'+(yt+10).toFixed(1)+'" text-anchor="'+anchor+'">'+s.anteil.toFixed(1)+'%</text>';
+    }).join('');
 
     const pnlGesamt = gesamt - gesamtKosten;
     const pnlPctGesamt = gesamtKosten ? pnlGesamt/gesamtKosten*100 : null;
 
     elChart.innerHTML =
       '<div class="donut-wrap">' +
-        '<div class="donut-outer"><div class="donut" style="background:'+gradient+'"></div>' +
-          '<div class="donut-hole"><div class="v">'+fmt(gesamt).replace('+','')+'</div><div class="l">Gesamtwert'+(allePreise?'':' (teilw.)')+'</div></div>' +
+        '<div class="donut-labelbox">' +
+          '<div class="donut-outer"><div class="donut" style="background:'+gradient+'"></div>' +
+            '<div class="donut-hole"><div class="v">'+fmt(gesamt).replace('+','')+'</div><div class="l">Gesamtwert'+(allePreise?'':' (teilw.)')+'</div></div>' +
+          '</div>' +
+          '<svg class="donut-labels" viewBox="0 0 300 300">'+beschriftungen+'</svg>' +
         '</div>' +
         '<div class="pf-legend">' +
           holdings.map((h,idx) => {

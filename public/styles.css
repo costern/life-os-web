@@ -126,8 +126,14 @@ a { color:var(--accent); }
 .cal-ev { background:#eef2ff; color:var(--accent); border-radius:5px; padding:1px 5px; margin-top:2px;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .donut-wrap { display:flex; align-items:center; gap:26px; flex-wrap:wrap; }
-.donut-outer { position:relative; width:170px; height:170px; flex:0 0 170px; }
+.donut-labelbox { position:relative; width:300px; height:300px; flex:0 0 300px; }
+.donut-outer { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:170px; height:170px; }
 .donut { width:170px; height:170px; border-radius:50%; }
+.donut-labels { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+.donut-label-line { stroke:var(--muted); stroke-width:1; fill:none; opacity:.6; }
+.donut-label-dot { }
+.donut-label-text { font-family:inherit; font-size:11px; fill:var(--ink); }
+.donut-label-pct { font-family:inherit; font-size:10px; fill:var(--muted); }
 .donut-hole { position:absolute; inset:24px; border-radius:50%; background:var(--card);
   display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
 .donut-hole .v { font-size:16px; font-weight:700; } .donut-hole .l { font-size:10.5px; color:var(--muted); margin-top:2px; }
