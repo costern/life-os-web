@@ -144,12 +144,13 @@ async function ladeMacro(){
       return;
     }
     const real = m.real_rate != null ? Number(m.real_rate) : null;
+    const prevReal = (m.prev_ffr != null && m.prev_inflation != null) ? Number(m.prev_ffr) - Number(m.prev_inflation) : null;
     const html =
       '<div class="macro-grid">' +
-        stat('Leitzins (FFR)', m.ffr, '%', m.ffr_date) +
-        stat('10J Treasury', m.ty, '%', m.ty_date) +
-        stat('Inflation (CPI YoY)', m.inflation, '%', m.cpi_date) +
-        stat('Realzins', real, '%', null) +
+        stat('Leitzins (FFR)', m.ffr, m.prev_ffr, '%', m.ffr_date) +
+        stat('10J Treasury', m.ty, m.prev_ty, '%', m.ty_date) +
+        stat('Inflation (CPI YoY)', m.inflation, m.prev_inflation, '%', m.cpi_date) +
+        stat('Realzins', real, prevReal, '%', null) +
       '</div>' +
       (m.note ? '<div class="macro-take">'+esc(m.note)+'</div>' : '') +
       '<div class="muted" style="margin-top:8px">Stand: '+(m.updated_at ? new Date(m.updated_at).toLocaleString('de-DE') : '–')+'</div>';
@@ -158,8 +159,16 @@ async function ladeMacro(){
     targets.forEach(el => el && (el.innerHTML = '<div class="err">Marktlage nicht ladbar: '+esc(e.message)+'</div>'));
   }
 }
-function stat(label, val, unit, date){
-  return '<div class="macro-stat"><div class="v">'+(val!=null?Number(val).toFixed(2)+unit:'–')+'</div>' +
+function stat(label, val, prev, unit, date){
+  let delta = '';
+  if (val != null && prev != null){
+    const d = Number(val) - Number(prev);
+    if (Math.abs(d) >= 0.005){
+      const auf = d > 0;
+      delta = ' <span class="macro-delta '+(auf?'pnl-pos':'pnl-neg')+'">'+(auf?'▲':'▼')+' '+(auf?'+':'')+d.toFixed(2)+unit+'</span>';
+    }
+  }
+  return '<div class="macro-stat"><div class="v">'+(val!=null?Number(val).toFixed(2)+unit:'–')+delta+'</div>' +
     '<div class="l">'+label+'</div>' + (date?'<div class="l">'+esc(date)+'</div>':'') + '</div>';
 }
 
