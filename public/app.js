@@ -401,14 +401,10 @@ async function ladeKalender(){
     const del = ev.target.closest('.todo-del');
     if (del){
       const id = +del.closest('.row').dataset.id;
-      if (del.dataset.confirm !== '1'){
-        del.dataset.confirm = '1'; del.textContent = '⚠️';
-        setTimeout(() => { if (del.dataset.confirm==='1'){ delete del.dataset.confirm; del.textContent='🗑'; } }, 4000);
-        return;
-      }
-      delete del.dataset.confirm;
+      if (!confirm('Dieses To-Do wirklich löschen?')) return;
+      del.textContent = '…'; del.style.pointerEvents = 'none';
       try { await api('/todos/'+id, { method:'DELETE' }); await laden(); }
-      catch(e){ alert('Konnte nicht gelöscht werden: ' + e.message); }
+      catch(e){ del.textContent = '🗑'; del.style.pointerEvents = ''; alert('Konnte nicht gelöscht werden: ' + e.message); }
       return;
     }
 
