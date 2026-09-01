@@ -680,7 +680,31 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
   let holdings = [];
   let portfolios = [];
   let aktivesPortfolioId = null;
+  let letzterPortfolioCheck = null;
   const elPfTabs = document.getElementById('pfTabs');
+  const elPfPreisStamp = document.getElementById('pfPreisStamp');
+  const refreshPortfolioBtn = document.getElementById('refreshPortfolio');
+
+  function zeigePortfolioPreisStamp(){
+    if (!elPfPreisStamp) return;
+    if (!letzterPortfolioCheck){ elPfPreisStamp.textContent = ''; return; }
+    const sek = Math.max(0, Math.round((Date.now() - letzterPortfolioCheck) / 1000));
+    const zeit = letzterPortfolioCheck.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    const vor = sek < 5 ? 'gerade eben' : sek < 60 ? 'vor '+sek+'s' : 'vor '+Math.floor(sek/60)+' Min';
+    elPfPreisStamp.textContent = 'Kurse zuletzt aktualisiert: '+zeit+' ('+vor+')';
+  }
+  setInterval(zeigePortfolioPreisStamp, 1000);
+
+  if (refreshPortfolioBtn) refreshPortfolioBtn.addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = 'lädt…';
+    try { await ladePortfolio(); }
+    finally {
+      btn.textContent = 'aktualisiert ✓';
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1200);
+    }
+  });
 
   if (tabs.length){
     tabs.forEach(btn => btn.addEventListener('click', () => {
@@ -763,6 +787,7 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     const kosten = h.buyPrice!=null ? h.amount*h.buyPrice : null;
     const pnl = (wert!=null && kosten!=null) ? wert-kosten : null;
     const pnlPct = (pnl!=null && kosten) ? pnl/kosten*100 : null;
+    const beAbstandPct = (last!=null && h.buyPrice) ? (last-h.buyPrice)/h.buyPrice*100 : null;
     return '<div class="row" data-id="'+h.id+'">' +
       '<span class="pf-dot" style="background:'+farbe+'"></span>' +
       '<span class="t">'+esc(h.asset)+' <span class="muted">'+h.amount+' '+esc(h.ticker)+'</span></span>' +
@@ -774,8 +799,13 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
       '</span>' +
     '</div>' +
     (h.buyPrice != null
-      ? '<div class="muted" style="padding:0 0 6px 0">BE-Preis '+fmt(h.buyPrice).replace('+','')+' · Anfangswert '+fmt(kosten).replace('+','')+'</div>'
-      : '') +
+      ? '<div class="muted" style="padding:0 0 6px 0">' +
+          'Kurs '+(last!=null?fmt(last).replace('+',''):'–') +
+          ' · BE-Preis '+fmt(h.buyPrice).replace('+','') +
+          ' · Anfangswert '+fmt(kosten).replace('+','') +
+          (beAbstandPct!=null ? ' · <span class="'+(beAbstandPct>=0?'pnl-pos':'pnl-neg')+'">'+(beAbstandPct>=0?'+':'')+beAbstandPct.toFixed(1)+'% vom BE</span>' : '') +
+        '</div>'
+      : (last!=null ? '<div class="muted" style="padding:0 0 6px 0">Kurs '+fmt(last).replace('+','')+'</div>' : '')) +
     panel(h);
   }
 
@@ -793,10 +823,12 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
       elChart.innerHTML = '<div class="empty">Noch keine Coins eingetragen – unten hinzufügen.</div>';
       elList.innerHTML = '<div class="empty">Keine Holdings</div>';
       elStamp.textContent = '';
+      if (elPfPreisStamp) elPfPreisStamp.textContent = '';
       return;
     }
     const preise = {};
     await Promise.all(holdings.map(async h => { preise[h.id] = await ladePreis(h.ticker || h.asset); }));
+    letzterPortfolioCheck = new Date(); zeigePortfolioPreisStamp();
 
     let gesamt = 0, gesamtKosten = 0, allePreise = true;
     holdings.forEach(h => {
