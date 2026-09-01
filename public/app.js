@@ -803,7 +803,8 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
           'Kurs '+(last!=null?fmt(last).replace('+',''):'–') +
           ' · BE-Preis '+fmt(h.buyPrice).replace('+','') +
           ' · Anfangswert '+fmt(kosten).replace('+','') +
-          (beAbstandPct!=null ? ' · <span class="'+(beAbstandPct>=0?'pnl-pos':'pnl-neg')+'">'+(beAbstandPct>=0?'+':'')+beAbstandPct.toFixed(1)+'% vom BE</span>' : '') +
+          (pnl!=null ? ' · <span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+(pnl>=0?'+':'')+fmt(pnl).replace('+','')+'</span>' : '') +
+          (beAbstandPct!=null ? ' <span class="'+(beAbstandPct>=0?'pnl-pos':'pnl-neg')+'">('+(beAbstandPct>=0?'+':'')+beAbstandPct.toFixed(1)+'% vom BE)</span>' : '') +
         '</div>'
       : (last!=null ? '<div class="muted" style="padding:0 0 6px 0">Kurs '+fmt(last).replace('+','')+'</div>' : '')) +
     panel(h);
