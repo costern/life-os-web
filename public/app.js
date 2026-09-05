@@ -112,16 +112,6 @@ async function api(path, opts) {
 })();
 
 function renderOverview(){
-  const el = document.getElementById('ovStats');
-  const parts = [];
-  if (ov.todos !== undefined)
-    parts.push('<div class="stat"><div class="v">'+ov.todos+'</div><div class="l">offene To-Dos</div></div>');
-  if (ov.unreal !== undefined)
-    parts.push('<div class="stat"><div class="v '+(ov.unreal>=0?'pnl-pos':'pnl-neg')+'">'+fmt(ov.unreal)+'</div><div class="l">offene Positionen</div></div>');
-  if (ov.sumPnl !== undefined)
-    parts.push('<div class="stat"><div class="v '+(ov.sumPnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(ov.sumPnl)+'</div><div class="l">Σ PnL realisiert</div></div>');
-  el.innerHTML = parts.join('') || '<div class="empty">Keine Daten</div>';
-
   if (ov.sumPnl !== undefined && ov.unreal !== undefined){
     const total = ov.sumPnl + ov.unreal;
     const html = '<div class="stats">' +
@@ -210,6 +200,29 @@ async function ladeKalender(){
       return '<div class="row'+(dt.toDateString()===heute.toDateString()?' today-mark':'')+'"><span class="t">'+esc(ev.title)+'</span><span class="muted">'+when+'</span></div>';
     }).join('');
   } catch(e){ el.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; }
+}
+
+/* ---------- Übersicht: kurzer Überblick der offenen (gehebelten) Trades ---------- */
+async function ladeOvTrades(){
+  const el = document.getElementById('ovTrades');
+  if (!el) return;
+  try {
+    const trades = await api('/trades/open');
+    if (!trades.length){ el.innerHTML = '<div class="empty">Keine offenen Positionen</div>'; return; }
+    const zeilen = await Promise.all(trades.map(async o => {
+      const size = (o.size1||0) + (o.size2||0);
+      const avg = size ? ((o.entry1||0)*(o.size1||0) + (o.entry2||0)*(o.size2||0)) / size : 0;
+      const dir = o.side === 'Short' ? -1 : 1;
+      const p = await ladePreis(o.ticker || o.asset);
+      let pctHtml = '<span class="muted">kein Kurs</span>';
+      if (p && isFinite(p.last) && avg){
+        const pct = dir*(p.last-avg)/avg*100;
+        pctHtml = '<span class="'+(pct>=0?'pnl-pos':'pnl-neg')+'">'+(pct>=0?'+':'')+pct.toFixed(1)+'%</span>';
+      }
+      return '<div class="row"><span class="t">'+esc(o.asset)+' <span class="muted">'+esc(o.side)+'</span></span>'+pctHtml+'</div>';
+    }));
+    el.innerHTML = zeilen.join('');
+  } catch(e){ el.innerHTML = '<div class="err">Trades nicht ladbar: '+esc(e.message)+'</div>'; }
 }
 
 /* ---------- Kalender: Monatsansicht auf der To-Dos-Seite ---------- */
@@ -1005,13 +1018,13 @@ function seiteAuffrischen(id){
   else if (id === 'todos'){ if (window.ladeTodos) window.ladeTodos(); if (window.ladeKalenderMonat) window.ladeKalenderMonat(); }
   else if (id === 'disziplin'){ if (window.ladeReading) window.ladeReading(); }
   else if (id === 'news'){ ladeMacro(); ladeNews(); }
-  else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); ladeKalender(); if (window.ladeTodos) window.ladeTodos(); }
+  else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); ladeKalender(); ladeOvTrades(); if (window.ladeTodos) window.ladeTodos(); }
 }
 
 document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });
 document.querySelectorAll('nav.side button[data-page]').forEach(b =>
   b.addEventListener('click', () => seiteAuffrischen(b.dataset.page)));
 
-ladeMacro(); ladeNews(); ladeHistorie(); ladeKalender();
+ladeMacro(); ladeNews(); ladeHistorie(); ladeKalender(); ladeOvTrades();
 renderLivePos().then(() => { letzteAktualisierung = Date.now(); });
 setInterval(() => vielleichtAuffrischen(), AKTUALISIERUNG_MS);
