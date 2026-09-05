@@ -525,6 +525,8 @@ function rundPreis(v){
 }
 
 async function ladePreis(ticker){
+  // USD ist Bargeld, kein handelbarer Coin - Kurs ist trivial 1:1, kein API-Call noetig.
+  if (String(ticker).toUpperCase() === 'USD') return { symbol: 'USD', last: 1 };
   try { return await api('/prices/'+encodeURIComponent(ticker)); }
   catch(e){ return null; }
 }
@@ -943,13 +945,18 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
       '</div>';
 
     elStamp.textContent = holdings.length + ' Coin' + (holdings.length===1?'':'s') + (staub.length ? ' · '+staub.length+' Staub ausgeblendet' : '');
-    elList.innerHTML = holdings.map((h,idx) => zeile(h, preise[h.id], FARBEN[idx%FARBEN.length])).join('') +
-      (staub.length ? '<div class="muted" style="padding:8px 0" id="pfStaubToggle" role="button" style="cursor:pointer">▸ '+staub.length+' Staub-Position'+(staub.length===1?'':'en')+' anzeigen (< 1 $)</div>' : '');
-    const staubToggle = document.getElementById('pfStaubToggle');
-    if (staubToggle) staubToggle.addEventListener('click', () => {
+
+    let staubSichtbar = false;
+    function renderListe(){
       elList.innerHTML = holdings.map((h,idx) => zeile(h, preise[h.id], FARBEN[idx%FARBEN.length])).join('') +
-        staub.map((h,idx) => zeile(h, preise[h.id], FARBEN[(holdings.length+idx)%FARBEN.length])).join('');
-    });
+        (staubSichtbar ? staub.map((h,idx) => zeile(h, preise[h.id], FARBEN[(holdings.length+idx)%FARBEN.length])).join('') : '') +
+        (staub.length ? '<div class="muted" style="padding:8px 0;cursor:pointer" id="pfStaubToggle" role="button">' +
+          (staubSichtbar ? '▾ Staub-Positionen wieder ausblenden' : '▸ '+staub.length+' Staub-Position'+(staub.length===1?'':'en')+' anzeigen (< 1 $)') +
+          '</div>' : '');
+      const staubToggle = document.getElementById('pfStaubToggle');
+      if (staubToggle) staubToggle.addEventListener('click', () => { staubSichtbar = !staubSichtbar; renderListe(); });
+    }
+    renderListe();
   }
   window.ladePortfolio = ladePortfolio;
 
