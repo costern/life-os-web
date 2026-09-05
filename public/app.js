@@ -214,10 +214,11 @@ async function ladeOvTrades(){
       const avg = size ? ((o.entry1||0)*(o.size1||0) + (o.entry2||0)*(o.size2||0)) / size : 0;
       const dir = o.side === 'Short' ? -1 : 1;
       const p = await ladePreis(o.ticker || o.asset);
+      const rund3 = v => Number(v).toFixed(3);
       let pnlHtml = '<span class="muted">kein Kurs</span>';
-      let kursZeile = 'Entry '+(avg?rundPreis(avg):'–');
+      let kursZeile = 'Entry '+(avg?rund3(avg):'–');
       if (p && isFinite(p.last)){
-        kursZeile += ' → aktuell '+rundPreis(p.last);
+        kursZeile += ' → aktuell '+rund3(p.last);
         if (avg && size){
           const pnl = dir*(p.last-avg)*size;
           pnlHtml = '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(pnl)+'</span>';
