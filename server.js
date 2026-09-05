@@ -19,6 +19,7 @@ const portfolioRoutes = require('./routes/portfolio');
 const portfoliosRoutes = require('./routes/portfolios');
 const bitgetRoutes = require('./routes/bitget');
 const coinpricesRoutes = require('./routes/coinprices');
+const ledgerRoutes = require('./routes/ledger');
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
@@ -42,6 +43,7 @@ app.use('/api/portfolio', requireAuthOrClaude, portfolioRoutes);
 app.use('/api/portfolios', requireAuthOrClaude, portfoliosRoutes);
 app.use('/api/bitget', requireAuthOrClaude, bitgetRoutes);
 app.use('/api/coinprices', requireAuthOrClaude, coinpricesRoutes);
+app.use('/api/ledger', requireAuthOrClaude, ledgerRoutes);
 
 // Statische Seiten: login.html frei, alles andere hinter Login
 app.use('/login.html', express.static(path.join(__dirname, 'public', 'login.html')));

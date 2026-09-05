@@ -756,6 +756,30 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     }
   });
 
+  const ledgerSyncBtn = document.getElementById('ledgerSyncBtn');
+  const ledgerSyncErr = document.getElementById('ledgerSyncErr');
+  if (ledgerSyncBtn) ledgerSyncBtn.addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = 'synchronisiere…';
+    if (ledgerSyncErr){ ledgerSyncErr.style.display = 'none'; ledgerSyncErr.textContent = ''; }
+    try {
+      const result = await api('/ledger/sync-balances');
+      await ladePortfolioListe();
+      if (result.errors && result.errors.length){
+        btn.textContent = 'teilweise ✗';
+        if (ledgerSyncErr){ ledgerSyncErr.style.display = 'block'; ledgerSyncErr.textContent = 'Ledger-Sync teilweise fehlgeschlagen: '+result.errors.map(e=>e.wallet+': '+e.error).join('; '); }
+      } else {
+        btn.textContent = 'synchronisiert ✓';
+      }
+    } catch(e){
+      btn.textContent = 'Fehler ✗';
+      if (ledgerSyncErr){ ledgerSyncErr.style.display = 'block'; ledgerSyncErr.textContent = 'Ledger-Sync fehlgeschlagen: '+e.message; }
+    } finally {
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+    }
+  });
+
   async function ladePortfolioListe(){
     try { portfolios = await api('/portfolios'); }
     catch(e){ if (elPfTabs) elPfTabs.innerHTML = '<div class="err">Portfolios nicht ladbar: '+esc(e.message)+'</div>'; return; }
