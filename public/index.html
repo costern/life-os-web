@@ -174,12 +174,15 @@
       <div class="grid">
         <div class="card wide" style="padding-bottom:6px">
           <div class="tabbar" id="pfTabs"></div>
-          <form id="pfNewPortfolioForm" style="display:flex;gap:6px;margin-top:-6px">
+          <form id="pfNewPortfolioForm" style="display:flex;gap:6px;margin-top:-6px;align-items:center;flex-wrap:wrap">
             <input type="text" id="pfNewPortfolioName" placeholder="Neues Portfolio…" maxlength="60"
               style="font-family:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);
               border-radius:8px;background:#fbfbfc;flex:0 0 200px">
             <button type="submit" class="btn ghost">+ Portfolio anlegen</button>
+            <button type="button" id="bitgetSyncBtn" class="btn ghost">🔄 Bitget synchronisieren</button>
+            <span class="muted" style="font-size:12px">(live von Bitget – nur nötig, wenn du dort etwas gekauft, verkauft oder verschoben hast)</span>
           </form>
+          <div class="err" id="bitgetSyncErr" style="display:none;margin-top:6px"></div>
         </div>
         <div class="pos-hist-grid">
           <div class="card">

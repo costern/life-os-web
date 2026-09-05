@@ -736,6 +736,26 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     }
   });
 
+  const bitgetSyncBtn = document.getElementById('bitgetSyncBtn');
+  const bitgetSyncErr = document.getElementById('bitgetSyncErr');
+  if (bitgetSyncBtn) bitgetSyncBtn.addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = 'synchronisiere…';
+    if (bitgetSyncErr){ bitgetSyncErr.style.display = 'none'; bitgetSyncErr.textContent = ''; }
+    try {
+      await api('/bitget/sync-balances');
+      await api('/bitget/sync-trades');
+      await ladePortfolioListe();
+      btn.textContent = 'synchronisiert ✓';
+    } catch(e){
+      btn.textContent = 'Fehler ✗';
+      if (bitgetSyncErr){ bitgetSyncErr.style.display = 'block'; bitgetSyncErr.textContent = 'Bitget-Sync fehlgeschlagen: '+e.message; }
+    } finally {
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+    }
+  });
+
   async function ladePortfolioListe(){
     try { portfolios = await api('/portfolios'); }
     catch(e){ if (elPfTabs) elPfTabs.innerHTML = '<div class="err">Portfolios nicht ladbar: '+esc(e.message)+'</div>'; return; }
