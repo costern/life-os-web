@@ -255,10 +255,11 @@ async function ladeKalender(){
     grid.innerHTML = tage.map(tag => {
       const inMonat = tag.getMonth() === aktMonat.getMonth();
       const istHeute = tag.toDateString() === heute.toDateString();
+      const istWochenende = tag.getDay() === 0 || tag.getDay() === 6;
       const tagEvents = events.filter(ev => evDatum(ev).toDateString() === tag.toDateString());
       const evHtml = tagEvents.slice(0,3).map(ev => '<div class="cal-ev" title="'+esc(ev.title)+'">'+esc(ev.title)+'</div>').join('') +
         (tagEvents.length > 3 ? '<div class="muted">+'+(tagEvents.length-3)+' mehr</div>' : '');
-      return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
+      return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+(istWochenende?' weekend':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
     }).join('');
   }
 
