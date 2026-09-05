@@ -1,5 +1,16 @@
 const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 const fmt = n => (n >= 0 ? '+' : '') + Number(n).toFixed(2) + ' $';
+const fmtAmount = n => {
+  const x = Number(n);
+  if (!isFinite(x)) return String(n);
+  if (x === 0) return '0';
+  const abs = Math.abs(x);
+  const digits = abs >= 1000 ? 2 : abs >= 1 ? 4 : abs >= 0.01 ? 6 : 8;
+  let s = x.toFixed(digits).replace(/0+$/,'').replace(/\.$/,'');
+  const parts = s.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return parts.join(',');
+};
 const ov = {};
 
 async function api(path, opts) {
@@ -756,7 +767,7 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     const pnlPct = (pnl!=null && kosten) ? pnl/kosten*100 : null;
     return '<div class="row" data-id="'+h.id+'">' +
       '<span class="pf-dot" style="background:'+farbe+'"></span>' +
-      '<span class="t">'+esc(h.asset)+' <span class="muted">'+h.amount+' '+esc(h.ticker)+'</span></span>' +
+      '<span class="t">'+esc(h.asset)+' <span class="muted">'+fmtAmount(h.amount)+' '+esc(h.ticker)+'</span></span>' +
       (wert!=null ? '<span>'+fmt(wert).replace('+','')+'</span>' : '<span class="muted">kein Kurs</span>') +
       (pnlPct!=null ? '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+(pnlPct>=0?'+':'')+pnlPct.toFixed(1)+'%</span>' : '') +
       '<span class="row-actions">' +
@@ -788,6 +799,25 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     }
     const preise = {};
     await Promise.all(holdings.map(async h => { preise[h.id] = await ladePreis(h.ticker || h.asset); }));
+
+    // Staub (Restbetraege < 1 $) rausfiltern, damit Dust nicht die Liste zumuellt.
+    // Werden nicht geloescht, nur eingeklappt - ueber den Zaehler unten einblendbar.
+    const wertVon = h => {
+      const p = preise[h.id];
+      if (p && isFinite(p.last)) return h.amount*p.last;
+      if (h.buyPrice != null) return h.amount*h.buyPrice;
+      return null;
+    };
+    const staub = holdings.filter(h => { const w = wertVon(h); return w != null && w < 1; });
+    holdings = holdings.filter(h => { const w = wertVon(h); return w == null || w >= 1; });
+    // Groesste zuerst; Holdings ohne Kursdaten ans Ende.
+    holdings.sort((a,b) => {
+      const wa = wertVon(a), wb = wertVon(b);
+      if (wa == null && wb == null) return 0;
+      if (wa == null) return 1;
+      if (wb == null) return -1;
+      return wb - wa;
+    });
 
     let gesamt = 0, gesamtKosten = 0, allePreise = true;
     holdings.forEach(h => {
@@ -828,8 +858,14 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
         '</div>' +
       '</div>';
 
-    elStamp.textContent = holdings.length + ' Coin' + (holdings.length===1?'':'s');
-    elList.innerHTML = holdings.map((h,idx) => zeile(h, preise[h.id], FARBEN[idx%FARBEN.length])).join('');
+    elStamp.textContent = holdings.length + ' Coin' + (holdings.length===1?'':'s') + (staub.length ? ' · '+staub.length+' Staub ausgeblendet' : '');
+    elList.innerHTML = holdings.map((h,idx) => zeile(h, preise[h.id], FARBEN[idx%FARBEN.length])).join('') +
+      (staub.length ? '<div class="muted" style="padding:8px 0" id="pfStaubToggle" role="button" style="cursor:pointer">▸ '+staub.length+' Staub-Position'+(staub.length===1?'':'en')+' anzeigen (< 1 $)</div>' : '');
+    const staubToggle = document.getElementById('pfStaubToggle');
+    if (staubToggle) staubToggle.addEventListener('click', () => {
+      elList.innerHTML = holdings.map((h,idx) => zeile(h, preise[h.id], FARBEN[idx%FARBEN.length])).join('') +
+        staub.map((h,idx) => zeile(h, preise[h.id], FARBEN[(holdings.length+idx)%FARBEN.length])).join('');
+    });
   }
   window.ladePortfolio = ladePortfolio;
 
