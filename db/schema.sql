@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS macro_status (
   updated_at TIMESTAMPTZ,
   CONSTRAINT single_row CHECK (id = 1)
 );
+ALTER TABLE macro_status ADD COLUMN IF NOT EXISTS prev_ffr NUMERIC;
+ALTER TABLE macro_status ADD COLUMN IF NOT EXISTS prev_ty NUMERIC;
+ALTER TABLE macro_status ADD COLUMN IF NOT EXISTS prev_inflation NUMERIC;
+ALTER TABLE macro_status ADD COLUMN IF NOT EXISTS prev_real_rate NUMERIC;
 INSERT INTO macro_status (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS news (

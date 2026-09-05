@@ -123,16 +123,6 @@ async function api(path, opts) {
 })();
 
 function renderOverview(){
-  const el = document.getElementById('ovStats');
-  const parts = [];
-  if (ov.todos !== undefined)
-    parts.push('<div class="stat"><div class="v">'+ov.todos+'</div><div class="l">offene To-Dos</div></div>');
-  if (ov.unreal !== undefined)
-    parts.push('<div class="stat"><div class="v '+(ov.unreal>=0?'pnl-pos':'pnl-neg')+'">'+fmt(ov.unreal)+'</div><div class="l">offene Positionen</div></div>');
-  if (ov.sumPnl !== undefined)
-    parts.push('<div class="stat"><div class="v '+(ov.sumPnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(ov.sumPnl)+'</div><div class="l">Σ PnL realisiert</div></div>');
-  el.innerHTML = parts.join('') || '<div class="empty">Keine Daten</div>';
-
   if (ov.sumPnl !== undefined && ov.unreal !== undefined){
     const total = ov.sumPnl + ov.unreal;
     const html = '<div class="stats">' +
@@ -155,12 +145,13 @@ async function ladeMacro(){
       return;
     }
     const real = m.real_rate != null ? Number(m.real_rate) : null;
+    const prevReal = (m.prev_ffr != null && m.prev_inflation != null) ? Number(m.prev_ffr) - Number(m.prev_inflation) : null;
     const html =
       '<div class="macro-grid">' +
-        stat('Leitzins (FFR)', m.ffr, '%', m.ffr_date) +
-        stat('10J Treasury', m.ty, '%', m.ty_date) +
-        stat('Inflation (CPI YoY)', m.inflation, '%', m.cpi_date) +
-        stat('Realzins', real, '%', null) +
+        stat('Leitzins (FFR)', m.ffr, m.prev_ffr, '%', m.ffr_date) +
+        stat('10J Treasury', m.ty, m.prev_ty, '%', m.ty_date) +
+        stat('Inflation (CPI YoY)', m.inflation, m.prev_inflation, '%', m.cpi_date) +
+        stat('Realzins', real, prevReal, '%', null) +
       '</div>' +
       (m.note ? '<div class="macro-take">'+esc(m.note)+'</div>' : '') +
       '<div class="muted" style="margin-top:8px">Stand: '+(m.updated_at ? new Date(m.updated_at).toLocaleString('de-DE') : '–')+'</div>';
@@ -169,8 +160,16 @@ async function ladeMacro(){
     targets.forEach(el => el && (el.innerHTML = '<div class="err">Marktlage nicht ladbar: '+esc(e.message)+'</div>'));
   }
 }
-function stat(label, val, unit, date){
-  return '<div class="macro-stat"><div class="v">'+(val!=null?Number(val).toFixed(2)+unit:'–')+'</div>' +
+function stat(label, val, prev, unit, date){
+  let delta = '';
+  if (val != null && prev != null){
+    const d = Number(val) - Number(prev);
+    if (Math.abs(d) >= 0.005){
+      const auf = d > 0;
+      delta = ' <span class="macro-delta '+(auf?'pnl-pos':'pnl-neg')+'">'+(auf?'▲':'▼')+' '+(auf?'+':'')+d.toFixed(2)+unit+'</span>';
+    }
+  }
+  return '<div class="macro-stat"><div class="v">'+(val!=null?Number(val).toFixed(2)+unit:'–')+delta+'</div>' +
     '<div class="l">'+label+'</div>' + (date?'<div class="l">'+esc(date)+'</div>':'') + '</div>';
 }
 
@@ -212,6 +211,35 @@ async function ladeKalender(){
       return '<div class="row'+(dt.toDateString()===heute.toDateString()?' today-mark':'')+'"><span class="t">'+esc(ev.title)+'</span><span class="muted">'+when+'</span></div>';
     }).join('');
   } catch(e){ el.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; }
+}
+
+/* ---------- Übersicht: kurzer Überblick der offenen (gehebelten) Trades ---------- */
+async function ladeOvTrades(){
+  const el = document.getElementById('ovTrades');
+  if (!el) return;
+  try {
+    const trades = await api('/trades/open');
+    if (!trades.length){ el.innerHTML = '<div class="empty">Keine offenen Positionen</div>'; return; }
+    const zeilen = await Promise.all(trades.map(async o => {
+      const size = (o.size1||0) + (o.size2||0);
+      const avg = size ? ((o.entry1||0)*(o.size1||0) + (o.entry2||0)*(o.size2||0)) / size : 0;
+      const dir = o.side === 'Short' ? -1 : 1;
+      const p = await ladePreis(o.ticker || o.asset);
+      const rund3 = v => { const a = Math.abs(v); return Number(v).toFixed(a >= 1000 ? 1 : a >= 1 ? 3 : 4); };
+      let pnlHtml = '<span class="muted">kein Kurs</span>';
+      let kursZeile = 'Entry '+(avg?rund3(avg):'–');
+      if (p && isFinite(p.last)){
+        kursZeile += ' → aktuell '+rund3(p.last);
+        if (avg && size){
+          const pnl = dir*(p.last-avg)*size;
+          pnlHtml = '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(pnl)+'</span>';
+        }
+      }
+      return '<div class="row"><span class="t">'+esc(o.asset)+' <span class="muted">'+esc(o.side)+'</span></span>'+pnlHtml+'</div>' +
+        '<div class="muted" style="padding:0 0 6px 0">'+kursZeile+'</div>';
+    }));
+    el.innerHTML = zeilen.join('');
+  } catch(e){ el.innerHTML = '<div class="err">Trades nicht ladbar: '+esc(e.message)+'</div>'; }
 }
 
 /* ---------- Kalender: Monatsansicht auf der To-Dos-Seite ---------- */
@@ -257,10 +285,11 @@ async function ladeKalender(){
     grid.innerHTML = tage.map(tag => {
       const inMonat = tag.getMonth() === aktMonat.getMonth();
       const istHeute = tag.toDateString() === heute.toDateString();
+      const istWochenende = tag.getDay() === 0 || tag.getDay() === 6;
       const tagEvents = events.filter(ev => evDatum(ev).toDateString() === tag.toDateString());
       const evHtml = tagEvents.slice(0,3).map(ev => '<div class="cal-ev" title="'+esc(ev.title)+'">'+esc(ev.title)+'</div>').join('') +
         (tagEvents.length > 3 ? '<div class="muted">+'+(tagEvents.length-3)+' mehr</div>' : '');
-      return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
+      return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+(istWochenende?' weekend':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
     }).join('');
   }
 
@@ -305,7 +334,7 @@ async function ladeKalender(){
   const elBeob = document.getElementById('beob');
   const elOvTodos = document.getElementById('ovTodos');
   const elOvBeob = document.getElementById('ovBeobachten');
-  const THEMEN_LISTE = ['Trading','Beobachten','Sport','Arbeit','Privat','Sonstiges'];
+  const THEMEN_LISTE = ['Trading','Beobachten','Dashboard','Sport','Arbeit','Privat','Sonstiges'];
   let rows = [];
   let ansicht = 'offen';
 
@@ -482,7 +511,7 @@ async function ladeHistorie(){
       '<div class="row"><span class="t">'+esc(r.name||r.asset)+'</span>' +
       '<span class="badge">'+esc(r.asset)+' '+esc(r.side)+'</span>' +
       (r.exit==null
-        ? '<span class="badge amber">LIVE</span>' + (r.realizedPnl ? ' <span class="pnl-pos">Teilgewinn '+fmt(r.realizedPnl)+'</span>' : '')
+        ? '<span class="badge amber">LIVE</span>' + (r.realizedPnl ? ' <span class="'+(Number(r.realizedPnl)>=0?'pnl-pos':'pnl-amber')+'">Teilgewinn '+fmt(r.realizedPnl)+'</span>' : '')
         : (r.pnl!=null ? '<span class="'+(r.pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(r.pnl)+'</span>' : '<span class="muted">PnL fehlt</span>')) +
       '</div>'
     )).join('') || '<div class="empty">Noch keine Trades</div>';
@@ -545,7 +574,7 @@ async function renderLivePos(){
         avg.toLocaleString('de-DE',{maximumFractionDigits:4})+(last!=null?' → '+last.toLocaleString('de-DE',{maximumFractionDigits:4}):'')+
         '</span></span>'+pnlHtml+'</div>' +
         '<div class="muted" style="padding:0 0 6px 0">'+esc(o.name||'')+' · '+slTxt+' · TP '+(o.tp??'–')+
-        (o.realizedPnl ? ' · <span class="pnl-pos">realisiert '+fmt(o.realizedPnl)+'</span>' : '') +
+        (o.realizedPnl ? ' · <span class="'+(Number(o.realizedPnl)>=0?'pnl-pos':'pnl-amber')+'">realisiert '+fmt(o.realizedPnl)+'</span>' : '') +
         ' · <span class="lp-toggle" role="button" data-idx="'+idx+'">verwalten</span></div>' +
         '<div class="lp-panel" data-idx="'+idx+'">' +
           '<div class="lp-line">' +
@@ -682,7 +711,31 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
   let holdings = [];
   let portfolios = [];
   let aktivesPortfolioId = null;
+  let letzterPortfolioCheck = null;
   const elPfTabs = document.getElementById('pfTabs');
+  const elPfPreisStamp = document.getElementById('pfPreisStamp');
+  const refreshPortfolioBtn = document.getElementById('refreshPortfolio');
+
+  function zeigePortfolioPreisStamp(){
+    if (!elPfPreisStamp) return;
+    if (!letzterPortfolioCheck){ elPfPreisStamp.textContent = ''; return; }
+    const sek = Math.max(0, Math.round((Date.now() - letzterPortfolioCheck) / 1000));
+    const zeit = letzterPortfolioCheck.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    const vor = sek < 5 ? 'gerade eben' : sek < 60 ? 'vor '+sek+'s' : 'vor '+Math.floor(sek/60)+' Min';
+    elPfPreisStamp.textContent = 'Kurse zuletzt aktualisiert: '+zeit+' ('+vor+')';
+  }
+  setInterval(zeigePortfolioPreisStamp, 1000);
+
+  if (refreshPortfolioBtn) refreshPortfolioBtn.addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = 'lädt…';
+    try { await ladePortfolio(); }
+    finally {
+      btn.textContent = 'aktualisiert ✓';
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1200);
+    }
+  });
 
   if (tabs.length){
     tabs.forEach(btn => btn.addEventListener('click', () => {
@@ -765,6 +818,7 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     const kosten = h.buyPrice!=null ? h.amount*h.buyPrice : null;
     const pnl = (wert!=null && kosten!=null) ? wert-kosten : null;
     const pnlPct = (pnl!=null && kosten) ? pnl/kosten*100 : null;
+    const beAbstandPct = (last!=null && h.buyPrice) ? (last-h.buyPrice)/h.buyPrice*100 : null;
     return '<div class="row" data-id="'+h.id+'">' +
       '<span class="pf-dot" style="background:'+farbe+'"></span>' +
       '<span class="t">'+esc(h.asset)+' <span class="muted">'+fmtAmount(h.amount)+' '+esc(h.ticker)+'</span></span>' +
@@ -776,8 +830,14 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
       '</span>' +
     '</div>' +
     (h.buyPrice != null
-      ? '<div class="muted" style="padding:0 0 6px 0">BE-Preis '+fmt(h.buyPrice).replace('+','')+' · Anfangswert '+fmt(kosten).replace('+','')+'</div>'
-      : '') +
+      ? '<div class="muted" style="padding:0 0 6px 0">' +
+          'Kurs '+(last!=null?fmt(last).replace('+',''):'–') +
+          ' · BE-Preis '+fmt(h.buyPrice).replace('+','') +
+          ' · Anfangswert '+fmt(kosten).replace('+','') +
+          (pnl!=null ? ' · <span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+(pnl>=0?'+':'')+fmt(pnl).replace('+','')+'</span>' : '') +
+          (beAbstandPct!=null ? ' <span class="'+(beAbstandPct>=0?'pnl-pos':'pnl-neg')+'">('+(beAbstandPct>=0?'+':'')+beAbstandPct.toFixed(1)+'% vom BE)</span>' : '') +
+        '</div>'
+      : (last!=null ? '<div class="muted" style="padding:0 0 6px 0">Kurs '+fmt(last).replace('+','')+'</div>' : '')) +
     panel(h);
   }
 
@@ -795,10 +855,12 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
       elChart.innerHTML = '<div class="empty">Noch keine Coins eingetragen – unten hinzufügen.</div>';
       elList.innerHTML = '<div class="empty">Keine Holdings</div>';
       elStamp.textContent = '';
+      if (elPfPreisStamp) elPfPreisStamp.textContent = '';
       return;
     }
     const preise = {};
     await Promise.all(holdings.map(async h => { preise[h.id] = await ladePreis(h.ticker || h.asset); }));
+    letzterPortfolioCheck = new Date(); zeigePortfolioPreisStamp();
 
     // Staub (Restbetraege < 1 $) rausfiltern, damit Dust nicht die Liste zumuellt.
     // Werden nicht geloescht, nur eingeklappt - ueber den Zaehler unten einblendbar.
@@ -828,23 +890,45 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
 
     let cursor = 0;
     const stops = [];
+    const segmente = [];
     holdings.forEach((h, idx) => {
       const p = preise[h.id];
       const wert = (p && isFinite(p.last)) ? h.amount*p.last : (h.buyPrice!=null ? h.amount*h.buyPrice : 0);
       const anteil = gesamt>0 ? wert/gesamt*100 : (holdings.length ? 100/holdings.length : 0);
       const farbe = FARBEN[idx % FARBEN.length];
       stops.push(farbe+' '+cursor.toFixed(2)+'% '+(cursor+anteil).toFixed(2)+'%');
+      segmente.push({ h, anteil, farbe, mitte: cursor + anteil/2 });
       cursor += anteil;
     });
     const gradient = stops.length ? 'conic-gradient('+stops.join(', ')+')' : '#e5e7eb';
+
+    // Ring-Beschriftung: kleine Linien vom Ring nach außen zu Asset+Prozent, wie bei
+    // klassischen Asset-Allocation-Grafiken. Sehr kleine Anteile (<2%) werden übersprungen,
+    // sonst überlappt sich der Text bei vielen Coins.
+    const cx = 150, cy = 150, rRing = 85, rLinie = 95, rText = 122;
+    const beschriftungen = segmente.filter(s => s.anteil >= 2).map(s => {
+      const winkel = (s.mitte / 100) * 2 * Math.PI;
+      const sin = Math.sin(winkel), cos = Math.cos(winkel);
+      const x1 = cx + rRing*sin, y1 = cy - rRing*cos;
+      const x2 = cx + rLinie*sin, y2 = cy - rLinie*cos;
+      const xt = cx + rText*sin, yt = cy - rText*cos;
+      const anchor = xt > cx + 4 ? 'start' : xt < cx - 4 ? 'end' : 'middle';
+      const dx = anchor === 'start' ? 4 : anchor === 'end' ? -4 : 0;
+      return '<line class="donut-label-line" x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'"/>' +
+        '<text class="donut-label-text" x="'+(xt+dx).toFixed(1)+'" y="'+(yt-2).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(s.h.asset)+'</text>' +
+        '<text class="donut-label-pct" x="'+(xt+dx).toFixed(1)+'" y="'+(yt+10).toFixed(1)+'" text-anchor="'+anchor+'">'+s.anteil.toFixed(1)+'%</text>';
+    }).join('');
 
     const pnlGesamt = gesamt - gesamtKosten;
     const pnlPctGesamt = gesamtKosten ? pnlGesamt/gesamtKosten*100 : null;
 
     elChart.innerHTML =
       '<div class="donut-wrap">' +
-        '<div class="donut-outer"><div class="donut" style="background:'+gradient+'"></div>' +
-          '<div class="donut-hole"><div class="v">'+fmt(gesamt).replace('+','')+'</div><div class="l">Gesamtwert'+(allePreise?'':' (teilw.)')+'</div></div>' +
+        '<div class="donut-labelbox">' +
+          '<div class="donut-outer"><div class="donut" style="background:'+gradient+'"></div>' +
+            '<div class="donut-hole"><div class="v">'+fmt(gesamt).replace('+','')+'</div><div class="l">Gesamtwert'+(allePreise?'':' (teilw.)')+'</div></div>' +
+          '</div>' +
+          '<svg class="donut-labels" viewBox="0 0 300 300">'+beschriftungen+'</svg>' +
         '</div>' +
         '<div class="pf-legend">' +
           holdings.map((h,idx) => {
@@ -976,13 +1060,13 @@ function seiteAuffrischen(id){
   else if (id === 'todos'){ if (window.ladeTodos) window.ladeTodos(); if (window.ladeKalenderMonat) window.ladeKalenderMonat(); }
   else if (id === 'disziplin'){ if (window.ladeReading) window.ladeReading(); }
   else if (id === 'news'){ ladeMacro(); ladeNews(); }
-  else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); ladeKalender(); if (window.ladeTodos) window.ladeTodos(); }
+  else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); ladeKalender(); ladeOvTrades(); if (window.ladeTodos) window.ladeTodos(); }
 }
 
 document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });
 document.querySelectorAll('nav.side button[data-page]').forEach(b =>
   b.addEventListener('click', () => seiteAuffrischen(b.dataset.page)));
 
-ladeMacro(); ladeNews(); ladeHistorie(); ladeKalender();
+ladeMacro(); ladeNews(); ladeHistorie(); ladeKalender(); ladeOvTrades();
 renderLivePos().then(() => { letzteAktualisierung = Date.now(); });
 setInterval(() => vielleichtAuffrischen(), AKTUALISIERUNG_MS);
