@@ -303,7 +303,7 @@ async function ladeKalender(){
   const elBeob = document.getElementById('beob');
   const elOvTodos = document.getElementById('ovTodos');
   const elOvBeob = document.getElementById('ovBeobachten');
-  const THEMEN_LISTE = ['Trading','Beobachten','Sport','Arbeit','Privat','Sonstiges'];
+  const THEMEN_LISTE = ['Trading','Beobachten','Dashboard','Sport','Arbeit','Privat','Sonstiges'];
   let rows = [];
   let ansicht = 'offen';
 
