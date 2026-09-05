@@ -41,20 +41,41 @@ async function upsertHolding(portfolioId, wallet, chain, ticker, amount) {
   return 'inserted';
 }
 
+// Sonderfall auf Wunsch: "Bitcoin Mama" ist schon manuell in Portfolio 2 erfasst
+// (mit eigenem Einstandspreis). Statt eine zweite, doppelte Zeile im Ledger-Portfolio
+// anzulegen, aktualisieren wir dort nur die Menge live - Einstandspreis/Wallet/Chain
+// bleiben unangetastet.
+const PORTFOLIO2_BTC_MAMA = { portfolioId: 3, ticker: 'BTC' };
+
+async function updatePortfolio2BtcMama(amount) {
+  const { rows } = await pool.query(
+    `UPDATE portfolio SET amount = $1, updated_at = now()
+     WHERE portfolio_id = $2 AND ticker = $3 RETURNING id`,
+    [amount, PORTFOLIO2_BTC_MAMA.portfolioId, PORTFOLIO2_BTC_MAMA.ticker]
+  );
+  if (!rows.length) throw new Error(`Keine BTC-Zeile in Portfolio ${PORTFOLIO2_BTC_MAMA.portfolioId} gefunden`);
+  return 'updated (Portfolio 2)';
+}
+
 // Fragt alle konfigurierten Ledger-Konten live ab (Bitcoin per xpub-Scan, Ethereum/
-// Arbitrum/Solana/Sui per Adresse) und schreibt die Mengen in die portfolio-Tabelle,
-// Portfolio "Ledger". Kein Einstandspreis hier (nur Mengen) - der kommt, falls
-// bekannt, separat aus der importierten CSV-Analyse.
+// Arbitrum/Solana/Sui per Adresse) und schreibt die Mengen in die portfolio-Tabelle.
+// "Bitcoin Mama" geht nach Portfolio 2 (siehe oben), alles andere ins Portfolio
+// "Ledger". Kein Einstandspreis hier (nur Mengen) - der kommt, falls bekannt, separat
+// aus der importierten CSV-Analyse.
 router.get('/sync-balances', async (req, res) => {
   const results = [];
   const errors = [];
   const portfolioId = await getOrCreateLedgerPortfolio();
 
+  try {
+    const amount = await ledgerBtc.getXpubBalanceBtc(must('LEDGER_BTC_XPUB_MAMA'));
+    const action = await updatePortfolio2BtcMama(amount);
+    results.push({ wallet: 'Bitcoin Mama -> Portfolio 2', ticker: 'BTC', amount, action });
+  } catch (e) {
+    errors.push({ wallet: 'Bitcoin Mama -> Portfolio 2', error: e.message });
+  }
+
   const jobs = [
-    { wallet: 'Ledger BTC (Mama)', chain: 'Bitcoin', run: async () => {
-        const amount = await ledgerBtc.getXpubBalanceBtc(must('LEDGER_BTC_XPUB_MAMA'));
-        return amount > 0 ? [{ ticker: 'BTC', amount }] : [];
-      } },
     { wallet: 'Ledger BTC 1', chain: 'Bitcoin', run: async () => {
         const amount = await ledgerBtc.getXpubBalanceBtc(must('LEDGER_BTC_XPUB_1'));
         return amount > 0 ? [{ ticker: 'BTC', amount }] : [];
