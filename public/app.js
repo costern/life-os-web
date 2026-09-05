@@ -847,8 +847,19 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
       if (elPfPreisStamp) elPfPreisStamp.textContent = '';
       return;
     }
+    // EIN Sammel-Request fuer alle Coins statt einer Einzelabfrage pro Coin -
+    // frueher fuehrte das bei vielen Klicks auf "Aktualisieren" zu CoinGecko-Rate-Limits.
     const preise = {};
-    await Promise.all(holdings.map(async h => { preise[h.id] = await ladePreis(h.ticker || h.asset); }));
+    const tickerListe = [...new Set(holdings.map(h => (h.ticker || h.asset).toUpperCase()))];
+    try {
+      const antwort = await api('/coinprices?tickers=' + encodeURIComponent(tickerListe.join(',')));
+      holdings.forEach(h => {
+        const t = (h.ticker || h.asset).toUpperCase();
+        if (antwort.prices && antwort.prices[t]) preise[h.id] = antwort.prices[t];
+      });
+    } catch (e) {
+      console.warn('Sammel-Kursabfrage fehlgeschlagen:', e.message);
+    }
     letzterPortfolioCheck = new Date(); zeigePortfolioPreisStamp();
 
     // Staub (Restbetraege < 1 $) rausfiltern, damit Dust nicht die Liste zumuellt.
