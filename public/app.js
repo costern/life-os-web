@@ -214,12 +214,17 @@ async function ladeOvTrades(){
       const avg = size ? ((o.entry1||0)*(o.size1||0) + (o.entry2||0)*(o.size2||0)) / size : 0;
       const dir = o.side === 'Short' ? -1 : 1;
       const p = await ladePreis(o.ticker || o.asset);
-      let pctHtml = '<span class="muted">kein Kurs</span>';
-      if (p && isFinite(p.last) && avg){
-        const pct = dir*(p.last-avg)/avg*100;
-        pctHtml = '<span class="'+(pct>=0?'pnl-pos':'pnl-neg')+'">'+(pct>=0?'+':'')+pct.toFixed(1)+'%</span>';
+      let pnlHtml = '<span class="muted">kein Kurs</span>';
+      let kursZeile = 'Entry '+(avg?rundPreis(avg):'–');
+      if (p && isFinite(p.last)){
+        kursZeile += ' → aktuell '+rundPreis(p.last);
+        if (avg && size){
+          const pnl = dir*(p.last-avg)*size;
+          pnlHtml = '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(pnl)+'</span>';
+        }
       }
-      return '<div class="row"><span class="t">'+esc(o.asset)+' <span class="muted">'+esc(o.side)+'</span></span>'+pctHtml+'</div>';
+      return '<div class="row"><span class="t">'+esc(o.asset)+' <span class="muted">'+esc(o.side)+'</span></span>'+pnlHtml+'</div>' +
+        '<div class="muted" style="padding:0 0 6px 0">'+kursZeile+'</div>';
     }));
     el.innerHTML = zeilen.join('');
   } catch(e){ el.innerHTML = '<div class="err">Trades nicht ladbar: '+esc(e.message)+'</div>'; }
