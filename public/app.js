@@ -702,9 +702,6 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
 /* ---------- Portfolio: eigener Reiter auf der Trading-Seite fuer tatsaechlich
    gehaltene Coins (Spot/Wallets) - getrennt von den gehebelten Positionen oben. ---------- */
 (function(){
-  const tabs = document.querySelectorAll('#tradingTabs .tab');
-  const posEl = document.getElementById('tradingSub-positionen');
-  const pfEl = document.getElementById('tradingSub-portfolio');
   const FARBEN = ['#4f46e5','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#db2777','#65a30d','#0284c7','#ea580c'];
   const elChart = document.getElementById('pfChart');
   const elList = document.getElementById('pfList');
@@ -738,16 +735,6 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
       setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1200);
     }
   });
-
-  if (tabs.length){
-    tabs.forEach(btn => btn.addEventListener('click', () => {
-      tabs.forEach(b => b.classList.toggle('active', b === btn));
-      const sub = btn.dataset.sub;
-      posEl.style.display = sub === 'positionen' ? '' : 'none';
-      pfEl.style.display = sub === 'portfolio' ? '' : 'none';
-      if (sub === 'portfolio') ladePortfolioListe();
-    }));
-  }
 
   async function ladePortfolioListe(){
     try { portfolios = await api('/portfolios'); }
@@ -959,6 +946,7 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     renderListe();
   }
   window.ladePortfolio = ladePortfolio;
+  window.ladePortfolioListe = ladePortfolioListe;
 
   elForm.innerHTML =
     '<form class="ntform" id="pfNewForm">' +
@@ -1068,6 +1056,7 @@ function seiteAuffrischen(id){
   else if (id === 'disziplin'){ if (window.ladeReading) window.ladeReading(); }
   else if (id === 'news'){ ladeMacro(); ladeNews(); }
   else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); ladeKalender(); ladeOvTrades(); if (window.ladeTodos) window.ladeTodos(); }
+  else if (id === 'portfolio'){ if (window.ladePortfolioListe) window.ladePortfolioListe(); }
 }
 
 document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });

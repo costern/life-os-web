@@ -15,6 +15,7 @@
     <button data-page="todos"><span class="ico">✅</span>To-Dos</button>
     <button data-page="news"><span class="ico">📰</span>News</button>
     <button data-page="trading"><span class="ico">📈</span>Trading</button>
+    <button data-page="portfolio"><span class="ico">💼</span>Portfolio</button>
     <a href="/api/export" id="exportLink" download style="display:flex;align-items:center;gap:9px;width:100%;
        font-size:14px;color:#6b7280;padding:9px 12px;border-radius:10px;text-decoration:none;margin-top:16px">
        <span class="ico">💾</span>Daten sichern</a>
@@ -142,11 +143,6 @@
     </section>
 
     <section class="page" id="page-trading">
-      <div class="tabbar" id="tradingTabs">
-        <button type="button" class="tab active" data-sub="positionen">Positionen</button>
-        <button type="button" class="tab" data-sub="portfolio">Portfolio</button>
-      </div>
-
       <div id="tradingSub-positionen">
         <div class="grid">
           <div class="card wide" id="tradingTotalCard2" style="display:none">
@@ -172,32 +168,33 @@
         </div>
       </div>
 
-      <div id="tradingSub-portfolio" style="display:none">
-        <div class="grid">
-          <div class="card wide" style="padding-bottom:6px">
-            <div class="tabbar" id="pfTabs"></div>
-            <form id="pfNewPortfolioForm" style="display:flex;gap:6px;margin-top:-6px">
-              <input type="text" id="pfNewPortfolioName" placeholder="Neues Portfolio…" maxlength="60"
-                style="font-family:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);
-                border-radius:8px;background:#fbfbfc;flex:0 0 200px">
-              <button type="submit" class="btn ghost">+ Portfolio anlegen</button>
-            </form>
+    </section>
+
+    <section class="page" id="page-portfolio">
+      <div class="grid">
+        <div class="card wide" style="padding-bottom:6px">
+          <div class="tabbar" id="pfTabs"></div>
+          <form id="pfNewPortfolioForm" style="display:flex;gap:6px;margin-top:-6px">
+            <input type="text" id="pfNewPortfolioName" placeholder="Neues Portfolio…" maxlength="60"
+              style="font-family:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);
+              border-radius:8px;background:#fbfbfc;flex:0 0 200px">
+            <button type="submit" class="btn ghost">+ Portfolio anlegen</button>
+          </form>
+        </div>
+        <div class="pos-hist-grid">
+          <div class="card">
+            <h2>🥧 Portfolio-Verteilung <span class="sub" id="pfStamp"></span></h2>
+            <div id="pfChart"><div class="empty">Lade…</div></div>
           </div>
-          <div class="pos-hist-grid">
-            <div class="card">
-              <h2>🥧 Portfolio-Verteilung <span class="sub" id="pfStamp"></span></h2>
-              <div id="pfChart"><div class="empty">Lade…</div></div>
-            </div>
-            <div class="card">
-              <h2>💼 Holdings <button id="refreshPortfolio" class="btn">Kurse aktualisieren</button></h2>
-              <div class="muted" id="pfPreisStamp" style="margin-bottom:8px"></div>
-              <div id="pfList"><div class="empty">Lade…</div></div>
-            </div>
+          <div class="card">
+            <h2>💼 Holdings <button id="refreshPortfolio" class="btn">Kurse aktualisieren</button></h2>
+            <div class="muted" id="pfPreisStamp" style="margin-bottom:8px"></div>
+            <div id="pfList"><div class="empty">Lade…</div></div>
           </div>
-          <div class="card wide">
-            <h2>➕ Coin hinzufügen</h2>
-            <div id="pfForm"></div>
-          </div>
+        </div>
+        <div class="card wide">
+          <h2>➕ Coin hinzufügen</h2>
+          <div id="pfForm"></div>
         </div>
       </div>
     </section>
