@@ -124,6 +124,18 @@ router.get('/debug-solana', async (req, res) => {
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
+// Ad-hoc-Check einer beliebigen Solana-Adresse (z.B. eine andere Wallet wie Phantom,
+// zum Abgleich, ob dort etwas liegt/lag). ?address=...
+router.get('/debug-solana-address', async (req, res) => {
+  try {
+    const address = req.query.address;
+    if (!address) return res.status(400).json({ error: 'address fehlt' });
+    const holdings = await ledgerSolana.getChainHoldings(address);
+    const sigs = await ledgerSolana.listSignaturesSince(address, '2020-01-01T00:00:00Z');
+    res.json({ ok: true, address, holdings, txCount: sigs.length, firstFew: sigs.slice(-5) });
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
 router.get('/debug-sui', async (req, res) => {
   try {
     const holdings = await ledgerSui.getChainHoldings(must('LEDGER_SUI_ADDRESS'));
