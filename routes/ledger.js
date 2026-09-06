@@ -126,6 +126,17 @@ router.get('/debug-solana', async (req, res) => {
 
 // Ad-hoc-Check einer beliebigen Solana-Adresse (z.B. eine andere Wallet wie Phantom,
 // zum Abgleich, ob dort etwas liegt/lag). ?address=...
+router.get('/debug-solana-tx', async (req, res) => {
+  try {
+    const sigsParam = req.query.sigs;
+    if (!sigsParam) return res.status(400).json({ error: 'sigs fehlt (kommagetrennt)' });
+    const address = must('LEDGER_SOL_ADDRESS');
+    const sigs = sigsParam.split(',').map(s => ({ signature: s.trim() }));
+    const changes = await ledgerSolana.getBalanceChanges(address, sigs);
+    res.json({ ok: true, changes });
+  } catch (e) { res.status(502).json({ error: e.message, detail: e.detail || null }); }
+});
+
 router.get('/debug-solana-address', async (req, res) => {
   try {
     const address = req.query.address;
