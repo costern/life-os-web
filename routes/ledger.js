@@ -131,4 +131,19 @@ router.get('/debug-sui', async (req, res) => {
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
+// Rekonstruktion von Solana-Aktivitaet, die Ledger Live selbst nicht anzeigt (z.B.
+// Swaps ueber Jupiter/DEX). since=ISO-Datum, default 2025-09-18.
+router.get('/debug-solana-history', async (req, res) => {
+  try {
+    const since = req.query.since || '2025-09-18T00:00:00Z';
+    const address = must('LEDGER_SOL_ADDRESS');
+    const sigs = await ledgerSolana.listSignaturesSince(address, since);
+    if (req.query.detail !== '1') {
+      return res.json({ ok: true, count: sigs.length, since, sample: sigs.slice(0, 5) });
+    }
+    const changes = await ledgerSolana.getBalanceChanges(address, sigs);
+    res.json({ ok: true, count: sigs.length, since, changes });
+  } catch (e) { res.status(502).json({ error: e.message, detail: e.detail || null }); }
+});
+
 module.exports = router;
