@@ -14,6 +14,19 @@
 })();
 
 const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+
+// Coin-Icons: liegen als SVG unter /icons/<datei>.svg. COIN_ICON_ALIAS bildet
+// Ticker ab, deren Icon-Dateiname vom Ticker abweicht (z.B. RENDER -> render.svg
+// heisst intern noch "render", war frueher unter RNDR bekannt).
+const COIN_ICONS = new Set(['eth','link','sui','render']);
+const COIN_ICON_ALIAS = { rndr: 'render' };
+function coinIcon(ticker, name){
+  const key = String(ticker || name || '').toLowerCase();
+  const file = COIN_ICON_ALIAS[key] || key;
+  if (COIN_ICONS.has(file)) return '<img class="coin-icon" src="/icons/'+file+'.svg" alt="">';
+  const buchstabe = esc((ticker || name || '?').trim().charAt(0).toUpperCase() || '?');
+  return '<span class="coin-icon coin-icon-fallback">'+buchstabe+'</span>';
+}
 const fmt = n => (n >= 0 ? '+' : '') + Number(n).toFixed(2) + ' $';
 const fmtAmount = n => {
   const x = Number(n);
@@ -586,13 +599,13 @@ async function renderLivePos(){
       } else allPriced = false;
       const beSchon = o.sl != null && avg > 0 && (dir > 0 ? o.sl >= avg : o.sl <= avg);
       const slHtml = o.sl == null ? '<span class="muted">–</span>'
-        : '<span class="'+(beSchon?'pnl-amber':'pnl-neg')+'">'+(beSchon?'BE ':'')+o.sl+'</span>';
+        : '<span class="'+(beSchon?'pnl-amber':'pnl-neg')+'">'+o.sl+'</span>';
       const tpHtml = o.tp == null ? '<span class="muted">–</span>' : '<span class="pnl-pos">'+o.tp+'</span>';
       const realHtml = o.realizedPnl ? '<span class="'+(Number(o.realizedPnl)>=0?'pnl-pos':'pnl-amber')+'">'+fmt(o.realizedPnl)+'</span>' : '<span class="muted">–</span>';
       parts.push(
         '<div class="lp-trow">' +
-          '<div class="lp-col"><span class="t">'+esc(o.asset)+'</span><div class="muted" style="font-size:11px">'+esc(o.side)+(o.name?' · '+esc(o.name):'')+'</div></div>' +
-          '<div class="lp-col lp-sltp"><div>'+slHtml+'</div><div>'+rundPreis(avg)+'</div><div>'+tpHtml+'</div></div>' +
+          '<div class="lp-col"><div class="lp-asset">'+coinIcon(o.ticker, o.asset)+'<span class="t">'+esc(o.asset)+'</span></div><div class="muted" style="font-size:11px">'+esc(o.side)+(o.name?' · '+esc(o.name):'')+'</div></div>' +
+          '<div class="lp-col lp-sltp"><div class="lp-stp-val">'+slHtml+'</div><div class="lp-stp-val">'+rundPreis(avg)+'</div><div class="lp-stp-val">'+tpHtml+'</div></div>' +
           '<div class="lp-col">'+markHtml+'</div>' +
           '<div class="lp-col">'+pnlHtml+'</div>' +
           '<div class="lp-col">'+realHtml+'</div>' +
@@ -621,7 +634,7 @@ async function renderLivePos(){
       '<div class="lp-table-wrap"><div class="lp-table">' +
         '<div class="lp-thead">' +
           '<div class="lp-col">Position</div>' +
-          '<div class="lp-col lp-sltp">SL · Entry · TP</div>' +
+          '<div class="lp-col lp-sltp"><span>SL</span><span>Entry</span><span>TP</span></div>' +
           '<div class="lp-col">Kurs</div>' +
           '<div class="lp-col">Unrealisiert</div>' +
           '<div class="lp-col">Realisiert</div>' +
