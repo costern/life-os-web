@@ -175,6 +175,8 @@ a { color:var(--accent); }
 .lp-sltp > *:nth-child(2) { font-weight:600; }
 .lp-manage { text-align:right; }
 .lp-asset { display:flex; align-items:center; gap:6px; }
+.lp-kurs-col { border-left:1px solid var(--line); padding-left:12px; }
+.kurs-badge { display:inline-block; padding:2px 10px; border-radius:8px; background:var(--badge-blue-bg); color:var(--accent); font-weight:600; }
 .coin-icon { width:18px; height:18px; border-radius:50%; flex:none; }
 .coin-icon-fallback { display:inline-flex; align-items:center; justify-content:center;
   background:var(--badge-blue-bg); color:var(--accent); font-size:10px; font-weight:700; }

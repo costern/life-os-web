@@ -595,7 +595,7 @@ async function renderLivePos(){
         const pnl = dir*(last-avg)*size; total += pnl;
         const pct = avg ? dir*(last-avg)/avg*100 : 0;
         pnlHtml = '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(pnl)+'</span><div class="muted" style="font-size:11px">'+(pct>=0?'+':'')+pct.toFixed(1)+'%</div>';
-        markHtml = rundPreis(last);
+        markHtml = '<span class="kurs-badge">'+rundPreis(last)+'</span>';
       } else allPriced = false;
       const beSchon = o.sl != null && avg > 0 && (dir > 0 ? o.sl >= avg : o.sl <= avg);
       const slHtml = o.sl == null ? '<span class="muted">–</span>'
@@ -604,9 +604,9 @@ async function renderLivePos(){
       const realHtml = o.realizedPnl ? '<span class="'+(Number(o.realizedPnl)>=0?'pnl-pos':'pnl-amber')+'">'+fmt(o.realizedPnl)+'</span>' : '<span class="muted">–</span>';
       parts.push(
         '<div class="lp-trow">' +
-          '<div class="lp-col"><div class="lp-asset">'+coinIcon(o.ticker, o.asset)+'<span class="t">'+esc(o.asset)+'</span></div><div class="muted" style="font-size:11px">'+esc(o.side)+(o.name?' · '+esc(o.name):'')+'</div></div>' +
+          '<div class="lp-col"><div class="lp-asset"'+(o.name?' title="'+esc(o.name)+'"':'')+'>'+coinIcon(o.ticker, o.asset)+'<span class="t">'+esc(o.asset)+'</span></div><div class="muted" style="font-size:11px">'+esc(o.side)+'</div></div>' +
           '<div class="lp-col lp-sltp"><div class="lp-stp-val">'+slHtml+'</div><div class="lp-stp-val">'+rundPreis(avg)+'</div><div class="lp-stp-val">'+tpHtml+'</div></div>' +
-          '<div class="lp-col">'+markHtml+'</div>' +
+          '<div class="lp-col lp-kurs-col">'+markHtml+'</div>' +
           '<div class="lp-col">'+pnlHtml+'</div>' +
           '<div class="lp-col">'+realHtml+'</div>' +
           '<div class="lp-col lp-manage"><span class="lp-toggle" role="button" data-idx="'+idx+'">verwalten</span></div>' +
@@ -635,7 +635,7 @@ async function renderLivePos(){
         '<div class="lp-thead">' +
           '<div class="lp-col">Position</div>' +
           '<div class="lp-col lp-sltp"><span>SL</span><span>Entry</span><span>TP</span></div>' +
-          '<div class="lp-col">Kurs</div>' +
+          '<div class="lp-col lp-kurs-col">Kurs</div>' +
           '<div class="lp-col">Unrealisiert</div>' +
           '<div class="lp-col">Realisiert</div>' +
           '<div class="lp-col"></div>' +
