@@ -1,3 +1,18 @@
+/* ---------- Dark Mode: Umschalter oben rechts, gilt auf jeder Seite ---------- */
+(function(){
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  const istDunkel = () => document.documentElement.getAttribute('data-theme') === 'dark';
+  function setzen(dunkel){
+    if (dunkel) document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('theme', dunkel ? 'dark' : 'light'); } catch(e){}
+    btn.textContent = dunkel ? '☀️' : '🌙';
+  }
+  setzen(istDunkel());
+  btn.addEventListener('click', () => setzen(!istDunkel()));
+})();
+
 const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 const fmt = n => (n >= 0 ? '+' : '') + Number(n).toFixed(2) + ' $';
 const fmtAmount = n => {

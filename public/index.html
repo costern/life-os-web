@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Life OS – Colin</title>
 <link rel="stylesheet" href="/styles.css">
+<script>
+(function(){ try{ if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme','dark'); }catch(e){} })();
+</script>
 </head>
 <body>
 <div class="shell">
@@ -25,7 +28,10 @@
   <main>
     <header class="top">
       <h1 id="greeting">Life OS<span>.</span></h1>
-      <div class="date" id="dateline"></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="date" id="dateline"></div>
+        <button id="themeToggle" class="theme-toggle" type="button" title="Dark Mode umschalten">🌙</button>
+      </div>
     </header>
 
     <section class="page active" id="page-uebersicht">
