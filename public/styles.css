@@ -164,3 +164,13 @@ a { color:var(--accent); }
 .theme-toggle { cursor:pointer; border:1px solid var(--line); background:var(--card); color:var(--ink);
   border-radius:99px; width:30px; height:30px; font-size:14px; display:flex; align-items:center; justify-content:center; line-height:1; }
 .theme-toggle:hover { background:var(--hover-bg); }
+.lp-table-wrap { overflow-x:auto; margin-top:4px; }
+.lp-table { min-width:640px; }
+.lp-thead, .lp-trow { display:grid; grid-template-columns:1.2fr 1.6fr .9fr 1.1fr 1fr .7fr; gap:10px; align-items:center; }
+.lp-thead { font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:0 0 6px; border-bottom:1px solid var(--line); margin-bottom:4px; }
+.lp-trow { padding:9px 0; border-bottom:1px solid var(--line); font-size:13px; }
+.lp-trow:last-of-type { border-bottom:none; }
+.lp-col { min-width:0; }
+.lp-sltp { display:flex; justify-content:space-between; gap:6px; text-align:center; font-size:12.5px; }
+.lp-sltp > div:nth-child(2) { font-weight:600; }
+.lp-manage { text-align:right; }

@@ -575,24 +575,29 @@ async function renderLivePos(){
       const p = await ladePreis(o.ticker || o.asset);
       o._avg = avg; o._size = size; o._dir = dir;
       let pnlHtml = '<span class="muted">kein Kurs</span>';
+      let markHtml = '<span class="muted">–</span>';
       let last = null;
       if (p && isFinite(p.last)){
         last = p.last;
         const pnl = dir*(last-avg)*size; total += pnl;
         const pct = avg ? dir*(last-avg)/avg*100 : 0;
-        pnlHtml = '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(pnl)+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</span>';
+        pnlHtml = '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(pnl)+'</span><div class="muted" style="font-size:11px">'+(pct>=0?'+':'')+pct.toFixed(1)+'%</div>';
+        markHtml = rundPreis(last);
       } else allPriced = false;
       const beSchon = o.sl != null && avg > 0 && (dir > 0 ? o.sl >= avg : o.sl <= avg);
-      const slTxt = o.sl == null ? '<span class="muted">SL –</span>'
-        : beSchon ? '<span class="badge amber">BE</span> '+o.sl
-        : '<span class="badge red">SL</span> '+o.sl;
+      const slHtml = o.sl == null ? '<span class="muted">–</span>'
+        : '<span class="'+(beSchon?'pnl-amber':'pnl-neg')+'">'+(beSchon?'BE ':'')+o.sl+'</span>';
+      const tpHtml = o.tp == null ? '<span class="muted">–</span>' : '<span class="pnl-pos">'+o.tp+'</span>';
+      const realHtml = o.realizedPnl ? '<span class="'+(Number(o.realizedPnl)>=0?'pnl-pos':'pnl-amber')+'">'+fmt(o.realizedPnl)+'</span>' : '<span class="muted">–</span>';
       parts.push(
-        '<div class="row"><span class="t">'+esc(o.asset)+' '+esc(o.side)+' <span class="muted">@ '+
-        avg.toLocaleString('de-DE',{maximumFractionDigits:4})+(last!=null?' → '+last.toLocaleString('de-DE',{maximumFractionDigits:4}):'')+
-        '</span></span>'+pnlHtml+'</div>' +
-        '<div class="muted" style="padding:0 0 6px 0">'+esc(o.name||'')+' · '+slTxt+' · TP '+(o.tp??'–')+
-        (o.realizedPnl ? ' · <span class="'+(Number(o.realizedPnl)>=0?'pnl-pos':'pnl-amber')+'">realisiert '+fmt(o.realizedPnl)+'</span>' : '') +
-        ' · <span class="lp-toggle" role="button" data-idx="'+idx+'">verwalten</span></div>' +
+        '<div class="lp-trow">' +
+          '<div class="lp-col"><span class="t">'+esc(o.asset)+'</span><div class="muted" style="font-size:11px">'+esc(o.side)+(o.name?' · '+esc(o.name):'')+'</div></div>' +
+          '<div class="lp-col lp-sltp"><div>'+slHtml+'</div><div>'+rundPreis(avg)+'</div><div>'+tpHtml+'</div></div>' +
+          '<div class="lp-col">'+markHtml+'</div>' +
+          '<div class="lp-col">'+pnlHtml+'</div>' +
+          '<div class="lp-col">'+realHtml+'</div>' +
+          '<div class="lp-col lp-manage"><span class="lp-toggle" role="button" data-idx="'+idx+'">verwalten</span></div>' +
+        '</div>' +
         '<div class="lp-panel" data-idx="'+idx+'">' +
           '<div class="lp-line">' +
             '<label>SL</label><input type="number" step="any" class="lp-sl" value="'+(o.sl??'')+'">' +
@@ -613,7 +618,17 @@ async function renderLivePos(){
     el.innerHTML =
       '<div class="stats"><div class="stat"><div class="v '+(total>=0?'pnl-pos':'pnl-neg')+'">'+fmt(total)+'</div><div class="l">unrealisierter PnL'+(allPriced?'':' (teilw.)')+'</div></div>' +
       '<div class="stat"><div class="v">'+openTrades.length+'</div><div class="l">offene Positionen</div></div></div>' +
-      parts.join('') +
+      '<div class="lp-table-wrap"><div class="lp-table">' +
+        '<div class="lp-thead">' +
+          '<div class="lp-col">Position</div>' +
+          '<div class="lp-col lp-sltp">SL · Entry · TP</div>' +
+          '<div class="lp-col">Kurs</div>' +
+          '<div class="lp-col">Unrealisiert</div>' +
+          '<div class="lp-col">Realisiert</div>' +
+          '<div class="lp-col"></div>' +
+        '</div>' +
+        parts.join('') +
+      '</div></div>' +
       '<div class="muted" style="margin-top:6px">Live von Crypto.com · ohne Fees/Funding</div>';
   } catch(e){ el.innerHTML = '<div class="err">Live-Daten nicht ladbar: '+esc(e.message)+'</div>'; }
 }
