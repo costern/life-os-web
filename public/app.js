@@ -505,6 +505,15 @@ async function ladeOvTrades(){
     }
   });
 
+  const ntToggle = document.getElementById('ntToggle');
+  const ntForm = document.getElementById('todoAdd');
+  if (ntToggle && ntForm){
+    ntToggle.addEventListener('click', () => {
+      ntForm.hidden = !ntForm.hidden;
+      if (!ntForm.hidden) document.getElementById('ntText').focus();
+    });
+  }
+
   document.getElementById('todoAdd').addEventListener('submit', async ev => {
     ev.preventDefault();
     const text = document.getElementById('ntText').value.trim();
@@ -514,7 +523,7 @@ async function ladeOvTrades(){
     try {
       await api('/todos', { method:'POST', body: JSON.stringify({ text, due: due||null, thema: thema||null }) });
       document.getElementById('ntText').value = ''; document.getElementById('ntDue').value = '';
-      document.getElementById('ntThema').value = ''; await laden();
+      document.getElementById('ntThema').value = ''; ntForm.hidden = true; await laden();
     } catch(e){ alert('Konnte nicht angelegt werden: ' + e.message); }
   });
 })();

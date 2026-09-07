@@ -67,6 +67,15 @@ section.page { display:none; } section.page.active { display:block; }
   border:1px solid var(--line); border-radius:8px; background:var(--input-bg); color:var(--muted); flex:1; min-width:104px; }
 .addbar button { font-family:inherit; font-size:12px; font-weight:500; background:var(--accent); color:#fff;
   border:none; border-radius:8px; padding:6px 14px; cursor:pointer; }
+.todo-topbar-row { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.todo-topbar-row .tabbar { margin-bottom:0; }
+.todo-add-toggle { font-family:inherit; font-size:13px; font-weight:500; background:none; color:var(--accent);
+  border:1px dashed var(--dashed); border-radius:9px; padding:7px 14px; cursor:pointer; }
+.todo-add-toggle:hover { background:var(--badge-blue-bg); }
+.todo-add-toggle .plus { font-weight:700; margin-right:2px; }
+#todoAdd { margin-top:14px; margin-bottom:0; padding-bottom:0; border-bottom:none; }
+.todo-grid { grid-column:1/-1; display:grid; grid-template-columns:1fr; gap:16px; }
+@media (min-width:900px){ .todo-grid { grid-template-columns:1fr 1fr; } }
 .tcb { flex:0 0 18px; width:18px; height:18px; line-height:17px; text-align:center; cursor:pointer;
   color:var(--line); font-size:15px; border-radius:99px; user-select:none; }
 .tcb:hover { background:var(--badge-blue-bg); color:var(--accent); }
