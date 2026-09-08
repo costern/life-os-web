@@ -767,6 +767,146 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
   const elPfPreisStamp = document.getElementById('pfPreisStamp');
   const refreshPortfolioBtn = document.getElementById('refreshPortfolio');
 
+  // Performance-Verlauf
+  const elPerfChart = document.getElementById('perfChart');
+  const elPerfSummary = document.getElementById('perfSummary');
+  const elPerfStamp = document.getElementById('perfStamp');
+  const elPerfTabs = document.getElementById('perfRangeTabs');
+  let perfRange = '1y';
+  const perfBackfillVersucht = new Set();
+  const perfSnapshotHeute = new Set();
+
+  if (elPerfTabs) elPerfTabs.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      perfRange = btn.dataset.range;
+      elPerfTabs.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
+      ladePerformance();
+    });
+  });
+
+  function perfPunkte(verlauf, breite, hoehe, padL, padR, padT, padB){
+    const werte = verlauf.map(v => v.value);
+    let min = Math.min(...werte), max = Math.max(...werte);
+    if (min === max) { min -= 1; max += 1; }
+    const spanne = max - min;
+    min -= spanne * 0.08; max += spanne * 0.08;
+    const innenB = breite - padL - padR, innenH = hoehe - padT - padB;
+    return verlauf.map((v, i) => ({
+      x: padL + (verlauf.length > 1 ? i / (verlauf.length - 1) * innenB : innenB / 2),
+      y: padT + innenH - (v.value - min) / (max - min) * innenH,
+      ...v
+    }));
+  }
+
+  function zeichnePerf(verlauf){
+    if (!elPerfChart) return;
+    if (!verlauf.length){
+      elPerfChart.innerHTML = '<div class="empty">Noch kein Verlauf vorhanden.</div>';
+      if (elPerfSummary) elPerfSummary.innerHTML = '';
+      return;
+    }
+    const B = 640, H = 220, padL = 54, padR = 12, padT = 14, padB = 26;
+    const pts = perfPunkte(verlauf, B, H, padL, padR, padT, padB);
+    const erster = pts[0], letzter = pts[pts.length - 1];
+    const diff = letzter.value - erster.value;
+    const diffPct = erster.value ? diff / erster.value * 100 : 0;
+    const hoch = diff >= 0;
+    const farbe = hoch ? 'var(--green)' : 'var(--red)';
+
+    const linie = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+    const flaeche = linie + ' L' + letzter.x.toFixed(1) + ',' + (H - padB).toFixed(1) +
+      ' L' + erster.x.toFixed(1) + ',' + (H - padB).toFixed(1) + ' Z';
+
+    const werte = verlauf.map(v => v.value);
+    const min = Math.min(...werte), max = Math.max(...werte), mitte = (min + max) / 2;
+    const yFuer = w => padT + (H - padT - padB) - (w - (min - (max - min) * 0.08)) / ((max - min) * 1.16) * (H - padT - padB);
+    const gitterlinien = [max, mitte, min].map(w => {
+      const y = yFuer(w).toFixed(1);
+      return '<line class="perf-grid" x1="'+padL+'" y1="'+y+'" x2="'+(B-padR)+'" y2="'+y+'"/>' +
+        '<text class="perf-grid-label" x="'+(padL-8)+'" y="'+y+'" text-anchor="end" dominant-baseline="middle">'+fmt(w).replace('+','')+'</text>';
+    }).join('');
+
+    const datLabel = d => new Date(d+'T00:00:00').toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year: perfRange==='all'||perfRange==='1y' ? '2-digit' : undefined });
+    const xAchse = [erster, letzter].map((p,i) =>
+      '<text class="perf-grid-label" x="'+p.x.toFixed(1)+'" y="'+(H-6)+'" text-anchor="'+(i===0?'start':'end')+'">'+datLabel(p.date)+'</text>'
+    ).join('');
+
+    const geschaetztDabei = verlauf.some(v => v.estimated);
+
+    elPerfChart.innerHTML =
+      '<svg viewBox="0 0 '+B+' '+H+'" class="perf-svg" preserveAspectRatio="none" id="perfSvg">' +
+        gitterlinien +
+        '<path class="perf-area" d="'+flaeche+'" fill="'+farbe+'"/>' +
+        '<path class="perf-line" d="'+linie+'" stroke="'+farbe+'"/>' +
+        '<circle class="perf-enddot" cx="'+letzter.x.toFixed(1)+'" cy="'+letzter.y.toFixed(1)+'" r="4" fill="'+farbe+'"/>' +
+        '<line id="perfCrosshair" class="perf-crosshair" x1="0" y1="'+padT+'" x2="0" y2="'+(H-padB)+'" style="display:none"/>' +
+        '<circle id="perfHoverDot" class="perf-enddot" r="4" fill="'+farbe+'" style="display:none"/>' +
+        xAchse +
+        '<rect id="perfHitArea" x="'+padL+'" y="0" width="'+(B-padL-padR)+'" height="'+H+'" fill="transparent"/>' +
+      '</svg>' +
+      '<div id="perfTooltip" class="perf-tooltip" style="display:none"></div>';
+
+    if (elPerfSummary) elPerfSummary.innerHTML =
+      '<div class="stat"><div class="v">'+fmt(letzter.value).replace('+','')+'</div><div class="l">Aktueller Wert</div></div>' +
+      '<div class="stat"><div class="v '+(hoch?'pnl-pos':'pnl-neg')+'">'+(hoch?'+':'')+fmt(diff).replace('+','')+'</div><div class="l">Veränderung</div></div>' +
+      '<div class="stat"><div class="v '+(hoch?'pnl-pos':'pnl-neg')+'">'+(hoch?'+':'')+diffPct.toFixed(1)+'%</div><div class="l">seit '+datLabel(erster.date)+'</div></div>';
+
+    if (elPerfStamp) elPerfStamp.textContent = geschaetztDabei ? '· Teile geschätzt (≈ auf Basis aktueller Bestände)' : '';
+
+    // Hover: Fadenkreuz + Tooltip auf die naechstgelegene Tagesposition einrasten.
+    const svg = document.getElementById('perfSvg');
+    const hitArea = document.getElementById('perfHitArea');
+    const crosshair = document.getElementById('perfCrosshair');
+    const hoverDot = document.getElementById('perfHoverDot');
+    const tooltip = document.getElementById('perfTooltip');
+    if (hitArea && svg) {
+      const zeigePunkt = (i) => {
+        const p = pts[i];
+        crosshair.setAttribute('x1', p.x.toFixed(1)); crosshair.setAttribute('x2', p.x.toFixed(1));
+        crosshair.style.display = ''; hoverDot.style.display = '';
+        hoverDot.setAttribute('cx', p.x.toFixed(1)); hoverDot.setAttribute('cy', p.y.toFixed(1));
+        tooltip.style.display = '';
+        tooltip.style.left = (p.x / B * 100) + '%';
+        tooltip.style.top = Math.max(0, p.y - 46) + 'px';
+        tooltip.innerHTML = '<div class="perf-tt-val">'+(p.estimated?'≈ ':'')+fmt(p.value).replace('+','')+'</div><div class="perf-tt-date">'+datLabel(p.date)+'</div>';
+      };
+      const verbergen = () => { crosshair.style.display='none'; hoverDot.style.display='none'; tooltip.style.display='none'; };
+      hitArea.addEventListener('pointermove', ev => {
+        const rect = svg.getBoundingClientRect();
+        const xSvg = (ev.clientX - rect.left) / rect.width * B;
+        let nahester = 0, besterAbstand = Infinity;
+        pts.forEach((p, i) => { const a = Math.abs(p.x - xSvg); if (a < besterAbstand){ besterAbstand = a; nahester = i; } });
+        zeigePunkt(nahester);
+      });
+      hitArea.addEventListener('pointerleave', verbergen);
+    }
+  }
+
+  async function ladePerformance(){
+    if (!aktivesPortfolioId || !elPerfChart) return;
+    const pid = aktivesPortfolioId;
+    elPerfChart.innerHTML = '<div class="empty">Lade…</div>';
+    try {
+      let verlauf = await api('/portfolio/history?portfolioId='+pid+'&range='+perfRange);
+      if (!verlauf.length && !perfBackfillVersucht.has(pid)){
+        perfBackfillVersucht.add(pid);
+        elPerfChart.innerHTML = '<div class="empty">Erstelle geschätzten Verlauf (einmalig, kann ~15s dauern)…</div>';
+        try { await api('/portfolio/backfill?portfolioId='+pid, { method:'POST' }); } catch(e){ /* Chart zeigt notfalls nur ab heute an */ }
+      }
+      if (!perfSnapshotHeute.has(pid)){
+        perfSnapshotHeute.add(pid);
+        try { await api('/portfolio/snapshot?portfolioId='+pid, { method:'POST' }); } catch(e){}
+      }
+      verlauf = await api('/portfolio/history?portfolioId='+pid+'&range='+perfRange);
+      if (pid !== aktivesPortfolioId) return;
+      zeichnePerf(verlauf);
+    } catch(e){
+      if (pid !== aktivesPortfolioId) return;
+      elPerfChart.innerHTML = '<div class="err">Verlauf nicht ladbar: '+esc(e.message)+'</div>';
+      if (elPerfSummary) elPerfSummary.innerHTML = '';
+    }
+  }
+
   function zeigePortfolioPreisStamp(){
     if (!elPfPreisStamp) return;
     if (!letzterPortfolioCheck){ elPfPreisStamp.textContent = ''; return; }
@@ -927,9 +1067,10 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
   }
 
   async function ladePortfolio(){
-    if (!aktivesPortfolioId) { elChart.innerHTML = ''; elList.innerHTML = ''; return; }
+    if (!aktivesPortfolioId) { elChart.innerHTML = ''; elList.innerHTML = ''; if (elPerfChart) elPerfChart.innerHTML = ''; return; }
     elChart.innerHTML = '<div class="empty">Lade…</div>';
     elList.innerHTML = '<div class="empty">Lade…</div>';
+    ladePerformance();
     try { holdings = await api('/portfolio?portfolioId='+aktivesPortfolioId); }
     catch(e){
       elChart.innerHTML = '<div class="err">Portfolio nicht ladbar: '+esc(e.message)+'</div>';

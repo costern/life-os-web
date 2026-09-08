@@ -95,3 +95,17 @@ CREATE TABLE IF NOT EXISTS portfolio (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS portfolio_id INTEGER REFERENCES portfolios(id) DEFAULT 1;
+
+-- Performance-Verlauf: ein Wert pro Portfolio pro Tag. "estimated=true" heisst
+-- rueckwirkend geschaetzt (aktuelle Bestaende x historische Kurse), "false" ist ein
+-- echter, am jeweiligen Tag aufgenommener Snapshot. UNIQUE macht beides ueber
+-- ON CONFLICT wiederholbar (mehrfacher Aufruf am selben Tag legt keine Duplikate an).
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+  id SERIAL PRIMARY KEY,
+  portfolio_id INTEGER NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+  taken_at DATE NOT NULL,
+  value_usd NUMERIC NOT NULL,
+  estimated BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(portfolio_id, taken_at)
+);
