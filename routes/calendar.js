@@ -133,4 +133,39 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Bearbeiten eines bestehenden Termins (Titel, Datum/Zeit, ganztaegig, Ort).
+// Wie beim Anlegen: end = start, falls kein eigenes Ende mitgeschickt wird -
+// diese App verwaltet bisher keine Termin-Dauer, nur den Startzeitpunkt.
+router.patch('/:id', async (req, res) => {
+  if (!konfiguriert()) return res.status(400).json({ error: 'Kalender ist noch nicht konfiguriert' });
+  const b = req.body || {};
+  if (!b.title || !b.start) return res.status(400).json({ error: 'title und start sind Pflicht' });
+  try {
+    const token = await holeAccessToken();
+    const calendarId = encodeURIComponent(process.env.GOOGLE_CALENDAR_ID);
+    const event = {
+      summary: b.title,
+      location: b.location || null,
+      start: b.allDay ? { date: b.start } : { dateTime: b.start },
+      end: b.allDay ? { date: b.end || b.start } : { dateTime: b.end || b.start }
+    };
+    const data = await googleFetch('/calendar/v3/calendars/' + calendarId + '/events/' + encodeURIComponent(req.params.id), token, 'PATCH', event);
+    res.json({ id: data.id, title: data.summary });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  if (!konfiguriert()) return res.status(400).json({ error: 'Kalender ist noch nicht konfiguriert' });
+  try {
+    const token = await holeAccessToken();
+    const calendarId = encodeURIComponent(process.env.GOOGLE_CALENDAR_ID);
+    await googleFetch('/calendar/v3/calendars/' + calendarId + '/events/' + encodeURIComponent(req.params.id), token, 'DELETE');
+    res.status(204).end();
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

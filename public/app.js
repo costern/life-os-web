@@ -276,6 +276,20 @@ async function ladeOvTrades(){
   const label = document.getElementById('calMonthLabel');
   if (!grid || !label) return;
   let aktMonat = new Date(); aktMonat.setDate(1); aktMonat.setHours(0,0,0,0);
+  let aktuelleEvents = [];
+
+  // Termin-Modal (Bearbeiten/Löschen)
+  const modal = document.getElementById('calEventModal');
+  const ceForm = document.getElementById('calEventForm');
+  const ceTitle = document.getElementById('ceTitle');
+  const ceDate = document.getElementById('ceDate');
+  const ceTime = document.getElementById('ceTime');
+  const ceAllDay = document.getElementById('ceAllDay');
+  const ceLocation = document.getElementById('ceLocation');
+  const ceSave = document.getElementById('ceSave');
+  const ceDelete = document.getElementById('ceDelete');
+  const ceCancel = document.getElementById('ceCancel');
+  const ceMsg = document.getElementById('ceMsg');
 
   function montag(d){
     const t = new Date(d);
@@ -306,6 +320,7 @@ async function ladeOvTrades(){
       events = d.events || [];
     } catch(e){ grid.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; return; }
 
+    aktuelleEvents = events;
     const heute = new Date(); heute.setHours(0,0,0,0);
     const tage = [];
     for (let d = new Date(gridStart); d <= gridEnde; d.setDate(d.getDate()+1)) tage.push(new Date(d));
@@ -315,11 +330,91 @@ async function ladeOvTrades(){
       const istHeute = tag.toDateString() === heute.toDateString();
       const istWochenende = tag.getDay() === 0 || tag.getDay() === 6;
       const tagEvents = events.filter(ev => evDatum(ev).toDateString() === tag.toDateString());
-      const evHtml = tagEvents.slice(0,3).map(ev => '<div class="cal-ev" title="'+esc(ev.title)+'">'+esc(ev.title)+'</div>').join('') +
+      const evHtml = tagEvents.slice(0,3).map(ev => '<div class="cal-ev" data-id="'+esc(ev.id)+'" title="'+esc(ev.title)+'">'+esc(ev.title)+'</div>').join('') +
         (tagEvents.length > 3 ? '<div class="muted">+'+(tagEvents.length-3)+' mehr</div>' : '');
       return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+(istWochenende?' weekend':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
     }).join('');
   }
+
+  function oeffneModal(ev){
+    ceMsg.textContent = ''; ceMsg.classList.remove('bad');
+    ceForm.dataset.id = ev.id;
+    ceTitle.value = ev.title === '(ohne Titel)' ? '' : (ev.title || '');
+    ceLocation.value = ev.location || '';
+    ceAllDay.checked = !!ev.allDay;
+    ceTime.disabled = !!ev.allDay;
+    if (ev.allDay){
+      ceDate.value = ev.start;
+      ceTime.value = '';
+    } else {
+      const d = new Date(ev.start);
+      ceDate.value = d.toLocaleDateString('sv-SE');
+      ceTime.value = d.toTimeString().slice(0,5);
+    }
+    modal.hidden = false;
+  }
+
+  function schliesseModal(){
+    modal.hidden = true;
+    delete ceForm.dataset.id;
+    delete ceDelete.dataset.confirm;
+    ceDelete.textContent = 'Löschen';
+    ceDelete.disabled = false;
+  }
+
+  grid.addEventListener('click', ev => {
+    const el = ev.target.closest('.cal-ev');
+    if (!el) return;
+    const found = aktuelleEvents.find(e => e.id === el.dataset.id);
+    if (found) oeffneModal(found);
+  });
+
+  modal.addEventListener('click', ev => { if (ev.target === modal) schliesseModal(); });
+  ceCancel.addEventListener('click', schliesseModal);
+
+  ceAllDay.addEventListener('change', () => { ceTime.disabled = ceAllDay.checked; });
+
+  ceForm.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const id = ceForm.dataset.id;
+    if (!id) return;
+    const title = ceTitle.value.trim();
+    if (!title){ ceMsg.textContent = 'Titel fehlt.'; ceMsg.classList.add('bad'); return; }
+    if (!ceDate.value){ ceMsg.textContent = 'Datum fehlt.'; ceMsg.classList.add('bad'); return; }
+    const allDay = ceAllDay.checked;
+    const start = allDay ? ceDate.value : new Date(ceDate.value + 'T' + (ceTime.value || '00:00') + ':00').toISOString();
+    ceMsg.textContent = ''; ceMsg.classList.remove('bad');
+    ceSave.disabled = true; ceSave.textContent = 'speichert…';
+    try {
+      await api('/calendar/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        body: JSON.stringify({ title, location: ceLocation.value.trim(), allDay, start })
+      });
+      schliesseModal();
+      await laden();
+    } catch(e){ ceMsg.textContent = 'Fehler: ' + e.message; ceMsg.classList.add('bad'); }
+    finally { ceSave.disabled = false; ceSave.textContent = 'Speichern'; }
+  });
+
+  ceDelete.addEventListener('click', async () => {
+    const id = ceForm.dataset.id;
+    if (!id) return;
+    if (ceDelete.dataset.confirm !== '1'){
+      ceDelete.dataset.confirm = '1'; ceDelete.textContent = 'Wirklich löschen?';
+      setTimeout(() => { if (ceDelete.dataset.confirm==='1'){ delete ceDelete.dataset.confirm; ceDelete.textContent = 'Löschen'; } }, 4000);
+      return;
+    }
+    delete ceDelete.dataset.confirm;
+    ceDelete.disabled = true; ceDelete.textContent = 'löscht…';
+    try {
+      await api('/calendar/' + encodeURIComponent(id), { method: 'DELETE' });
+      schliesseModal();
+      await laden();
+    } catch(e){
+      ceMsg.textContent = 'Fehler: ' + e.message; ceMsg.classList.add('bad');
+      ceDelete.disabled = false; ceDelete.textContent = 'Löschen';
+    }
+  });
 
   document.getElementById('calPrev').addEventListener('click', () => { aktMonat.setMonth(aktMonat.getMonth()-1); laden(); });
   document.getElementById('calNext').addEventListener('click', () => { aktMonat.setMonth(aktMonat.getMonth()+1); laden(); });

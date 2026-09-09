@@ -137,6 +137,33 @@
       </div>
     </section>
 
+    <div class="modal-overlay" id="calEventModal" hidden>
+      <div class="modal-card todo-panel on">
+        <h2 style="margin-bottom:12px">🗓️ Termin bearbeiten</h2>
+        <form id="calEventForm">
+          <div class="tp-line">
+            <input type="text" id="ceTitle" placeholder="Titel" maxlength="200" required style="flex:1;min-width:200px">
+          </div>
+          <div class="tp-line">
+            <input type="date" id="ceDate" required>
+            <input type="time" id="ceTime">
+            <label class="muted" style="display:flex;align-items:center;gap:5px;font-size:13px">
+              <input type="checkbox" id="ceAllDay" style="width:auto"> ganztägig
+            </label>
+          </div>
+          <div class="tp-line">
+            <input type="text" id="ceLocation" placeholder="Ort (optional)" maxlength="200" style="flex:1;min-width:200px">
+          </div>
+          <div class="tp-line">
+            <button type="submit" id="ceSave">Speichern</button>
+            <button type="button" id="ceDelete" class="danger">Löschen</button>
+            <button type="button" id="ceCancel" class="ghost">Abbrechen</button>
+          </div>
+          <div class="te-msg" id="ceMsg"></div>
+        </form>
+      </div>
+    </div>
+
     <section class="page" id="page-news">
       <div class="grid">
         <div class="card wide">
