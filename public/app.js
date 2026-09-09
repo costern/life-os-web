@@ -263,7 +263,7 @@ async function ladeOvTrades(){
           pnlHtml = '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(pnl)+'</span>';
         }
       }
-      return '<div class="row"><span class="t">'+esc(o.asset)+' <span class="muted">'+esc(o.side)+'</span></span>'+pnlHtml+'</div>' +
+      return '<div class="row"><span class="t">'+coinIcon(o.ticker, o.asset)+' '+esc(o.asset)+' <span class="muted">'+esc(o.side)+'</span></span>'+pnlHtml+'</div>' +
         '<div class="muted" style="padding:0 0 6px 0">'+kursZeile+'</div>';
     }));
     el.innerHTML = zeilen.join('');
