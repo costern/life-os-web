@@ -74,8 +74,10 @@ section.page { display:none; } section.page.active { display:block; }
 .todo-add-toggle:hover { background:var(--badge-blue-bg); }
 .todo-add-toggle .plus { font-weight:700; margin-right:2px; }
 #todoAdd { margin-top:14px; margin-bottom:0; padding-bottom:0; border-bottom:none; }
-.todo-grid { grid-column:1/-1; display:grid; grid-template-columns:1fr; gap:16px; }
-@media (min-width:900px){ .todo-grid { grid-template-columns:1fr 1fr; } }
+.todo-board { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:flex-start; gap:16px; }
+.todo-col { flex:1 1 260px; max-width:380px; }
+.addrow input[type=text] { font-family:inherit; font-size:12px; padding:5px 8px; border:1px solid var(--line);
+  border-radius:8px; background:var(--input-bg); color:var(--ink); flex:1; min-width:104px; width:auto; }
 
 .perf-wrap { position:relative; }
 .perf-svg { width:100%; height:220px; display:block; overflow:visible; }

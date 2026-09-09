@@ -453,24 +453,33 @@ async function ladeOvTrades(){
 })();
 
 (function(){
-  const elTodos = document.getElementById('todos');
-  const elBeob = document.getElementById('beob');
+  const elBoard = document.getElementById('todoBoard');
   const elOvTodos = document.getElementById('ovTodos');
   const elOvBeob = document.getElementById('ovBeobachten');
-  const THEMEN_LISTE = ['Trading','Beobachten','Dashboard','Sport','Arbeit','Privat','Sonstiges'];
+  const THEMEN_VORSCHLAEGE = ['Trading','Beobachten','Dashboard','Sport','Arbeit','Privat','Sonstiges'];
   let rows = [];
   let ansicht = 'offen';
 
+  function themaSlug(th){
+    return (th || 'ohne').toLowerCase().replace(/[^a-z0-9äöüß]+/g,'-').replace(/^-+|-+$/g,'') || 'ohne';
+  }
+
+  function renderThemaDatalist(){
+    const dl = document.getElementById('themaSuggest');
+    if (!dl) return;
+    const themen = Array.from(new Set([...THEMEN_VORSCHLAEGE, ...rows.map(r => r.thema).filter(Boolean)]))
+      .sort((a,b) => a.localeCompare(b,'de'));
+    dl.innerHTML = themen.map(th => '<option value="'+esc(th)+'">').join('');
+  }
+
   function panel(r){
-    const themaOpts = '<option value="">Thema…</option>' + THEMEN_LISTE.map(th =>
-      '<option'+(r.thema===th?' selected':'')+'>'+th+'</option>').join('');
     const prioOpts = '<option value="">Priorität…</option>' + ['Hoch','Mittel','Niedrig'].map(p =>
       '<option'+(r.prio===p?' selected':'')+'>'+p+'</option>').join('');
     return '<div class="todo-panel" data-id="'+r.id+'">' +
       '<div class="tp-line"><input type="text" class="te-text" maxlength="200" value="'+esc(r.text)+'" placeholder="Aufgabe"></div>' +
       '<div class="tp-line">' +
         '<input type="date" class="te-due" value="'+(r.due ? String(r.due).slice(0,10) : '')+'">' +
-        '<select class="te-thema">'+themaOpts+'</select>' +
+        '<input type="text" class="te-thema" list="themaSuggest" maxlength="40" value="'+esc(r.thema||'')+'" placeholder="Thema…">' +
         '<select class="te-prio">'+prioOpts+'</select>' +
       '</div>' +
       '<div class="tp-line">' +
@@ -481,12 +490,12 @@ async function ladeOvTrades(){
     '</div>';
   }
 
-  function zeile(r){
+  function zeile(r, hideThema){
     return '<div class="row" data-id="'+r.id+'">' +
       '<span class="tcb'+(r.done?' done':'')+'" role="button">'+(r.done?'✓':'○')+'</span>' +
       '<span class="t">'+esc(r.text)+'</span>' +
       (r.prio ? '<span class="badge'+(r.prio==='Hoch'?' red':r.prio==='Mittel'?' amber':'')+'">'+esc(r.prio)+'</span>' : '') +
-      (r.thema ? '<span class="badge">'+esc(r.thema)+'</span>' : '') +
+      (r.thema && !hideThema ? '<span class="badge">'+esc(r.thema)+'</span>' : '') +
       (r.due ? '<span class="muted">'+new Date(r.due).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</span>' : '') +
       '<span class="row-actions">' +
         '<span class="icon-btn todo-edit-toggle" role="button" title="Bearbeiten">✎</span>' +
@@ -506,27 +515,43 @@ async function ladeOvTrades(){
 
   function zeichne(){
     const gefiltert = rows.filter(r => ansicht === 'erledigt' ? r.done : !r.done);
-    const normal = sortiert(gefiltert.filter(r => r.thema !== 'Beobachten'));
-    const beob = sortiert(gefiltert.filter(r => r.thema === 'Beobachten'));
 
     ov.todos = rows.filter(r => !r.done).length; renderOverview();
 
-    if (elTodos) elTodos.innerHTML = normal.length ? normal.map(zeile).join('')
-      : '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Keine offenen To-Dos')+'</div>';
-    if (elBeob) elBeob.innerHTML = beob.length ? beob.map(zeile).join('')
-      : '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Nichts zu beobachten')+'</div>';
+    // ToDo-Seite: eigene Spalte pro Thema, nebeneinander
+    if (elBoard){
+      const themen = Array.from(new Set(gefiltert.map(r => r.thema).filter(Boolean))).sort((a,b) => a.localeCompare(b,'de'));
+      const ohneThema = sortiert(gefiltert.filter(r => !r.thema));
+      const spalten = [];
+      if (ohneThema.length || !themen.length) spalten.push({ label:'Ohne Thema', liste: ohneThema });
+      themen.forEach(th => spalten.push({ label: th, liste: sortiert(gefiltert.filter(r => r.thema === th)) }));
 
+      elBoard.innerHTML = spalten.map(sp =>
+        '<div class="card todo-col" data-thema-slug="'+themaSlug(sp.label==='Ohne Thema'?'':sp.label)+'">' +
+          '<h2>'+esc(sp.label)+' <span class="sub">'+sp.liste.length+'</span></h2>' +
+          '<div class="todo-col-list">' + (sp.liste.length ? sp.liste.map(r => zeile(r, true)).join('') :
+            '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Keine Einträge')+'</div>') +
+          '</div>' +
+        '</div>'
+      ).join('') || '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Keine offenen To-Dos')+'</div>';
+    }
+
+    // Übersicht-Seite: kompakte Vorschau, "Beobachten" weiterhin eigens hervorgehoben
+    const normal = sortiert(gefiltert.filter(r => r.thema !== 'Beobachten'));
+    const beob = sortiert(gefiltert.filter(r => r.thema === 'Beobachten'));
     const normalOffen = normal.filter(r => !r.done);
     const beobOffen = beob.filter(r => !r.done);
     if (elOvTodos) elOvTodos.innerHTML = normalOffen.length ? normalOffen.slice(0,6).map(zeile).join('') : '<div class="empty">Alles erledigt ✨</div>';
     if (elOvBeob) elOvBeob.innerHTML = beobOffen.length ? beobOffen.slice(0,6).map(zeile).join('') : '<div class="empty">Nichts zu beobachten</div>';
+
+    renderThemaDatalist();
   }
 
   async function laden(){
     try { rows = await api('/todos'); zeichne(); }
     catch(e){
       const msg = '<div class="err">To-Dos nicht ladbar: '+esc(e.message)+'</div>';
-      [elTodos, elBeob, elOvTodos, elOvBeob].forEach(el => { if (el) el.innerHTML = msg; });
+      [elBoard, elOvTodos, elOvBeob].forEach(el => { if (el) el.innerHTML = msg; });
     }
   }
   window.ladeTodos = laden;
@@ -541,7 +566,7 @@ async function ladeOvTrades(){
   });
 
   document.addEventListener('click', async ev => {
-    if (!ev.target.closest('#todos, #beob, #ovTodos, #ovBeobachten')) return;
+    if (!ev.target.closest('#todoBoard, #ovTodos, #ovBeobachten')) return;
 
     const cb = ev.target.closest('.tcb');
     if (cb){
@@ -584,7 +609,7 @@ async function ladeOvTrades(){
       const id = p.dataset.id;
       const text = p.querySelector('.te-text').value.trim();
       const due = p.querySelector('.te-due').value;
-      const thema = p.querySelector('.te-thema').value;
+      const thema = p.querySelector('.te-thema').value.trim();
       const prio = p.querySelector('.te-prio').value;
       const msg = p.querySelector('.te-msg');
       if (!text){ msg.textContent = 'Text darf nicht leer sein'; msg.className = 'te-msg bad'; return; }
@@ -614,7 +639,7 @@ async function ladeOvTrades(){
     const text = document.getElementById('ntText').value.trim();
     if (!text) return;
     const due = document.getElementById('ntDue').value;
-    const thema = document.getElementById('ntThema').value;
+    const thema = document.getElementById('ntThema').value.trim();
     try {
       await api('/todos', { method:'POST', body: JSON.stringify({ text, due: due||null, thema: thema||null }) });
       document.getElementById('ntText').value = ''; document.getElementById('ntDue').value = '';
