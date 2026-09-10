@@ -91,6 +91,14 @@ section.page { display:none; } section.page.active { display:block; }
 .perf-tooltip { position:absolute; transform:translateX(-50%); background:var(--card); border:1px solid var(--line);
   border-radius:8px; padding:5px 9px; font-size:12px; box-shadow:0 4px 12px rgba(0,0,0,.12); pointer-events:none; white-space:nowrap; }
 .perf-tt-val { font-weight:700; } .perf-tt-date { color:var(--muted); font-size:11px; }
+.wl-legend { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
+.wl-legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+.wl-wrap { overflow-x:auto; }
+.wl-svg { display:block; }
+.wl-row-label { font-size:11px; fill:var(--muted); font-family:inherit; }
+.wl-grid { stroke:var(--line); stroke-width:1; }
+.wl-axis-label { font-size:10px; fill:var(--muted); font-family:inherit; }
+.wl-dot { stroke:var(--card); stroke-width:1.5; cursor:default; }
 .tcb { flex:0 0 18px; width:18px; height:18px; line-height:17px; text-align:center; cursor:pointer;
   color:var(--line); font-size:15px; border-radius:99px; user-select:none; }
 .tcb:hover { background:var(--badge-blue-bg); color:var(--accent); }
