@@ -94,11 +94,19 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-legend { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
 .wl-legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
 .wl-wrap { overflow-x:auto; }
+.wl-chart-wrap { position:relative; overflow-x:auto; }
 .wl-svg { display:block; }
 .wl-row-label { font-size:11px; fill:var(--muted); font-family:inherit; }
 .wl-grid { stroke:var(--line); stroke-width:1; }
+.wl-grid-v { stroke:var(--line); stroke-width:1; opacity:.6; }
 .wl-axis-label { font-size:10px; fill:var(--muted); font-family:inherit; }
-.wl-dot { stroke:var(--card); stroke-width:1.5; cursor:default; }
+.wl-axis-label-y { font-size:10px; fill:var(--muted); font-family:inherit; }
+.wl-btc-line { fill:none; stroke:var(--muted); stroke-width:1.5; opacity:.85; stroke-linejoin:round; }
+.wl-btc-area { fill:var(--muted); opacity:.08; }
+.wl-dot { stroke:var(--card); stroke-width:1.5; cursor:pointer; }
+.wl-tooltip { position:absolute; transform:translate(-50%,-100%); background:var(--card); border:1px solid var(--line);
+  border-radius:8px; padding:5px 9px; font-size:12px; box-shadow:0 4px 12px rgba(0,0,0,.12); pointer-events:none;
+  white-space:normal; max-width:280px; z-index:5; }
 .tcb { flex:0 0 18px; width:18px; height:18px; line-height:17px; text-align:center; cursor:pointer;
   color:var(--line); font-size:15px; border-radius:99px; user-select:none; }
 .tcb:hover { background:var(--badge-blue-bg); color:var(--accent); }
