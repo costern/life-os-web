@@ -724,44 +724,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
 
   const btcZeit = BTC_DAILY.map(d => new Date(d[0]+'T00:00:00').getTime());
   const btcPreis = BTC_DAILY.map(d => d[1]);
-  const minT = btcZeit[0], maxT = btcZeit[btcZeit.length - 1];
-  const spanne = Math.max(maxT - minT, 1);
+  const fullMinT = btcZeit[0], fullMaxT = btcZeit[btcZeit.length - 1];
 
-  const minP = Math.min(...btcPreis), maxP = Math.max(...btcPreis);
-  const logMin = Math.log(minP * 0.85), logMax = Math.log(maxP * 1.12);
-  const logSpanne = logMax - logMin;
-
-  const padL = 58, padR = 16, padT = 18, padB = 26, W = 860, H = 300;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
-
-  const x = t => padL + (t - minT) / spanne * plotW;
-  const yPreis = p => padT + plotH - (Math.log(p) - logMin) / logSpanne * plotH;
-
-  // BTC-Preislinie + Fläche (Hintergrund)
-  const linie = btcZeit.map((t,i) => (i===0?'M':'L') + x(t).toFixed(1) + ',' + yPreis(btcPreis[i]).toFixed(1)).join(' ');
-  const flaeche = linie + ' L' + x(maxT).toFixed(1) + ',' + (H-padB).toFixed(1) + ' L' + x(minT).toFixed(1) + ',' + (H-padB).toFixed(1) + ' Z';
-
-  // Preis-Gitterlinien (log, runde USD-Werte)
-  const tickKandidaten = [10000,15000,20000,30000,50000,70000,100000,150000,200000,300000];
-  const ticks = tickKandidaten.filter(v => v >= minP*0.85 && v <= maxP*1.12);
-  const preisGitter = ticks.map(v => {
-    const yt = yPreis(v);
-    return '<line class="wl-grid" x1="'+padL+'" y1="'+yt.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+yt.toFixed(1)+'"/>' +
-      '<text class="wl-axis-label-y" x="'+(padL-8)+'" y="'+(yt+3).toFixed(1)+'" text-anchor="end">'+(v>=1000?(v/1000)+'k':v)+' $</text>';
-  }).join('');
-
-  // Jahres-Gitterlinien (X-Achse)
-  const jahre = [];
-  for (let j = new Date(minT).getFullYear(); j <= new Date(maxT).getFullYear(); j++) jahre.push(j);
-  const jahresGitter = jahre.map(j => {
-    const t = new Date(j, 0, 1).getTime();
-    if (t < minT || t > maxT) return '';
-    const xt = x(t);
-    return '<line class="wl-grid-v" x1="'+xt.toFixed(1)+'" y1="'+padT+'" x2="'+xt.toFixed(1)+'" y2="'+(H-padB)+'"/>' +
-      '<text class="wl-axis-label" x="'+xt.toFixed(1)+'" y="'+(H-8)+'">'+j+'</text>';
-  }).join('');
-
-  // BTC-Kurs zu einem Datum nachschlagen (nächstliegender Tag)
   const btcMap = new Map(BTC_DAILY.map(d => [d[0], d[1]]));
   function btcPreisAm(dateStr){
     if (btcMap.has(dateStr)) return btcMap.get(dateStr);
@@ -774,62 +738,246 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     return beste;
   }
 
-  // Signale nach Datum gruppieren, damit gleichzeitige Signale nicht exakt übereinanderliegen
-  const nachDatum = {};
-  WATCHLIST_SIGNALE.forEach(s => { (nachDatum[s.date] = nachDatum[s.date] || []).push(s); });
+  function niceStep(rough){
+    const exp = Math.floor(Math.log10(rough));
+    const f = rough / Math.pow(10, exp);
+    const nf = f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10;
+    return nf * Math.pow(10, exp);
+  }
+  function preisLabel(v){
+    return (v >= 1000 ? Math.round(v/1000) + 'k' : Math.round(v)) + ' $';
+  }
 
-  const punkte = [];
-  Object.keys(nachDatum).forEach(datum => {
-    const gruppe = nachDatum[datum];
-    const preis = btcPreisAm(datum);
-    const cx0 = x(new Date(datum+'T00:00:00').getTime());
-    const cy0 = yPreis(preis);
-    gruppe.forEach((s, i) => {
-      const dx = (i - (gruppe.length - 1) / 2) * 11;
-      const cx = cx0 + dx;
-      const titel = s.label+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[s.status]+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $';
-      punkte.push({ cx, cy: cy0, farbe: WL_FARBEN[s.status], titel });
-    });
+  // Signale, die zeitlich nah beieinanderliegen (gleicher Tag oder <=2 Tage Abstand),
+  // werden zu einer Gruppe zusammengefasst und im Chart + in der Tabelle markiert.
+  const sigSortiert = WATCHLIST_SIGNALE.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const CLUSTER_GRENZE = 2 * 86400000;
+  const cluster = [];
+  let aktuell = null;
+  sigSortiert.forEach(s => {
+    const t = new Date(s.date+'T00:00:00').getTime();
+    if (aktuell && (t - aktuell.maxT) <= CLUSTER_GRENZE) {
+      aktuell.sigs.push(s); aktuell.maxT = Math.max(aktuell.maxT, t);
+    } else {
+      aktuell = { sigs: [s], minT: t, maxT: t };
+      cluster.push(aktuell);
+    }
   });
+  const echteCluster = cluster.filter(c => c.sigs.length >= 2);
+  const clusterVonSignal = new Map();
+  echteCluster.forEach((c, ci) => c.sigs.forEach(s => clusterVonSignal.set(s, ci)));
 
-  const punkteHtml = punkte.map((p,i) =>
-    '<circle class="wl-dot" data-i="'+i+'" cx="'+p.cx.toFixed(1)+'" cy="'+p.cy.toFixed(1)+'" r="6" fill="'+p.farbe+'"></circle>'
-  ).join('');
+  // Icon je Asset: bekannte Ticker als farbiges SVG-Logo (CDN, mit Fallback-Buchstaben-Icon
+  // bei fehlendem Logo), damit gleiche Assets im Chart und in der Tabelle immer gleich aussehen.
+  function assetIconHtml(asset){
+    const ticker = String(asset || '').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const buchstabe = esc((asset || '?').trim().slice(0,3).toUpperCase());
+    return '<span class="wl-icon">' +
+      '<img src="https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/'+ticker+'.svg" alt="" ' +
+        'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+      '<span class="wl-icon-fallback" style="display:none">'+buchstabe+'</span>' +
+    '</span>';
+  }
 
-  const fehlsignale = WATCHLIST_SIGNALE.filter(s => s.status === 'fehlsignal').length;
-  const assetsAnzahl = new Set(WATCHLIST_SIGNALE.map(s => s.asset)).size;
+  const B = 860, PADL = 54, PADR = 16, PADT = 18, PADB = 30, H = 340;
+  const PLOTW = B - PADL - PADR, PLOTH = H - PADT - PADB;
+  let domain = [fullMinT, fullMaxT];
 
-  el.innerHTML =
-    '<div class="stats" style="margin-bottom:10px">' +
-      '<div class="stat"><div class="v">'+WATCHLIST_SIGNALE.length+'</div><div class="l">Signale</div></div>' +
-      '<div class="stat"><div class="v">'+assetsAnzahl+'</div><div class="l">Assets</div></div>' +
-      '<div class="stat"><div class="v pnl-neg">'+fehlsignale+'</div><div class="l">Fehlsignale</div></div>' +
-    '</div>' +
-    '<div class="wl-chart-wrap">' +
-      '<svg viewBox="0 0 '+W+' '+H+'" class="wl-svg" id="wlSvg">' +
-        preisGitter + jahresGitter +
-        '<path class="wl-btc-area" d="'+flaeche+'"/>' +
-        '<path class="wl-btc-line" d="'+linie+'"/>' +
-        punkteHtml +
-      '</svg>' +
-      '<div id="wlTooltip" class="wl-tooltip" style="display:none"></div>' +
-    '</div>';
+  function render(){
+    const [minT, maxT] = domain;
+    const spanne = Math.max(maxT - minT, 1);
+    const x = t => PADL + (t - minT) / spanne * PLOTW;
+    const tVonX = px => minT + (px - PADL) / PLOTW * spanne;
 
-  const svg = document.getElementById('wlSvg');
-  const tooltip = document.getElementById('wlTooltip');
-  if (svg && tooltip) {
-    svg.querySelectorAll('.wl-dot').forEach(dot => {
-      const p = punkte[+dot.dataset.i];
-      dot.addEventListener('pointerenter', () => {
-        const rect = svg.getBoundingClientRect();
+    let i0 = btcZeit.findIndex(t => t >= minT); if (i0 < 0) i0 = 0; i0 = Math.max(0, i0 - 1);
+    let i1 = btcZeit.length - 1; while (i1 > 0 && btcZeit[i1] > maxT) i1--; i1 = Math.min(btcZeit.length - 1, i1 + 1);
+    const visZeit = btcZeit.slice(i0, i1 + 1), visPreis = btcPreis.slice(i0, i1 + 1);
+
+    const minP = Math.min(...visPreis), maxP = Math.max(...visPreis);
+    const logMin = Math.log(Math.max(minP * 0.9, 1)), logMax = Math.log(maxP * 1.1);
+    const logSpanne = Math.max(logMax - logMin, 0.0001);
+    const yPreis = p => PADT + PLOTH - (Math.log(p) - logMin) / logSpanne * PLOTH;
+
+    const linie = visZeit.map((t,i) => (i===0?'M':'L') + x(t).toFixed(1) + ',' + yPreis(visPreis[i]).toFixed(1)).join(' ');
+    const flaeche = linie + ' L' + x(visZeit[visZeit.length-1]).toFixed(1) + ',' + (H-PADB).toFixed(1) +
+      ' L' + x(visZeit[0]).toFixed(1) + ',' + (H-PADB).toFixed(1) + ' Z';
+
+    // Preis-Gitterlinien: "runde" Schritte, passen sich beim Reinzoomen automatisch an
+    const rawStep = (maxP - minP) / 4 || maxP * 0.2;
+    const step = niceStep(rawStep);
+    const preisTicks = [];
+    for (let v = Math.ceil(minP / step) * step; v <= maxP; v += step) preisTicks.push(v);
+    const preisGitter = preisTicks.map(v => {
+      const yt = yPreis(v);
+      return '<line class="wl-grid" x1="'+PADL+'" y1="'+yt.toFixed(1)+'" x2="'+(B-PADR)+'" y2="'+yt.toFixed(1)+'"/>' +
+        '<text class="wl-axis-label-y" x="'+(PADL-8)+'" y="'+(yt+3).toFixed(1)+'" text-anchor="end">'+preisLabel(v)+'</text>';
+    }).join('');
+
+    // Zeit-Gitter: je nach Zoomstufe Jahre, Monate oder einzelne Tage
+    const spanTage = spanne / 86400000;
+    let zeitTicks = [];
+    if (spanTage > 540) {
+      for (let j = new Date(minT).getFullYear(); j <= new Date(maxT).getFullYear(); j++) {
+        const t = new Date(j, 0, 1).getTime();
+        if (t >= minT && t <= maxT) zeitTicks.push({ t, label: String(j) });
+      }
+    } else if (spanTage > 50) {
+      let cur = new Date(new Date(minT).getFullYear(), new Date(minT).getMonth(), 1);
+      while (cur.getTime() <= maxT) {
+        const t = cur.getTime();
+        if (t >= minT) zeitTicks.push({ t, label: cur.toLocaleDateString('de-DE',{month:'short',year:'2-digit'}) });
+        cur = new Date(cur.getFullYear(), cur.getMonth()+1, 1);
+      }
+    } else {
+      const n = 6;
+      for (let k = 0; k <= n; k++) {
+        const t = minT + (k/n) * spanne;
+        zeitTicks.push({ t, label: new Date(t).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) });
+      }
+    }
+    const zeitGitter = zeitTicks.map(tk => {
+      const xt = x(tk.t);
+      return '<line class="wl-grid-v" x1="'+xt.toFixed(1)+'" y1="'+PADT+'" x2="'+xt.toFixed(1)+'" y2="'+(H-PADB)+'"/>' +
+        '<text class="wl-axis-label" x="'+xt.toFixed(1)+'" y="'+(H-10)+'">'+tk.label+'</text>';
+    }).join('');
+
+    // Cluster-Bänder (Signale mit <=2 Tagen Abstand) im sichtbaren Bereich
+    const clusterBaender = echteCluster.map(c => {
+      if (c.maxT < minT || c.minT > maxT) return '';
+      const x0 = Math.max(x(c.minT) - 10, PADL), x1 = Math.min(x(c.maxT) + 10, B - PADR);
+      if (x1 <= x0) return '';
+      return '<rect class="wl-cluster-band" x="'+x0.toFixed(1)+'" y="'+PADT+'" width="'+(x1-x0).toFixed(1)+'" height="'+PLOTH+'" rx="4"/>';
+    }).join('');
+
+    // Signale im sichtbaren Zeitraum, nach Datum gruppiert (Jitter bei Mehrfach-Signalen am selben Tag)
+    const sichtbar = WATCHLIST_SIGNALE.filter(s => {
+      const t = new Date(s.date+'T00:00:00').getTime();
+      return t >= minT - CLUSTER_GRENZE && t <= maxT + CLUSTER_GRENZE;
+    });
+    const nachDatum = {};
+    sichtbar.forEach(s => { (nachDatum[s.date] = nachDatum[s.date] || []).push(s); });
+
+    const marker = [];
+    Object.keys(nachDatum).forEach(datum => {
+      const gruppe = nachDatum[datum];
+      const preis = btcPreisAm(datum);
+      const cx0 = x(new Date(datum+'T00:00:00').getTime());
+      const cy0 = yPreis(preis);
+      gruppe.forEach((s, i) => {
+        const dx = (i - (gruppe.length - 1) / 2) * 24;
+        const cx = cx0 + dx;
+        if (cx < PADL - 20 || cx > B - PADR + 20) return;
+        const titel = s.label+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[s.status]+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+(clusterVonSignal.has(s) ? ' · Teil einer Signal-Häufung' : '');
+        marker.push({ cx, cy: cy0, farbe: WL_FARBEN[s.status], titel, asset: s.asset, geclustert: clusterVonSignal.has(s) });
+      });
+    });
+
+    const markerHtml = marker.map((p,i) =>
+      '<span class="wl-marker'+(p.geclustert?' geclustert':'')+'" data-i="'+i+'" style="left:'+(p.cx/B*100).toFixed(2)+'%;top:'+(p.cy/H*100).toFixed(2)+'%;border-color:'+p.farbe+'">' +
+        assetIconHtml(p.asset) +
+      '</span>'
+    ).join('');
+
+    const zoomAktiv = domain[0] !== fullMinT || domain[1] !== fullMaxT;
+    const fehlsignale = WATCHLIST_SIGNALE.filter(s => s.status === 'fehlsignal').length;
+    const assetsAnzahl = new Set(WATCHLIST_SIGNALE.map(s => s.asset)).size;
+
+    const tabelle = sigSortiert.slice().reverse().map(s => {
+      const geclustert = clusterVonSignal.has(s);
+      return '<tr class="'+(geclustert?'wl-row-cluster':'')+'">' +
+        '<td class="muted">'+esc(s.label)+'</td>' +
+        '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
+        '<td class="muted">'+esc(s.tf||'–')+'</td>' +
+        '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[s.status]+';color:'+WL_FARBEN[s.status]+'">'+WL_LABEL[s.status]+'</span></td>' +
+        '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
+      '</tr>';
+    }).join('');
+
+    el.innerHTML =
+      '<div class="stats" style="margin-bottom:10px">' +
+        '<div class="stat"><div class="v">'+WATCHLIST_SIGNALE.length+'</div><div class="l">Signale</div></div>' +
+        '<div class="stat"><div class="v">'+assetsAnzahl+'</div><div class="l">Assets</div></div>' +
+        '<div class="stat"><div class="v pnl-neg">'+fehlsignale+'</div><div class="l">Fehlsignale</div></div>' +
+      '</div>' +
+      '<div class="wl-toolbar">' +
+        '<span class="muted">🔍 Ziehen zum Hineinzoomen · Doppelklick zum Zurücksetzen</span>' +
+        (zoomAktiv ? '<button type="button" class="btn ghost" id="wlZoomReset">Zoom zurücksetzen</button>' : '') +
+      '</div>' +
+      '<div class="wl-chart-wrap" id="wlChartWrap">' +
+        '<svg viewBox="0 0 '+B+' '+H+'" preserveAspectRatio="none" class="wl-svg" id="wlSvg">' +
+          preisGitter + zeitGitter + clusterBaender +
+          '<path class="wl-btc-area" d="'+flaeche+'"/>' +
+          '<path class="wl-btc-line" d="'+linie+'"/>' +
+          '<rect id="wlSelRect" class="wl-sel-rect" x="0" y="'+PADT+'" width="0" height="'+PLOTH+'" style="display:none"/>' +
+          '<rect id="wlHitArea" x="'+PADL+'" y="'+PADT+'" width="'+PLOTW+'" height="'+PLOTH+'" fill="transparent" style="cursor:crosshair"/>' +
+        '</svg>' +
+        '<div class="wl-markers">'+markerHtml+'</div>' +
+        '<div id="wlTooltip" class="wl-tooltip" style="display:none"></div>' +
+      '</div>' +
+      '<div class="wl-table-wrap">' +
+        '<table class="wl-table">' +
+          '<thead><tr><th>Datum</th><th>Asset</th><th>TF</th><th>Status</th><th>Notiz</th></tr></thead>' +
+          '<tbody>'+tabelle+'</tbody>' +
+        '</table>' +
+      '</div>';
+
+    // Tooltips für die Marker
+    const wrap = document.getElementById('wlChartWrap');
+    const tooltip = document.getElementById('wlTooltip');
+    wrap.querySelectorAll('.wl-marker').forEach(m => {
+      const p = marker[+m.dataset.i];
+      m.addEventListener('pointerenter', () => {
         tooltip.style.display = '';
-        tooltip.style.left = (p.cx / W * 100) + '%';
-        tooltip.style.top = Math.max(0, p.cy - 14) + 'px';
+        tooltip.style.left = m.style.left;
+        tooltip.style.top = m.style.top;
         tooltip.innerHTML = esc(p.titel);
       });
-      dot.addEventListener('pointerleave', () => { tooltip.style.display = 'none'; });
+      m.addEventListener('pointerleave', () => { tooltip.style.display = 'none'; });
     });
+
+    // Zoom per Ziehen auf der Chart-Fläche
+    const svg = document.getElementById('wlSvg');
+    const hit = document.getElementById('wlHitArea');
+    const selRect = document.getElementById('wlSelRect');
+    let ziehStart = null;
+    function pxVonEvent(ev){
+      const rect = svg.getBoundingClientRect();
+      return Math.min(Math.max((ev.clientX - rect.left) / rect.width * B, PADL), B - PADR);
+    }
+    hit.addEventListener('pointerdown', ev => {
+      ziehStart = pxVonEvent(ev);
+      hit.setPointerCapture(ev.pointerId);
+      selRect.style.display = '';
+      selRect.setAttribute('x', ziehStart.toFixed(1));
+      selRect.setAttribute('width', '0');
+    });
+    hit.addEventListener('pointermove', ev => {
+      if (ziehStart === null) return;
+      const cur = pxVonEvent(ev);
+      const a = Math.min(ziehStart, cur), b = Math.max(ziehStart, cur);
+      selRect.setAttribute('x', a.toFixed(1));
+      selRect.setAttribute('width', (b-a).toFixed(1));
+    });
+    hit.addEventListener('pointerup', ev => {
+      if (ziehStart === null) return;
+      const cur = pxVonEvent(ev);
+      selRect.style.display = 'none';
+      const distanz = Math.abs(cur - ziehStart);
+      if (distanz > 10) {
+        const a = Math.min(ziehStart, cur), b = Math.max(ziehStart, cur);
+        const neuMin = tVonX(a), neuMax = tVonX(b);
+        if (neuMax - neuMin > 3 * 86400000) domain = [neuMin, neuMax];
+        render();
+      }
+      ziehStart = null;
+    });
+    hit.addEventListener('dblclick', () => { domain = [fullMinT, fullMaxT]; render(); });
+
+    const resetBtn = document.getElementById('wlZoomReset');
+    if (resetBtn) resetBtn.addEventListener('click', () => { domain = [fullMinT, fullMaxT]; render(); });
   }
+
+  render();
 })();
 
 function rundPreis(v){
