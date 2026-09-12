@@ -675,43 +675,8 @@ async function ladeHistorie(){
   } catch(e){ el.innerHTML = '<div class="err">Historie nicht ladbar: '+esc(e.message)+'</div>'; }
 }
 
-/* ---------- Double-Bottom-Watchlist: Import aus Obsidian (Backtest/Double Bottom/04 Watchlist),
-   Stand 10.09.2026 – erstmal statisch eingetragen, kein automatischer Sync. ---------- */
-const WATCHLIST_SIGNALE = [
-  { date:'2021-06-27', label:'27.06.21', asset:'UNI', tf:'1D', notiz:'Double Bottom', status:'offen' },
-  { date:'2022-09-05', label:'05.09.22, 12.09.22', asset:'XRP', tf:'1W + 2W', notiz:'Double Confluence Signal', status:'unanalysiert' },
-  { date:'2023-10-23', label:'23.10.23', asset:'BNB', tf:'1W', notiz:'Double Bottom – nicht so eindeutig, aber wäre bestätigend', status:'offen' },
-  { date:'2023-10-23', label:'23.10.23', asset:'DOGE', tf:'1W', notiz:'Double Bottom', status:'offen' },
-  { date:'2024-02-12', label:'12.02.24', asset:'DOGE', tf:'1W', notiz:'Double Bottom', status:'offen' },
-  { date:'2024-07-01', label:'01.07.24', asset:'LINK', tf:'1W', notiz:'Double Bottom – kein Bogen in Seitwärt, zu oft angelaufen', status:'offen' },
-  { date:'2024-07-09', label:'09.07.24', asset:'SOL', tf:'1W', notiz:'Double Bottom – mit BTC-Signal', status:'offen' },
-  { date:'2024-09-09', label:'09.09.24', asset:'SOL', tf:'1W', notiz:'', status:'unanalysiert' },
-  { date:'2024-11-11', label:'11.11.24, 18.11.24', asset:'RENDER', tf:'1W + 2W', notiz:'Double Confluence Signal (2W spät)', status:'offen' },
-  { date:'2025-06-30', label:'30.06.25', asset:'XLM', tf:'1W', notiz:'Double Bottom', status:'unanalysiert' },
-  { date:'2025-06-30', label:'30.06.25', asset:'RENDER', tf:'–', notiz:'Double Bottom', status:'fehlsignal' },
-  { date:'2025-10-06', label:'06.10.25', asset:'TAO', tf:'1W', notiz:'Double Bottom – SL hätte BE sein müssen', status:'fehlsignal' },
-  { date:'2026-02-26', label:'26.02.26', asset:'NEAR', tf:'1D', notiz:'Double Bottom', status:'offen' },
-  { date:'2026-04-04', label:'04.04.26', asset:'BNB', tf:'1D', notiz:'Double Bottom', status:'offen' },
-  { date:'2026-04-06', label:'06.04.26', asset:'BTC', tf:'1W', notiz:'Double Bottom', status:'offen' },
-  { date:'2026-04-20', label:'20.04.26', asset:'ONDO', tf:'1W', notiz:'Double Bottom', status:'offen' },
-  { date:'2026-05-24', label:'24.05.26', asset:'XLM', tf:'1D + 3D', notiz:'', status:'unanalysiert' },
-  { date:'2026-06-23', label:'23.06.26', asset:'ADA', tf:'1D', notiz:'Double Bottom – lange Wick', status:'fehlsignal' },
-  { date:'2026-06-23', label:'23.06.26', asset:'BCH', tf:'1D', notiz:'Double Bottom', status:'fehlsignal' },
-  { date:'2026-06-25', label:'25.06.26', asset:'ADA', tf:'4h', notiz:'Double Bottom – 20 Uhr, Divergenz', status:'offen' },
-  { date:'2026-06-30', label:'30.06.26', asset:'BCH', tf:'1D', notiz:'Double Bottom', status:'offen' },
-  { date:'2026-06-30', label:'30.06.26', asset:'ADA', tf:'1D', notiz:'Double Bottom', status:'offen' },
-  { date:'2026-07-06', label:'06.07.26', asset:'KASPA', tf:'2W', notiz:'Double Bottom', status:'offen' },
-  { date:'2026-07-09', label:'09.07 / 10.07.26', asset:'HBAR', tf:'12H, 1D', notiz:'Double Bottom – trotz Divergenz', status:'fehlsignal' },
-  { date:'2026-07-15', label:'15.07.26', asset:'DOGE', tf:'1D', notiz:'Double Bottom – nicht so sauber', status:'fehlsignal' },
-  { date:'2026-07-27', label:'27.07.26', asset:'BGB', tf:'1W', notiz:'Double Bottom – Close drunter, hat aber gehalten', status:'offen' },
-  { date:'2026-08-02', label:'02.08.26', asset:'DOGE', tf:'12H', notiz:'Double Bottom – 14 Uhr', status:'offen' },
-  { date:'2026-08-03', label:'03.08.26', asset:'DOGE', tf:'1D', notiz:'Double Bottom – Double Confluence', status:'offen' },
-  { date:'2026-08-05', label:'05.08.26', asset:'DOGE', tf:'3D', notiz:'Double Bottom – Triple Confluence', status:'offen' },
-  { date:'2026-08-20', label:'20.08.26', asset:'GRAM', tf:'1D', notiz:'Double Bottom – nur bestätigend, Entry zu hoch', status:'offen' },
-  { date:'2026-08-20', label:'20.08.26', asset:'SUI', tf:'3D', notiz:'Double Bottom', status:'offen' },
-  { date:'2026-08-20', label:'20.08.26', asset:'KASPA', tf:'1D', notiz:'Double Bottom – zu spät, nur bestätigend', status:'offen' },
-  { date:'2026-09-03', label:'03.09.26', asset:'GRAM', tf:'1D', notiz:'Double Bottom', status:'offen' }
-];
+/* ---------- Double-Bottom-Watchlist: urspruenglich aus Obsidian importiert, jetzt direkt
+   im Dashboard pflegbar (DB-Tabelle watchlist_signals, /api/watchlist). ---------- */
 const WL_FARBEN = { fehlsignal:'var(--red)', unanalysiert:'var(--amber)', offen:'var(--accent)' };
 const WL_LABEL = { fehlsignal:'Fehlsignal', unanalysiert:'Noch nicht analysiert', offen:'Offen / unbewertet' };
 
@@ -747,25 +712,10 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
   function preisLabel(v){
     return (v >= 1000 ? Math.round(v/1000) + 'k' : Math.round(v)) + ' $';
   }
-
-  // Signale, die zeitlich nah beieinanderliegen (gleicher Tag oder <=2 Tage Abstand),
-  // werden zu einer Gruppe zusammengefasst und im Chart + in der Tabelle markiert.
-  const sigSortiert = WATCHLIST_SIGNALE.slice().sort((a,b) => a.date.localeCompare(b.date));
-  const CLUSTER_GRENZE = 2 * 86400000;
-  const cluster = [];
-  let aktuell = null;
-  sigSortiert.forEach(s => {
-    const t = new Date(s.date+'T00:00:00').getTime();
-    if (aktuell && (t - aktuell.maxT) <= CLUSTER_GRENZE) {
-      aktuell.sigs.push(s); aktuell.maxT = Math.max(aktuell.maxT, t);
-    } else {
-      aktuell = { sigs: [s], minT: t, maxT: t };
-      cluster.push(aktuell);
-    }
-  });
-  const echteCluster = cluster.filter(c => c.sigs.length >= 2);
-  const clusterVonSignal = new Map();
-  echteCluster.forEach((c, ci) => c.sigs.forEach(s => clusterVonSignal.set(s, ci)));
+  function wlDatumLabel(s){
+    if (s.label && s.label.trim()) return s.label;
+    return new Date(s.date+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+  }
 
   // Icon je Asset: bekannte Ticker als farbiges SVG-Logo (CDN, mit Fallback-Buchstaben-Icon
   // bei fehlendem Logo), damit gleiche Assets im Chart und in der Tabelle immer gleich aussehen.
@@ -778,12 +728,36 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       '<span class="wl-icon-fallback" style="display:none">'+buchstabe+'</span>' +
     '</span>';
   }
+  function statusOptionsHtml(aktuell){
+    return Object.keys(WL_LABEL).map(k => '<option value="'+k+'"'+(k===aktuell?' selected':'')+'>'+WL_LABEL[k]+'</option>').join('');
+  }
 
   const B = 860, PADL = 54, PADR = 16, PADT = 18, PADB = 30, H = 340;
   const PLOTW = B - PADL - PADR, PLOTH = H - PADT - PADB;
   let domain = [fullMinT, fullMaxT];
+  let signale = [];
+  let sortSpalte = 'date', sortRichtung = 'desc';
 
   function render(){
+    // Signale, die zeitlich nah beieinanderliegen (gleicher Tag oder <=2 Tage Abstand),
+    // werden zu einer Gruppe zusammengefasst und im Chart + in der Tabelle markiert.
+    const sigSortiert = signale.slice().sort((a,b) => a.date.localeCompare(b.date));
+    const CLUSTER_GRENZE = 2 * 86400000;
+    const cluster = [];
+    let aktuellCluster = null;
+    sigSortiert.forEach(s => {
+      const t = new Date(s.date+'T00:00:00').getTime();
+      if (aktuellCluster && (t - aktuellCluster.maxT) <= CLUSTER_GRENZE) {
+        aktuellCluster.sigs.push(s); aktuellCluster.maxT = Math.max(aktuellCluster.maxT, t);
+      } else {
+        aktuellCluster = { sigs: [s], minT: t, maxT: t };
+        cluster.push(aktuellCluster);
+      }
+    });
+    const echteCluster = cluster.filter(c => c.sigs.length >= 2);
+    const clusterVonSignal = new Map();
+    echteCluster.forEach((c, ci) => c.sigs.forEach(s => clusterVonSignal.set(s, ci)));
+
     const [minT, maxT] = domain;
     const spanne = Math.max(maxT - minT, 1);
     const x = t => PADL + (t - minT) / spanne * PLOTW;
@@ -849,8 +823,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       return '<rect class="wl-cluster-band" x="'+x0.toFixed(1)+'" y="'+PADT+'" width="'+(x1-x0).toFixed(1)+'" height="'+PLOTH+'" rx="4"/>';
     }).join('');
 
-    // Signale im sichtbaren Zeitraum, nach Datum gruppiert (Jitter bei Mehrfach-Signalen am selben Tag)
-    const sichtbar = WATCHLIST_SIGNALE.filter(s => {
+    // Signale im sichtbaren Zeitraum, nach Datum gruppiert (Stapel bei Mehrfach-Signalen am selben Tag)
+    const sichtbar = signale.filter(s => {
       const t = new Date(s.date+'T00:00:00').getTime();
       return t >= minT - CLUSTER_GRENZE && t <= maxT + CLUSTER_GRENZE;
     });
@@ -869,7 +843,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
         const dy = (i - (gruppe.length - 1) / 2) * 24;
         const cy = cy0 + dy;
         if (cx0 < PADL - 20 || cx0 > B - PADR + 20) return;
-        const titel = s.label+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[s.status]+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+(clusterVonSignal.has(s) ? ' · Teil einer Signal-Häufung' : '');
+        const titel = wlDatumLabel(s)+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[s.status]+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+(clusterVonSignal.has(s) ? ' · Teil einer Signal-Häufung' : '');
         marker.push({ cx: cx0, cy, farbe: WL_FARBEN[s.status], titel, asset: s.asset, geclustert: clusterVonSignal.has(s) });
       });
     });
@@ -881,23 +855,39 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     ).join('');
 
     const zoomAktiv = domain[0] !== fullMinT || domain[1] !== fullMaxT;
-    const fehlsignale = WATCHLIST_SIGNALE.filter(s => s.status === 'fehlsignal').length;
-    const assetsAnzahl = new Set(WATCHLIST_SIGNALE.map(s => s.asset)).size;
+    const fehlsignale = signale.filter(s => s.status === 'fehlsignal').length;
+    const assetsAnzahl = new Set(signale.map(s => s.asset)).size;
 
-    const tabelle = sigSortiert.slice().reverse().map(s => {
+    const tabelleSortiert = signale.slice().sort((a,b) => {
+      let cmp;
+      if (sortSpalte === 'asset') cmp = a.asset.localeCompare(b.asset) || a.date.localeCompare(b.date);
+      else cmp = a.date.localeCompare(b.date);
+      return sortRichtung === 'asc' ? cmp : -cmp;
+    });
+    const tabelle = tabelleSortiert.map(s => {
       const geclustert = clusterVonSignal.has(s);
-      return '<tr class="'+(geclustert?'wl-row-cluster':'')+'">' +
-        '<td class="muted">'+esc(s.label)+'</td>' +
+      return '<tr class="'+(geclustert?'wl-row-cluster':'')+'" data-id="'+s.id+'">' +
+        '<td class="muted">'+esc(wlDatumLabel(s))+'</td>' +
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+esc(s.tf||'–')+'</td>' +
         '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[s.status]+';color:'+WL_FARBEN[s.status]+'">'+WL_LABEL[s.status]+'</span></td>' +
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
-      '</tr>';
+        '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Bearbeiten">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
+      '</tr>' +
+      '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="6"><div class="addrow">' +
+        '<input type="date" class="wle-date" value="'+s.date+'">' +
+        '<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="Asset" style="max-width:90px">' +
+        '<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="TF" style="max-width:80px">' +
+        '<select class="wle-status">'+statusOptionsHtml(s.status)+'</select>' +
+        '<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="Notiz" style="flex:1;min-width:140px">' +
+        '<button type="button" class="wl-save">Speichern</button>' +
+        '<button type="button" class="wl-cancel">Abbrechen</button>' +
+      '</div></td></tr>';
     }).join('');
 
     el.innerHTML =
       '<div class="stats" style="margin-bottom:10px">' +
-        '<div class="stat"><div class="v">'+WATCHLIST_SIGNALE.length+'</div><div class="l">Signale</div></div>' +
+        '<div class="stat"><div class="v">'+signale.length+'</div><div class="l">Signale</div></div>' +
         '<div class="stat"><div class="v">'+assetsAnzahl+'</div><div class="l">Assets</div></div>' +
         '<div class="stat"><div class="v pnl-neg">'+fehlsignale+'</div><div class="l">Fehlsignale</div></div>' +
       '</div>' +
@@ -916,9 +906,24 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
         '<div class="wl-markers">'+markerHtml+'</div>' +
         '<div id="wlTooltip" class="wl-tooltip" style="display:none"></div>' +
       '</div>' +
+      '<form class="addbar" id="wlAddForm" autocomplete="off" style="margin-top:16px">' +
+        '<div class="addrow">' +
+          '<input type="date" id="wlNewDate" required>' +
+          '<input type="text" id="wlNewAsset" placeholder="Asset (z.B. BTC)" maxlength="20" required style="max-width:110px">' +
+          '<input type="text" id="wlNewTf" placeholder="TF (z.B. 1D)" maxlength="20" style="max-width:90px">' +
+          '<select id="wlNewStatus">'+statusOptionsHtml('offen')+'</select>' +
+          '<input type="text" id="wlNewNotiz" placeholder="Notiz (optional)" maxlength="200" style="flex:1;min-width:140px">' +
+          '<button type="submit">+ Hinzufügen</button>' +
+        '</div>' +
+        '<div class="te-msg" id="wlAddMsg"></div>' +
+      '</form>' +
       '<div class="wl-table-wrap">' +
         '<table class="wl-table">' +
-          '<thead><tr><th>Datum</th><th>Asset</th><th>TF</th><th>Status</th><th>Notiz</th></tr></thead>' +
+          '<thead><tr>' +
+            '<th class="wl-sortable" data-sort="date">Datum'+(sortSpalte==='date'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
+            '<th class="wl-sortable" data-sort="asset">Asset'+(sortSpalte==='asset'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
+            '<th>TF</th><th>Status</th><th>Notiz</th><th></th>' +
+          '</tr></thead>' +
           '<tbody>'+tabelle+'</tbody>' +
         '</table>' +
       '</div>';
@@ -977,9 +982,92 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
 
     const resetBtn = document.getElementById('wlZoomReset');
     if (resetBtn) resetBtn.addEventListener('click', () => { domain = [fullMinT, fullMaxT]; render(); });
+
+    // Neues Signal hinzufügen
+    const addForm = document.getElementById('wlAddForm');
+    const addMsg = document.getElementById('wlAddMsg');
+    addForm.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const date = document.getElementById('wlNewDate').value;
+      const asset = document.getElementById('wlNewAsset').value.trim();
+      if (!date || !asset) return;
+      const body = {
+        date, asset,
+        tf: document.getElementById('wlNewTf').value.trim() || null,
+        status: document.getElementById('wlNewStatus').value,
+        notiz: document.getElementById('wlNewNotiz').value.trim() || null
+      };
+      addMsg.textContent = '';
+      try {
+        await api('/watchlist', { method: 'POST', body: JSON.stringify(body) });
+        await ladeUndZeichne();
+      } catch(e) { addMsg.textContent = 'Fehler: ' + e.message; }
+    });
+
+    // Spalten-Sortierung (Datum/Asset), Klick auf Kopfzelle togglet Richtung
+    el.querySelectorAll('.wl-sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const spalte = th.dataset.sort;
+        if (sortSpalte === spalte) sortRichtung = sortRichtung === 'asc' ? 'desc' : 'asc';
+        else { sortSpalte = spalte; sortRichtung = spalte === 'asset' ? 'asc' : 'desc'; }
+        render();
+      });
+    });
+
+    // Bearbeiten / Löschen in der Tabelle
+    const tableWrap = el.querySelector('.wl-table-wrap');
+    tableWrap.addEventListener('click', async ev => {
+      const editBtn = ev.target.closest('.wl-edit');
+      if (editBtn) {
+        const id = editBtn.closest('tr').dataset.id;
+        const editRow = tableWrap.querySelector('tr.wl-edit-row[data-id="'+id+'"]');
+        if (editRow) editRow.hidden = !editRow.hidden;
+        return;
+      }
+      const cancelBtn = ev.target.closest('.wl-cancel');
+      if (cancelBtn) { cancelBtn.closest('tr').hidden = true; return; }
+
+      const saveBtn = ev.target.closest('.wl-save');
+      if (saveBtn) {
+        const row = saveBtn.closest('tr');
+        const id = row.dataset.id;
+        const body = {
+          date: row.querySelector('.wle-date').value,
+          asset: row.querySelector('.wle-asset').value.trim(),
+          tf: row.querySelector('.wle-tf').value.trim() || null,
+          status: row.querySelector('.wle-status').value,
+          notiz: row.querySelector('.wle-notiz').value.trim() || null
+        };
+        try { await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) }); await ladeUndZeichne(); }
+        catch(e) { alert('Fehler: ' + e.message); }
+        return;
+      }
+
+      const delBtn = ev.target.closest('.wl-del');
+      if (delBtn) {
+        if (delBtn.dataset.confirm !== '1') {
+          delBtn.dataset.confirm = '1'; delBtn.textContent = '⚠️';
+          setTimeout(() => { if (delBtn.dataset.confirm==='1'){ delete delBtn.dataset.confirm; delBtn.textContent='🗑'; } }, 4000);
+          return;
+        }
+        const id = delBtn.closest('tr').dataset.id;
+        try { await api('/watchlist/'+id, { method: 'DELETE' }); await ladeUndZeichne(); }
+        catch(e) { alert('Konnte nicht gelöscht werden: ' + e.message); }
+      }
+    });
   }
 
-  render();
+  async function ladeUndZeichne(){
+    try {
+      signale = await api('/watchlist');
+    } catch(e) {
+      el.innerHTML = '<div class="empty">Watchlist konnte nicht geladen werden.</div>';
+      return;
+    }
+    render();
+  }
+
+  ladeUndZeichne();
 })();
 
 function rundPreis(v){

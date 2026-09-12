@@ -109,3 +109,17 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(portfolio_id, taken_at)
 );
+
+-- Double-Bottom-Watchlist (urspruenglich aus Obsidian importiert, jetzt im Dashboard
+-- direkt pflegbar). "status": offen | unanalysiert | fehlsignal.
+CREATE TABLE IF NOT EXISTS watchlist_signals (
+  id SERIAL PRIMARY KEY,
+  date DATE NOT NULL,
+  label TEXT,
+  asset TEXT NOT NULL,
+  tf TEXT,
+  notiz TEXT,
+  status TEXT NOT NULL DEFAULT 'offen',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

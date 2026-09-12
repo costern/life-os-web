@@ -120,11 +120,18 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-table { width:100%; border-collapse:collapse; font-size:13px; }
 .wl-table th { text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
   padding:6px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.wl-table th.wl-sortable { cursor:pointer; user-select:none; }
+.wl-table th.wl-sortable:hover { color:var(--accent); }
 .wl-table td { padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:middle; border-left:3px solid transparent; }
 .wl-table tr.wl-row-cluster td { background:rgba(13,148,136,.08); }
 .wl-table tr.wl-row-cluster td:first-child { border-left-color:#0d9488; }
 .wl-table-asset { display:flex; align-items:center; gap:7px; white-space:nowrap; }
 .wl-table-asset .wl-icon { width:18px; height:18px; border-radius:50%; flex:none; }
+.wl-row-actions { white-space:nowrap; text-align:right; }
+.wl-edit, .wl-del { background:none; border:none; cursor:pointer; font-size:14px; padding:2px 5px; border-radius:6px; }
+.wl-edit:hover, .wl-del:hover { background:var(--badge-blue-bg); }
+.wl-edit-row td { background:var(--bg); padding:10px; }
+.wl-edit-row .addrow { margin-top:0; }
 .tcb { flex:0 0 18px; width:18px; height:18px; line-height:17px; text-align:center; cursor:pointer;
   color:var(--line); font-size:15px; border-radius:99px; user-select:none; }
 .tcb:hover { background:var(--badge-blue-bg); color:var(--accent); }
