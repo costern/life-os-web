@@ -31,7 +31,8 @@ function rowOut(r) {
     mtf: r.mtf === null || r.mtf === undefined ? null : Number(r.mtf),
     multiAsset: !!r.multi_asset,
     form: r.form,
-    details: r.details
+    details: r.details,
+    tradeId: r.trade_id
   };
 }
 
@@ -46,11 +47,11 @@ router.post('/', async (req, res) => {
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const status = STATI.has(b.status) ? b.status : null;
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
-     FORMEN.has(b.form) ? b.form : null, orNull(b.details)]
+     FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId)]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -61,7 +62,8 @@ router.patch('/:id', async (req, res) => {
   const fields = []; const vals = []; let i = 1;
   for (const [key, col] of [['date','date'],['label','label'],['asset','asset'],['tf','tf'],
                             ['notiz','notiz'],['status','status'],['eventTyp','event_typ'],
-                            ['mtf','mtf'],['multiAsset','multi_asset'],['form','form'],['details','details']]) {
+                            ['mtf','mtf'],['multiAsset','multi_asset'],['form','form'],['details','details'],
+                            ['tradeId','trade_id']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;

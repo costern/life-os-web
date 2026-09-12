@@ -132,3 +132,7 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS mtf INTEGER;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS multi_asset BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS form TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS details TEXT;
+-- trade_id: frei vergebene Nummer/Kennung. Mehrere Signale mit derselben trade_id
+-- gehoeren zu EINEM Trade (z.B. dasselbe Setup auf 3D, 1W und 2W) und werden in den
+-- Ergebnis-Zahlen nur einmal gezaehlt.
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS trade_id TEXT;

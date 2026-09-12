@@ -736,6 +736,9 @@ const WL_STATUS_HINT = { worked:'Worked', be_win:'BE Win (2R erreicht)',
   be_loss:'BE Loss (2R nicht erreicht)', failed:'Failed', '':'Noch nicht bewertet' };
 const WL_FORM_LABEL = { bogen:'Bogen', bogen_unsauber:'Bogen unsauber', kein_bogen:'kein Bogen', '':'' };
 const wlStatus = s => s.status || '';
+// Signale mit derselben Trade-ID gehoeren zu EINEM Trade. Ohne ID zaehlt jedes
+// Signal fuer sich - Schluessel dann eindeutig ueber die Zeilen-ID.
+const wlTradeKey = s => (s.tradeId && String(s.tradeId).trim()) ? 't:' + String(s.tradeId).trim() : 'e:' + s.id;
 
 // Kurzfassung des Setups fuer die Tabellenspalte, z.B. "Double · MTF 2 · Multi-Asset · Bogen"
 function wlSetupText(s){
@@ -930,9 +933,21 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
         const titel = wlDatumLabel(s)+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[wlStatus(s)]+
           (setup?' · '+setup:'')+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+zusatz;
         marker.push({ cx: cx0, cy, farbe: WL_FARBEN[wlStatus(s)], titel, asset: s.asset,
-          geclustert: clusterVonSignal.has(s), selberTag: !!tagAnzahl });
+          geclustert: clusterVonSignal.has(s), selberTag: !!tagAnzahl,
+          tradeId: s.tradeId || null, datum: datum });
       });
     });
+
+    // Signale, die zu einem Trade gehoeren, im Chart mit einer Linie verbinden -
+    // dann sieht man auf einen Blick, dass das ein Trade ueber mehrere Zeitpunkte ist.
+    const nachTrade = {};
+    marker.forEach(p => { if (p.tradeId) (nachTrade[p.tradeId] = nachTrade[p.tradeId] || []).push(p); });
+    const tradeLinien = Object.keys(nachTrade).map(tid => {
+      const gruppe = nachTrade[tid].slice().sort((a,b) => a.datum.localeCompare(b.datum) || a.cy - b.cy);
+      if (gruppe.length < 2) return '';
+      const d = gruppe.map((p,i) => (i===0?'M':'L') + p.cx.toFixed(1) + ',' + p.cy.toFixed(1)).join(' ');
+      return '<path class="wl-trade-linie" d="'+d+'"/>';
+    }).join('');
 
     const markerHtml = marker.map((p,i) =>
       '<span class="wl-marker'+(p.geclustert?' geclustert':'')+(p.selberTag?' selber-tag':'')+'" data-i="'+i+'" style="left:'+(p.cx/B*100).toFixed(2)+'%;top:'+(p.cy/H*100).toFixed(2)+'%;border-color:'+p.farbe+'">' +
@@ -941,10 +956,21 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     ).join('');
 
     const zoomAktiv = domain[0] !== fullMinT || domain[1] !== fullMaxT;
-    const anzWorked = signale.filter(s => s.status === 'worked').length;
-    const anzBeWin = signale.filter(s => s.status === 'be_win').length;
-    const anzBeLoss = signale.filter(s => s.status === 'be_loss').length;
-    const anzFailed = signale.filter(s => s.status === 'failed').length;
+    // Ergebnis-Zahlen zaehlen TRADES, nicht Signale: verbundene Signale (gleiche
+    // Trade-ID) sind ein Trade. Weichen die Bewertungen innerhalb eines Trades ab,
+    // zaehlt die des juengsten bewerteten Signals (= das Ergebnis am Ende).
+    const trades = new Map();
+    signale.slice().sort((a,b) => a.date.localeCompare(b.date)).forEach(s => {
+      const k = wlTradeKey(s);
+      if (!trades.has(k)) trades.set(k, { status: '' });
+      if (s.status) trades.get(k).status = s.status;
+    });
+    const tradeStati = [...trades.values()].map(t => t.status);
+    const anzTrades = trades.size;
+    const anzWorked = tradeStati.filter(x => x === 'worked').length;
+    const anzBeWin = tradeStati.filter(x => x === 'be_win').length;
+    const anzBeLoss = tradeStati.filter(x => x === 'be_loss').length;
+    const anzFailed = tradeStati.filter(x => x === 'failed').length;
     const assetsAnzahl = new Set(signale.map(s => s.asset)).size;
 
     const tabelleSortiert = signale.slice().sort((a,b) => {
@@ -967,8 +993,10 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       const tagBadge = tagAnzahl ? ' <span class="wl-sameday">'+tagAnzahl+'× selber Tag</span>' : '';
       const st = wlStatus(s);
       const setup = wlSetupText(s);
-      return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'" title="Doppelklick für Details">' +
+      const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
+      return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'"'+tradeAttr+' title="Doppelklick für Details">' +
         '<td class="muted">'+esc(wlDatumLabel(s))+tagBadge+'</td>' +
+        '<td>'+(s.tradeId ? '<span class="wl-trade-chip">🔗 '+esc(s.tradeId)+'</span>' : '<span class="muted">–</span>')+'</td>' +
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+esc(s.tf||'–')+'</td>' +
         '<td class="muted">'+(setup ? esc(setup) : '–')+'</td>' +
@@ -977,7 +1005,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
       '</tr>' +
       // Detailansicht: klappt per Doppelklick auf die Zeile (oder ueber ✎) auf
-      '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="7"><div class="wl-detail">' +
+      '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="8"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+'</span></div>' +
         '<div class="wl-detail-grid">' +
           '<label>Datum<input type="date" class="wle-date" value="'+s.date+'"></label>' +
@@ -989,6 +1017,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
         '</div>' +
+        '<label class="wl-detail-voll">Trade-ID <span class="wl-hint">gleiche Nummer bei mehreren Signalen = ein Trade</span>' +
+          '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="z.B. 7"></label>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
         '<label class="wl-detail-voll">Details<textarea class="wle-details" rows="5" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>' +
         '<div class="wl-detail-aktionen">' +
@@ -1001,12 +1031,14 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     el.innerHTML =
       '<div class="stats" style="margin-bottom:10px">' +
         '<div class="stat"><div class="v">'+signale.length+'</div><div class="l">Signale</div></div>' +
+        '<div class="stat"><div class="v">'+anzTrades+'</div><div class="l">Trades</div></div>' +
         '<div class="stat"><div class="v">'+assetsAnzahl+'</div><div class="l">Assets</div></div>' +
         '<div class="stat"><div class="v pnl-pos">'+anzWorked+'</div><div class="l">Worked</div></div>' +
         '<div class="stat"><div class="v pnl-amber">'+anzBeWin+'</div><div class="l">BE Win</div></div>' +
         '<div class="stat"><div class="v pnl-orange">'+anzBeLoss+'</div><div class="l">BE Loss</div></div>' +
         '<div class="stat"><div class="v pnl-neg">'+anzFailed+'</div><div class="l">Failed</div></div>' +
       '</div>' +
+      '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer.</div>' +
       '<div class="wl-toolbar">' +
         '<span class="muted">🔍 Ziehen zum Hineinzoomen · Doppelklick zum Zurücksetzen</span>' +
         (zoomAktiv ? '<button type="button" class="btn ghost" id="wlZoomReset">Zoom zurücksetzen</button>' : '') +
@@ -1016,6 +1048,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
           preisGitter + zeitGitter + clusterBaender +
           '<path class="wl-btc-area" d="'+flaeche+'"/>' +
           '<path class="wl-btc-line" d="'+linie+'"/>' +
+          tradeLinien +
           '<rect id="wlSelRect" class="wl-sel-rect" x="0" y="'+PADT+'" width="0" height="'+PLOTH+'" style="display:none"/>' +
           '<rect id="wlHitArea" x="'+PADL+'" y="'+PADT+'" width="'+PLOTW+'" height="'+PLOTH+'" fill="transparent" style="cursor:crosshair"/>' +
         '</svg>' +
@@ -1037,6 +1070,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
         '<table class="wl-table">' +
           '<thead><tr>' +
             '<th class="wl-sortable" data-sort="date">Datum'+(sortSpalte==='date'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
+            '<th>Trade</th>' +
             '<th class="wl-sortable" data-sort="asset">Asset'+(sortSpalte==='asset'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
             '<th>TF</th><th>Setup</th><th>Ergebnis</th><th>Notiz</th><th></th>' +
           '</tr></thead>' +
@@ -1133,6 +1167,18 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     // Bearbeiten / Löschen in der Tabelle
     const tableWrap = el.querySelector('.wl-table-wrap');
 
+    // Maus ueber einer Zeile mit Trade-ID hebt alle Zeilen desselben Trades hervor
+    tableWrap.addEventListener('mouseover', ev => {
+      const tr = ev.target.closest('tr[data-trade]');
+      tableWrap.querySelectorAll('tr.wl-trade-hover').forEach(r => r.classList.remove('wl-trade-hover'));
+      if (!tr) return;
+      tableWrap.querySelectorAll('tr[data-trade="'+tr.dataset.trade.replace(/"/g,'\\"')+'"]')
+        .forEach(r => r.classList.add('wl-trade-hover'));
+    });
+    tableWrap.addEventListener('mouseleave', () => {
+      tableWrap.querySelectorAll('tr.wl-trade-hover').forEach(r => r.classList.remove('wl-trade-hover'));
+    });
+
     // Doppelklick (bzw. Doppeltipp) auf eine Zeile klappt die Detailansicht auf/zu
     tableWrap.addEventListener('dblclick', ev => {
       const tr = ev.target.closest('tr[data-id]');
@@ -1165,7 +1211,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
           multiAsset: row.querySelector('.wle-multiasset').checked,
           form: row.querySelector('.wle-form').value,
           notiz: row.querySelector('.wle-notiz').value.trim() || null,
-          details: row.querySelector('.wle-details').value.trim() || null
+          details: row.querySelector('.wle-details').value.trim() || null,
+          tradeId: row.querySelector('.wle-tradeid').value.trim() || null
         };
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
         try { await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) }); await ladeUndZeichne(); }
