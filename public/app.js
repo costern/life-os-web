@@ -93,7 +93,8 @@ async function api(path, opts) {
     const tagNr = Math.round((heuteUtc - START) / 86400000) + 1;
     elNum.textContent = tagNr.toLocaleString('de-DE');
     document.getElementById('jdSince').textContent =
-      'seit ' + START.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'});
+      'seit ' + new Date(START).toLocaleDateString('de-DE',
+        { day:'2-digit', month:'long', year:'numeric', timeZone:'UTC' });
 
     const jahr = heute.getFullYear();
     const jahresStartUtc = Date.UTC(jahr, 0, 1);
