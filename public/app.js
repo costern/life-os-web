@@ -79,21 +79,26 @@ async function api(path, opts) {
 (function(){
   const elNum = document.getElementById('jdNum');
   if (!elNum) return;
-  const START = new Date(2025, 2, 31);   // Monat 2 = Maerz
+  const START = Date.UTC(2025, 2, 31);   // Monat 2 = Maerz
 
-  function tagOhneZeit(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  // Tagesdifferenzen immer ueber UTC-Stempel rechnen: lokale Mitternachts-Daten
+  // unterscheiden sich bei Sommer-/Winterzeit um eine Stunde, dadurch wuerde
+  // Math.floor sonst einen Tag zu wenig liefern.
+  function tagStempel(d){ return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); }
 
   function zeichne(){
-    const heute = tagOhneZeit(new Date());
-    const tagNr = Math.floor((heute - START) / 86400000) + 1;
+    const jetzt = new Date();
+    const heute = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+    const heuteUtc = tagStempel(heute);
+    const tagNr = Math.round((heuteUtc - START) / 86400000) + 1;
     elNum.textContent = tagNr.toLocaleString('de-DE');
     document.getElementById('jdSince').textContent =
       'seit ' + START.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'});
 
     const jahr = heute.getFullYear();
-    const jahresStart = new Date(jahr, 0, 1);
-    const tageImJahr = (new Date(jahr, 11, 31) - jahresStart) / 86400000 + 1;
-    const tagImJahr = Math.floor((heute - jahresStart) / 86400000) + 1;
+    const jahresStartUtc = Date.UTC(jahr, 0, 1);
+    const tageImJahr = Math.round((Date.UTC(jahr, 11, 31) - jahresStartUtc) / 86400000) + 1;
+    const tagImJahr = Math.round((heuteUtc - jahresStartUtc) / 86400000) + 1;
 
     const tageImMonat = new Date(jahr, heute.getMonth() + 1, 0).getDate();
     const tagImMonat = heute.getDate();
