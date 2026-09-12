@@ -2,10 +2,14 @@ const express = require('express');
 const pool = require('../db/pool');
 const router = express.Router();
 
-// status: worked | be | failed. Kein Status (null) = noch nicht bewertet.
-const STATI = new Set(['worked', 'be', 'failed']);
+// status: worked | be_win | be_loss | failed. Kein Status (null) = noch nicht bewertet.
+// be_win  = 2R wurden erreicht (SL stand schon auf BE), am Ende trotzdem BE raus.
+// be_loss = 2R nie erreicht, BE-Ausstieg ohne dass das Setup geliefert hat.
+const STATI = new Set(['worked', 'be_win', 'be_loss', 'failed']);
 const EVENT_TYPEN = new Set(['single', 'double']);
-const FORMEN = new Set(['bottom', 'bogen']);
+// form: bogen (sauber) | bogen_unsauber (Bogen erkennbar, aber z.B. nur eine Kerze
+// dazwischen oder Wick unter dem Mittel-Level) | kein_bogen
+const FORMEN = new Set(['bogen', 'bogen_unsauber', 'kein_bogen']);
 
 // Leerstring aus dem Formular als "nicht gesetzt" behandeln
 function orNull(v) { return v === '' || v === undefined ? null : v; }

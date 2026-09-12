@@ -726,12 +726,15 @@ async function ladeHistorie(){
 
 /* ---------- Double-Bottom-Watchlist: urspruenglich aus Obsidian importiert, jetzt direkt
    im Dashboard pflegbar (DB-Tabelle watchlist_signals, /api/watchlist). ---------- */
-// Ergebnis eines Signals: worked (gruen) / be = Breakeven (orange) / failed (rot).
-// Leer = noch nicht bewertet.
-const WL_FARBEN = { worked:'var(--green)', be:'var(--amber)', failed:'var(--red)', '':'var(--muted)' };
-const WL_LABEL = { worked:'Worked', be:'Breakeven', failed:'Failed', '':'Noch nicht bewertet' };
-const WL_EVENT_LABEL = { single:'Single Bottom', double:'Double Bottom', '':'–' };
-const WL_FORM_LABEL = { bottom:'Bodenbildung', bogen:'Bogenboden', '':'–' };
+// Ergebnis eines Signals. Bei Breakeven wird unterschieden, ob das Setup vorher
+// geliefert hat: be_win = 2R erreicht (SL stand schon auf BE), be_loss = 2R nie erreicht.
+const WL_FARBEN = { worked:'var(--green)', be_win:'var(--amber)', be_loss:'var(--orange)',
+  failed:'var(--red)', '':'var(--muted)' };
+const WL_LABEL = { worked:'Worked', be_win:'BE Win', be_loss:'BE Loss', failed:'Failed',
+  '':'Noch nicht bewertet' };
+const WL_STATUS_HINT = { worked:'Worked', be_win:'BE Win (2R erreicht)',
+  be_loss:'BE Loss (2R nicht erreicht)', failed:'Failed', '':'Noch nicht bewertet' };
+const WL_FORM_LABEL = { bogen:'Bogen', bogen_unsauber:'Bogen unsauber', kein_bogen:'kein Bogen', '':'' };
 const wlStatus = s => s.status || '';
 
 // Kurzfassung des Setups fuer die Tabellenspalte, z.B. "Double · MTF 2 · Multi-Asset · Bogen"
@@ -740,7 +743,7 @@ function wlSetupText(s){
   if (s.eventTyp) teile.push(s.eventTyp === 'double' ? 'Double' : 'Single');
   if (s.mtf > 1) teile.push('MTF ' + s.mtf);
   if (s.multiAsset) teile.push('Multi-Asset');
-  if (s.form) teile.push(s.form === 'bogen' ? 'Bogen' : 'Boden');
+  if (s.form) teile.push(WL_FORM_LABEL[s.form] || s.form);
   return teile.join(' · ');
 }
 
@@ -794,8 +797,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
   }
   function statusOptionsHtml(aktuell){
     const a = aktuell || '';
-    return ['', 'worked', 'be', 'failed']
-      .map(k => '<option value="'+k+'"'+(k===a?' selected':'')+'>'+WL_LABEL[k]+'</option>').join('');
+    return ['', 'worked', 'be_win', 'be_loss', 'failed']
+      .map(k => '<option value="'+k+'"'+(k===a?' selected':'')+'>'+WL_STATUS_HINT[k]+'</option>').join('');
   }
   function auswahlHtml(klasse, werte, aktuell){
     const a = aktuell || '';
@@ -939,7 +942,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
 
     const zoomAktiv = domain[0] !== fullMinT || domain[1] !== fullMaxT;
     const anzWorked = signale.filter(s => s.status === 'worked').length;
-    const anzBe = signale.filter(s => s.status === 'be').length;
+    const anzBeWin = signale.filter(s => s.status === 'be_win').length;
+    const anzBeLoss = signale.filter(s => s.status === 'be_loss').length;
     const anzFailed = signale.filter(s => s.status === 'failed').length;
     const assetsAnzahl = new Set(signale.map(s => s.asset)).size;
 
@@ -982,7 +986,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
           '<label>Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
           '<label>Event'+auswahlHtml('wle-event', [['','–'],['single','Single Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
           '<label>Multi-Timeframe'+auswahlHtml('wle-mtf', [['','–'],['1','1 Timeframe'],['2','2 Timeframes'],['3','3 Timeframes']], s.mtf ? String(s.mtf) : '')+'</label>' +
-          '<label>Form'+auswahlHtml('wle-form', [['','–'],['bottom','Bodenbildung'],['bogen','Bogenboden']], s.form)+'</label>' +
+          '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
         '</div>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
@@ -999,7 +1003,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
         '<div class="stat"><div class="v">'+signale.length+'</div><div class="l">Signale</div></div>' +
         '<div class="stat"><div class="v">'+assetsAnzahl+'</div><div class="l">Assets</div></div>' +
         '<div class="stat"><div class="v pnl-pos">'+anzWorked+'</div><div class="l">Worked</div></div>' +
-        '<div class="stat"><div class="v pnl-amber">'+anzBe+'</div><div class="l">Breakeven</div></div>' +
+        '<div class="stat"><div class="v pnl-amber">'+anzBeWin+'</div><div class="l">BE Win</div></div>' +
+        '<div class="stat"><div class="v pnl-orange">'+anzBeLoss+'</div><div class="l">BE Loss</div></div>' +
         '<div class="stat"><div class="v pnl-neg">'+anzFailed+'</div><div class="l">Failed</div></div>' +
       '</div>' +
       '<div class="wl-toolbar">' +
