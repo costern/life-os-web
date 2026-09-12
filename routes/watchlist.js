@@ -10,6 +10,8 @@ const EVENT_TYPEN = new Set(['single', 'double']);
 // form: bogen (sauber) | bogen_unsauber (Bogen erkennbar, aber z.B. nur eine Kerze
 // dazwischen oder Wick unter dem Mittel-Level) | kein_bogen
 const FORMEN = new Set(['bogen', 'bogen_unsauber', 'kein_bogen']);
+// note = Setup-Qualitaet (bewertet das Signal, nicht den Ausgang des Trades)
+const NOTEN = new Set(['A++', 'A+', 'A', 'B']);
 
 // Leerstring aus dem Formular als "nicht gesetzt" behandeln
 function orNull(v) { return v === '' || v === undefined ? null : v; }
@@ -32,7 +34,8 @@ function rowOut(r) {
     multiAsset: !!r.multi_asset,
     form: r.form,
     details: r.details,
-    tradeId: r.trade_id
+    tradeId: r.trade_id,
+    note: r.note
   };
 }
 
@@ -47,11 +50,12 @@ router.post('/', async (req, res) => {
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const status = STATI.has(b.status) ? b.status : null;
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
-     FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId)]
+     FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
+     NOTEN.has(b.note) ? b.note : null]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -63,10 +67,11 @@ router.patch('/:id', async (req, res) => {
   for (const [key, col] of [['date','date'],['label','label'],['asset','asset'],['tf','tf'],
                             ['notiz','notiz'],['status','status'],['eventTyp','event_typ'],
                             ['mtf','mtf'],['multiAsset','multi_asset'],['form','form'],['details','details'],
-                            ['tradeId','trade_id']]) {
+                            ['tradeId','trade_id'],['note','note']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
+    else if (key === 'note') wert = NOTEN.has(wert) ? wert : null;
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);

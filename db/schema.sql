@@ -136,3 +136,5 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS details TEXT;
 -- gehoeren zu EINEM Trade (z.B. dasselbe Setup auf 3D, 1W und 2W) und werden in den
 -- Ergebnis-Zahlen nur einmal gezaehlt.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS trade_id TEXT;
+-- note: Setup-Qualitaet A++ | A+ | A | B (bewertet das Signal, nicht den Ausgang)
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS note TEXT;

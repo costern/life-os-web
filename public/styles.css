@@ -138,11 +138,16 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-sameday { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:99px;
   background:#0d9488; color:#fff; font-size:10px; font-weight:700; white-space:nowrap; }
 /* Trade-Verknuepfung: gleiche Trade-ID = ein Trade ueber mehrere Signale */
-.wl-trade-chip { display:inline-block; padding:1px 8px; border-radius:99px; font-size:11px;
-  font-weight:600; background:var(--badge-blue-bg); color:var(--accent); white-space:nowrap; }
+/* Trade-Zelle: durchgehender Farbstrich + Nummer. Gleiche Farbe = gleicher Trade;
+   die Nummer steht immer daneben, damit die Farbe allein nichts tragen muss. */
+.wl-trade-cell { position:relative; padding-left:16px !important; white-space:nowrap; }
+.wl-trade-bar { position:absolute; left:4px; top:0; bottom:0; width:4px; border-radius:2px; }
+.wl-trade-chip { display:inline-block; font-size:12px; font-weight:700; white-space:nowrap; }
+.wl-note { display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px; font-weight:700;
+  border:1.5px solid; white-space:nowrap; }
 .wl-table tr.wl-trade-hover td { background:var(--badge-blue-bg); }
 .wl-table tr.wl-trade-hover td:first-child { border-left-color:var(--accent); }
-.wl-trade-linie { fill:none; stroke:var(--accent); stroke-width:1.5; stroke-dasharray:4,3;
+.wl-trade-linie { fill:none; stroke-width:1.5; stroke-dasharray:4,3;
   opacity:.8; stroke-linecap:round; }
 .wl-hint { text-transform:none; letter-spacing:0; font-weight:400; opacity:.8; }
 .wl-table-asset { display:flex; align-items:center; gap:7px; white-space:nowrap; }

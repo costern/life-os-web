@@ -736,6 +736,17 @@ const WL_STATUS_HINT = { worked:'Worked', be_win:'BE Win (2R erreicht)',
   be_loss:'BE Loss (2R nicht erreicht)', failed:'Failed', '':'Noch nicht bewertet' };
 const WL_FORM_LABEL = { bogen:'Bogen', bogen_unsauber:'Bogen unsauber', kein_bogen:'kein Bogen', '':'' };
 const wlStatus = s => s.status || '';
+// Setup-Qualitaet (bewertet das Signal selbst, unabhaengig vom Ausgang des Trades)
+const WL_NOTEN = ['A++', 'A+', 'A', 'B'];
+const WL_NOTE_FARBEN = { 'A++':'var(--green)', 'A+':'var(--green)', 'A':'var(--amber)', 'B':'var(--muted)' };
+// Feste Farbpalette fuer Trades. Die Farbe haengt nur an der Trade-ID, bleibt also
+// beim Umsortieren gleich; die Nummer steht immer daneben, Farbe allein traegt nichts.
+const WL_TRADE_FARBEN = ['#8b5cf6','#0ea5e9','#c026d3','#65a30d','#06b6d4','#7c3aed','#2563eb','#db2777'];
+function wlTradeFarbe(tid){
+  const t = String(tid); let h = 0;
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+  return WL_TRADE_FARBEN[h % WL_TRADE_FARBEN.length];
+}
 // Signale mit derselben Trade-ID gehoeren zu EINEM Trade. Ohne ID zaehlt jedes
 // Signal fuer sich - Schluessel dann eindeutig ueber die Zeilen-ID.
 const wlTradeKey = s => (s.tradeId && String(s.tradeId).trim()) ? 't:' + String(s.tradeId).trim() : 'e:' + s.id;
@@ -946,7 +957,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       const gruppe = nachTrade[tid].slice().sort((a,b) => a.datum.localeCompare(b.datum) || a.cy - b.cy);
       if (gruppe.length < 2) return '';
       const d = gruppe.map((p,i) => (i===0?'M':'L') + p.cx.toFixed(1) + ',' + p.cy.toFixed(1)).join(' ');
-      return '<path class="wl-trade-linie" d="'+d+'"/>';
+      return '<path class="wl-trade-linie" d="'+d+'" stroke="'+wlTradeFarbe(tid)+'"/>';
     }).join('');
 
     const markerHtml = marker.map((p,i) =>
@@ -996,22 +1007,29 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
       return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'"'+tradeAttr+' title="Doppelklick für Details">' +
         '<td class="muted">'+esc(wlDatumLabel(s))+tagBadge+'</td>' +
-        '<td>'+(s.tradeId ? '<span class="wl-trade-chip">🔗 '+esc(s.tradeId)+'</span>' : '<span class="muted">–</span>')+'</td>' +
+        '<td class="wl-trade-cell">' +
+          (s.tradeId
+            ? '<span class="wl-trade-bar" style="background:'+wlTradeFarbe(s.tradeId)+'"></span>' +
+              '<span class="wl-trade-chip" style="color:'+wlTradeFarbe(s.tradeId)+'">'+esc(s.tradeId)+'</span>'
+            : '<span class="muted">–</span>') +
+        '</td>' +
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+esc(s.tf||'–')+'</td>' +
         '<td class="muted">'+(setup ? esc(setup) : '–')+'</td>' +
+        '<td>'+(s.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span>' : '<span class="muted">–</span>')+'</td>' +
         '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span></td>' +
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
       '</tr>' +
       // Detailansicht: klappt per Doppelklick auf die Zeile (oder ueber ✎) auf
-      '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="8"><div class="wl-detail">' +
+      '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="9"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+'</span></div>' +
         '<div class="wl-detail-grid">' +
           '<label>Datum<input type="date" class="wle-date" value="'+s.date+'"></label>' +
           '<label>Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
           '<label>Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
           '<label>Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
+          '<label>Setup-Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
           '<label>Event'+auswahlHtml('wle-event', [['','–'],['single','Single Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
           '<label>Multi-Timeframe'+auswahlHtml('wle-mtf', [['','–'],['1','1 Timeframe'],['2','2 Timeframes'],['3','3 Timeframes']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
@@ -1072,7 +1090,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
             '<th class="wl-sortable" data-sort="date">Datum'+(sortSpalte==='date'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
             '<th>Trade</th>' +
             '<th class="wl-sortable" data-sort="asset">Asset'+(sortSpalte==='asset'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
-            '<th>TF</th><th>Setup</th><th>Ergebnis</th><th>Notiz</th><th></th>' +
+            '<th>TF</th><th>Setup</th><th>Note</th><th>Ergebnis</th><th>Notiz</th><th></th>' +
           '</tr></thead>' +
           '<tbody>'+tabelle+'</tbody>' +
         '</table>' +
@@ -1212,7 +1230,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
           form: row.querySelector('.wle-form').value,
           notiz: row.querySelector('.wle-notiz').value.trim() || null,
           details: row.querySelector('.wle-details').value.trim() || null,
-          tradeId: row.querySelector('.wle-tradeid').value.trim() || null
+          tradeId: row.querySelector('.wle-tradeid').value.trim() || null,
+          note: row.querySelector('.wle-note').value
         };
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
         try { await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) }); await ladeUndZeichne(); }
