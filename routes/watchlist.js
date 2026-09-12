@@ -2,10 +2,12 @@ const express = require('express');
 const pool = require('../db/pool');
 const router = express.Router();
 
-// status: worked | be_win | be_loss | failed. Kein Status (null) = noch nicht bewertet.
-// be_win  = 2R wurden erreicht (SL stand schon auf BE), am Ende trotzdem BE raus.
-// be_loss = 2R nie erreicht, BE-Ausstieg ohne dass das Setup geliefert hat.
-const STATI = new Set(['worked', 'be_win', 'be_loss', 'failed']);
+// status: win | be_win | be_loss | lose | no_entry. Kein Status (null) = noch nicht bewertet.
+// be_win   = 2R wurden erreicht (SL stand schon auf BE), am Ende trotzdem BE raus.
+// be_loss  = 2R nie erreicht, BE-Ausstieg ohne dass das Setup geliefert hat.
+// no_entry = kein Einstieg zustande gekommen (z.B. Entry zu hoch), der Kurs ist
+//            aber auch nicht mehr runtergekommen - also weder Gewinn noch Verlust.
+const STATI = new Set(['win', 'be_win', 'be_loss', 'lose', 'no_entry']);
 const EVENT_TYPEN = new Set(['single', 'double']);
 // form: bogen (sauber) | bogen_unsauber (Bogen erkennbar, aber z.B. nur eine Kerze
 // dazwischen oder Wick unter dem Mittel-Level) | kein_bogen

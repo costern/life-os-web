@@ -728,12 +728,13 @@ async function ladeHistorie(){
    im Dashboard pflegbar (DB-Tabelle watchlist_signals, /api/watchlist). ---------- */
 // Ergebnis eines Signals. Bei Breakeven wird unterschieden, ob das Setup vorher
 // geliefert hat: be_win = 2R erreicht (SL stand schon auf BE), be_loss = 2R nie erreicht.
-const WL_FARBEN = { worked:'var(--green)', be_win:'var(--amber)', be_loss:'var(--orange)',
-  failed:'var(--red)', '':'var(--muted)' };
-const WL_LABEL = { worked:'Worked', be_win:'BE Win', be_loss:'BE Loss', failed:'Failed',
-  '':'Noch nicht bewertet' };
-const WL_STATUS_HINT = { worked:'Worked', be_win:'BE Win (2R erreicht)',
-  be_loss:'BE Loss (2R nicht erreicht)', failed:'Failed', '':'Noch nicht bewertet' };
+const WL_FARBEN = { win:'var(--green)', be_win:'var(--amber)', be_loss:'var(--orange)',
+  lose:'var(--red)', no_entry:'var(--accent)', '':'var(--muted)' };
+const WL_LABEL = { win:'Win', be_win:'BE Win', be_loss:'BE Loss', lose:'Lose',
+  no_entry:'No Entry', '':'Noch nicht bewertet' };
+const WL_STATUS_HINT = { win:'Win', be_win:'BE Win (2R erreicht)',
+  be_loss:'BE Loss (2R nicht erreicht)', lose:'Lose',
+  no_entry:'No Entry (kein Einstieg, aber auch nicht gefallen)', '':'Noch nicht bewertet' };
 const WL_FORM_LABEL = { bogen:'Bogen', bogen_unsauber:'Bogen unsauber', kein_bogen:'kein Bogen', '':'' };
 const wlStatus = s => s.status || '';
 // Setup-Qualitaet (bewertet das Signal selbst, unabhaengig vom Ausgang des Trades)
@@ -811,7 +812,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
   }
   function statusOptionsHtml(aktuell){
     const a = aktuell || '';
-    return ['', 'worked', 'be_win', 'be_loss', 'failed']
+    return ['', 'win', 'be_win', 'be_loss', 'lose', 'no_entry']
       .map(k => '<option value="'+k+'"'+(k===a?' selected':'')+'>'+WL_STATUS_HINT[k]+'</option>').join('');
   }
   function auswahlHtml(klasse, werte, aktuell){
@@ -978,10 +979,11 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     });
     const tradeStati = [...trades.values()].map(t => t.status);
     const anzTrades = trades.size;
-    const anzWorked = tradeStati.filter(x => x === 'worked').length;
+    const anzWin = tradeStati.filter(x => x === 'win').length;
     const anzBeWin = tradeStati.filter(x => x === 'be_win').length;
     const anzBeLoss = tradeStati.filter(x => x === 'be_loss').length;
-    const anzFailed = tradeStati.filter(x => x === 'failed').length;
+    const anzLose = tradeStati.filter(x => x === 'lose').length;
+    const anzNoEntry = tradeStati.filter(x => x === 'no_entry').length;
     const assetsAnzahl = new Set(signale.map(s => s.asset)).size;
 
     const tabelleSortiert = signale.slice().sort((a,b) => {
@@ -1051,10 +1053,11 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
         '<div class="stat"><div class="v">'+signale.length+'</div><div class="l">Signale</div></div>' +
         '<div class="stat"><div class="v">'+anzTrades+'</div><div class="l">Trades</div></div>' +
         '<div class="stat"><div class="v">'+assetsAnzahl+'</div><div class="l">Assets</div></div>' +
-        '<div class="stat"><div class="v pnl-pos">'+anzWorked+'</div><div class="l">Worked</div></div>' +
+        '<div class="stat"><div class="v pnl-pos">'+anzWin+'</div><div class="l">Win</div></div>' +
         '<div class="stat"><div class="v pnl-amber">'+anzBeWin+'</div><div class="l">BE Win</div></div>' +
         '<div class="stat"><div class="v pnl-orange">'+anzBeLoss+'</div><div class="l">BE Loss</div></div>' +
-        '<div class="stat"><div class="v pnl-neg">'+anzFailed+'</div><div class="l">Failed</div></div>' +
+        '<div class="stat"><div class="v pnl-neg">'+anzLose+'</div><div class="l">Lose</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--accent)">'+anzNoEntry+'</div><div class="l">No Entry</div></div>' +
       '</div>' +
       '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer.</div>' +
       '<div class="wl-toolbar">' +
