@@ -739,15 +739,16 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
   let sortSpalte = 'date', sortRichtung = 'desc';
 
   function render(){
-    // Signale, die zeitlich nah beieinanderliegen (gleicher Tag oder <=2 Tage Abstand),
-    // werden zu einer Gruppe zusammengefasst und im Chart + in der Tabelle markiert.
+    // Haeufungen: Signale innerhalb eines FENSTERS von max. 2 Tagen ab dem ersten Signal
+    // der Gruppe. Bewusst kein Verketten (0->2->4->6 Tage waere sonst eine einzige Gruppe) -
+    // sobald ein Signal mehr als 2 Tage nach dem Gruppenstart liegt, beginnt eine neue Gruppe.
     const sigSortiert = signale.slice().sort((a,b) => a.date.localeCompare(b.date));
     const CLUSTER_GRENZE = 2 * 86400000;
     const cluster = [];
     let aktuellCluster = null;
     sigSortiert.forEach(s => {
       const t = new Date(s.date+'T00:00:00').getTime();
-      if (aktuellCluster && (t - aktuellCluster.maxT) <= CLUSTER_GRENZE) {
+      if (aktuellCluster && (t - aktuellCluster.minT) <= CLUSTER_GRENZE) {
         aktuellCluster.sigs.push(s); aktuellCluster.maxT = Math.max(aktuellCluster.maxT, t);
       } else {
         aktuellCluster = { sigs: [s], minT: t, maxT: t };
@@ -757,6 +758,11 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     const echteCluster = cluster.filter(c => c.sigs.length >= 2);
     const clusterVonSignal = new Map();
     echteCluster.forEach((c, ci) => c.sigs.forEach(s => clusterVonSignal.set(s, ci)));
+
+    // Signale an EXAKT demselben Tag: eigene, staerkere Markierung (unabhaengig von der Haeufung)
+    const proTag = {};
+    signale.forEach(s => { proTag[s.date] = (proTag[s.date] || 0) + 1; });
+    const gleicherTag = s => proTag[s.date] > 1 ? proTag[s.date] : 0;
 
     const [minT, maxT] = domain;
     const spanne = Math.max(maxT - minT, 1);
@@ -816,11 +822,11 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     }).join('');
 
     // Cluster-Bänder (Signale mit <=2 Tagen Abstand) im sichtbaren Bereich
-    const clusterBaender = echteCluster.map(c => {
+    const clusterBaender = echteCluster.map((c, ci) => {
       if (c.maxT < minT || c.minT > maxT) return '';
-      const x0 = Math.max(x(c.minT) - 10, PADL), x1 = Math.min(x(c.maxT) + 10, B - PADR);
+      const x0 = Math.max(x(c.minT) - 6, PADL), x1 = Math.min(x(c.maxT) + 6, B - PADR);
       if (x1 <= x0) return '';
-      return '<rect class="wl-cluster-band" x="'+x0.toFixed(1)+'" y="'+PADT+'" width="'+(x1-x0).toFixed(1)+'" height="'+PLOTH+'" rx="4"/>';
+      return '<rect class="wl-cluster-band '+(ci % 2 === 0 ? 'wl-band-a' : 'wl-band-b')+'" x="'+x0.toFixed(1)+'" y="'+PADT+'" width="'+(x1-x0).toFixed(1)+'" height="'+PLOTH+'" rx="4"/>';
     }).join('');
 
     // Signale im sichtbaren Zeitraum, nach Datum gruppiert (Stapel bei Mehrfach-Signalen am selben Tag)
@@ -843,13 +849,16 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
         const dy = (i - (gruppe.length - 1) / 2) * 24;
         const cy = cy0 + dy;
         if (cx0 < PADL - 20 || cx0 > B - PADR + 20) return;
-        const titel = wlDatumLabel(s)+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[s.status]+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+(clusterVonSignal.has(s) ? ' · Teil einer Signal-Häufung' : '');
-        marker.push({ cx: cx0, cy, farbe: WL_FARBEN[s.status], titel, asset: s.asset, geclustert: clusterVonSignal.has(s) });
+        const tagAnzahl = gleicherTag(s);
+        const zusatz = tagAnzahl ? ' · '+tagAnzahl+'× am selben Tag' : (clusterVonSignal.has(s) ? ' · Teil einer Signal-Häufung' : '');
+        const titel = wlDatumLabel(s)+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[s.status]+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+zusatz;
+        marker.push({ cx: cx0, cy, farbe: WL_FARBEN[s.status], titel, asset: s.asset,
+          geclustert: clusterVonSignal.has(s), selberTag: !!tagAnzahl });
       });
     });
 
     const markerHtml = marker.map((p,i) =>
-      '<span class="wl-marker'+(p.geclustert?' geclustert':'')+'" data-i="'+i+'" style="left:'+(p.cx/B*100).toFixed(2)+'%;top:'+(p.cy/H*100).toFixed(2)+'%;border-color:'+p.farbe+'">' +
+      '<span class="wl-marker'+(p.geclustert?' geclustert':'')+(p.selberTag?' selber-tag':'')+'" data-i="'+i+'" style="left:'+(p.cx/B*100).toFixed(2)+'%;top:'+(p.cy/H*100).toFixed(2)+'%;border-color:'+p.farbe+'">' +
         assetIconHtml(p.asset) +
       '</span>'
     ).join('');
@@ -864,10 +873,20 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       else cmp = a.date.localeCompare(b.date);
       return sortRichtung === 'asc' ? cmp : -cmp;
     });
-    const tabelle = tabelleSortiert.map(s => {
-      const geclustert = clusterVonSignal.has(s);
-      return '<tr class="'+(geclustert?'wl-row-cluster':'')+'" data-id="'+s.id+'">' +
-        '<td class="muted">'+esc(wlDatumLabel(s))+'</td>' +
+    const tabelle = tabelleSortiert.map((s, idx) => {
+      const grp = clusterVonSignal.has(s) ? clusterVonSignal.get(s) : null;
+      const grpVorher = idx > 0 && clusterVonSignal.has(tabelleSortiert[idx-1]) ? clusterVonSignal.get(tabelleSortiert[idx-1]) : null;
+      // Gruppen wechseln sich farblich ab und bekommen oben eine Trennlinie, damit zwei
+      // direkt untereinanderstehende Haeufungen nicht wie eine einzige grosse aussehen.
+      const klassen = [];
+      if (grp !== null) {
+        klassen.push('wl-row-cluster', grp % 2 === 0 ? 'wl-grp-a' : 'wl-grp-b');
+        if (grp !== grpVorher) klassen.push('wl-grp-start');
+      }
+      const tagAnzahl = gleicherTag(s);
+      const tagBadge = tagAnzahl ? ' <span class="wl-sameday">'+tagAnzahl+'× selber Tag</span>' : '';
+      return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'">' +
+        '<td class="muted">'+esc(wlDatumLabel(s))+tagBadge+'</td>' +
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+esc(s.tf||'–')+'</td>' +
         '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[s.status]+';color:'+WL_FARBEN[s.status]+'">'+WL_LABEL[s.status]+'</span></td>' +

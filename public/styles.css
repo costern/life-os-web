@@ -103,12 +103,15 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-axis-label-y { font-size:10px; fill:var(--muted); font-family:inherit; }
 .wl-btc-line { fill:none; stroke:var(--muted); stroke-width:1.5; opacity:.85; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
 .wl-btc-area { fill:var(--muted); opacity:.08; }
-.wl-cluster-band { fill:#0d9488; opacity:.12; }
+.wl-cluster-band { fill:#0d9488; }
+.wl-band-a { opacity:.14; }
+.wl-band-b { opacity:.07; }
 .wl-sel-rect { fill:var(--accent); opacity:.12; stroke:var(--accent); stroke-width:1; stroke-dasharray:3,3; pointer-events:none; }
 .wl-markers { position:absolute; inset:0; pointer-events:none; }
 .wl-marker { position:absolute; width:22px; height:22px; transform:translate(-50%,-50%); border-radius:50%;
   border:2px solid; background:var(--card); overflow:hidden; cursor:pointer; pointer-events:auto; box-shadow:0 1px 3px rgba(0,0,0,.2); }
 .wl-marker.geclustert { box-shadow:0 0 0 3px rgba(13,148,136,.45), 0 1px 3px rgba(0,0,0,.2); }
+.wl-marker.selber-tag { box-shadow:0 0 0 3px #0d9488, 0 1px 3px rgba(0,0,0,.25); }
 .wl-icon { display:block; width:100%; height:100%; }
 .wl-icon img { display:block; width:100%; height:100%; object-fit:cover; }
 .wl-icon-fallback { display:flex; align-items:center; justify-content:center; width:100%; height:100%;
@@ -123,8 +126,16 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-table th.wl-sortable { cursor:pointer; user-select:none; }
 .wl-table th.wl-sortable:hover { color:var(--accent); }
 .wl-table td { padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:middle; border-left:3px solid transparent; }
-.wl-table tr.wl-row-cluster td { background:rgba(13,148,136,.08); }
-.wl-table tr.wl-row-cluster td:first-child { border-left-color:#0d9488; }
+/* Zwei Haeufungen, die in der Tabelle direkt untereinanderstehen, wechseln sich in der
+   Helligkeit ab und werden oben durch eine Trennlinie getrennt - so sieht man sofort,
+   wo eine Gruppe aufhoert und die naechste anfaengt. */
+.wl-table tr.wl-grp-a td { background:rgba(13,148,136,.11); }
+.wl-table tr.wl-grp-b td { background:rgba(13,148,136,.045); }
+.wl-table tr.wl-grp-a td:first-child { border-left-color:#0d9488; }
+.wl-table tr.wl-grp-b td:first-child { border-left-color:#5eead4; }
+.wl-table tr.wl-grp-start td { border-top:2px solid var(--line); }
+.wl-sameday { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:99px;
+  background:#0d9488; color:#fff; font-size:10px; font-weight:700; white-space:nowrap; }
 .wl-table-asset { display:flex; align-items:center; gap:7px; white-space:nowrap; }
 .wl-table-asset .wl-icon { width:18px; height:18px; border-radius:50%; flex:none; }
 .wl-row-actions { white-space:nowrap; text-align:right; }
