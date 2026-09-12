@@ -2,7 +2,17 @@ const express = require('express');
 const pool = require('../db/pool');
 const router = express.Router();
 
-const STATI = new Set(['offen', 'unanalysiert', 'fehlsignal']);
+// status: worked | be | failed. Kein Status (null) = noch nicht bewertet.
+const STATI = new Set(['worked', 'be', 'failed']);
+const EVENT_TYPEN = new Set(['single', 'double']);
+const FORMEN = new Set(['bottom', 'bogen']);
+
+// Leerstring aus dem Formular als "nicht gesetzt" behandeln
+function orNull(v) { return v === '' || v === undefined ? null : v; }
+function mtfOrNull(v) {
+  const n = Number(v);
+  return [1, 2, 3].includes(n) ? n : null;
+}
 
 function rowOut(r) {
   return {
@@ -12,7 +22,12 @@ function rowOut(r) {
     asset: r.asset,
     tf: r.tf,
     notiz: r.notiz,
-    status: r.status
+    status: r.status,
+    eventTyp: r.event_typ,
+    mtf: r.mtf === null || r.mtf === undefined ? null : Number(r.mtf),
+    multiAsset: !!r.multi_asset,
+    form: r.form,
+    details: r.details
   };
 }
 
@@ -25,11 +40,13 @@ router.post('/', async (req, res) => {
   const b = req.body || {};
   if (!b.date) return res.status(400).json({ error: 'date ist Pflicht' });
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
-  const status = STATI.has(b.status) ? b.status : 'offen';
+  const status = STATI.has(b.status) ? b.status : null;
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status]
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+    [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
+     EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
+     FORMEN.has(b.form) ? b.form : null, orNull(b.details)]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -38,11 +55,18 @@ router.patch('/:id', async (req, res) => {
   const id = +req.params.id;
   const b = req.body || {};
   const fields = []; const vals = []; let i = 1;
-  for (const [key, col] of [['date','date'],['label','label'],['asset','asset'],['tf','tf'],['notiz','notiz'],['status','status']]) {
-    if (b[key] !== undefined) {
-      if (key === 'status' && !STATI.has(b[key])) continue;
-      fields.push(`${col} = $${i++}`); vals.push(b[key]);
-    }
+  for (const [key, col] of [['date','date'],['label','label'],['asset','asset'],['tf','tf'],
+                            ['notiz','notiz'],['status','status'],['eventTyp','event_typ'],
+                            ['mtf','mtf'],['multiAsset','multi_asset'],['form','form'],['details','details']]) {
+    if (b[key] === undefined) continue;
+    let wert = b[key];
+    if (key === 'status') wert = STATI.has(wert) ? wert : null;
+    else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
+    else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
+    else if (key === 'mtf') wert = mtfOrNull(wert);
+    else if (key === 'multiAsset') wert = !!wert;
+    else wert = orNull(wert);
+    fields.push(`${col} = $${i++}`); vals.push(wert);
   }
   if (!fields.length) return res.status(400).json({ error: 'nichts zu ändern' });
   fields.push(`updated_at = now()`);

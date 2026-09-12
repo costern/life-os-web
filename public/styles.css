@@ -141,8 +141,26 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-row-actions { white-space:nowrap; text-align:right; }
 .wl-edit, .wl-del { background:none; border:none; cursor:pointer; font-size:14px; padding:2px 5px; border-radius:6px; }
 .wl-edit:hover, .wl-del:hover { background:var(--badge-blue-bg); }
-.wl-edit-row td { background:var(--bg); padding:10px; }
-.wl-edit-row .addrow { margin-top:0; }
+.wl-edit-row td { background:var(--bg); padding:0; }
+.wl-detail { padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+.wl-detail-kopf { display:flex; align-items:center; gap:8px; font-size:15px; }
+.wl-detail-kopf .wl-icon { width:22px; height:22px; border-radius:50%; flex:none; }
+.wl-detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px 14px; }
+.wl-detail label, .wl-detail-voll { display:flex; flex-direction:column; gap:4px;
+  font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.wl-detail input[type=text], .wl-detail input[type=date], .wl-detail select, .wl-detail textarea {
+  font-family:inherit; font-size:13px; padding:7px 9px; border:1px solid var(--line);
+  border-radius:8px; background:var(--card); color:var(--ink); text-transform:none; letter-spacing:0; width:100%; }
+.wl-detail textarea { resize:vertical; line-height:1.5; }
+.wl-detail input:focus, .wl-detail select:focus, .wl-detail textarea:focus { outline:none; border-color:var(--accent); }
+.wl-detail .wl-check { flex-direction:row; align-items:center; gap:7px; text-transform:none;
+  letter-spacing:0; font-size:13px; color:var(--ink); align-self:end; padding-bottom:7px; }
+.wl-detail .wl-check input { width:auto; }
+.wl-detail-aktionen { display:flex; gap:8px; }
+.wl-detail-aktionen button { font-family:inherit; font-size:12px; font-weight:500; background:var(--accent);
+  color:#fff; border:none; border-radius:8px; padding:7px 16px; cursor:pointer; }
+.wl-detail-aktionen button.ghost { background:var(--ghost-bg); color:var(--ghost-text); }
+.wl-table tbody tr[data-id]:not(.wl-edit-row) { cursor:pointer; }
 .tcb { flex:0 0 18px; width:18px; height:18px; line-height:17px; text-align:center; cursor:pointer;
   color:var(--line); font-size:15px; border-radius:99px; user-select:none; }
 .tcb:hover { background:var(--badge-blue-bg); color:var(--accent); }

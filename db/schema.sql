@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
 );
 
 -- Double-Bottom-Watchlist (urspruenglich aus Obsidian importiert, jetzt im Dashboard
--- direkt pflegbar). "status": offen | unanalysiert | fehlsignal.
+-- direkt pflegbar). "status": worked | be | failed, NULL = noch nicht bewertet.
 CREATE TABLE IF NOT EXISTS watchlist_signals (
   id SERIAL PRIMARY KEY,
   date DATE NOT NULL,
@@ -119,7 +119,16 @@ CREATE TABLE IF NOT EXISTS watchlist_signals (
   asset TEXT NOT NULL,
   tf TEXT,
   notiz TEXT,
-  status TEXT NOT NULL DEFAULT 'offen',
+  status TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Detailfelder zum Setup: event_typ single|double, mtf = Anzahl Timeframes (1-3),
+-- multi_asset = Signal auf mehreren Assets gleichzeitig, form = bottom|bogen.
+ALTER TABLE watchlist_signals ALTER COLUMN status DROP NOT NULL;
+ALTER TABLE watchlist_signals ALTER COLUMN status DROP DEFAULT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS event_typ TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS mtf INTEGER;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS multi_asset BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS form TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS details TEXT;
