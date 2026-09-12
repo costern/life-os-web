@@ -73,6 +73,49 @@ async function api(path, opts) {
   document.getElementById('dateline').textContent = now.toLocaleDateString('de-DE',{weekday:'long', day:'2-digit', month:'long', year:'numeric'});
 })();
 
+/* ---------- Journal Day + Jahres-/Monatsfortschritt (Uebersicht) ----------
+   Tag 1 = 31.03.2025, d.h. der 12.09.2026 ist Journal Day 531. Reine Datumsrechnung
+   im Browser, nichts gespeichert - der Zaehler laeuft dadurch automatisch weiter. */
+(function(){
+  const elNum = document.getElementById('jdNum');
+  if (!elNum) return;
+  const START = new Date(2025, 2, 31);   // Monat 2 = Maerz
+
+  function tagOhneZeit(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+
+  function zeichne(){
+    const heute = tagOhneZeit(new Date());
+    const tagNr = Math.floor((heute - START) / 86400000) + 1;
+    elNum.textContent = tagNr.toLocaleString('de-DE');
+    document.getElementById('jdSince').textContent =
+      'seit ' + START.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'});
+
+    const jahr = heute.getFullYear();
+    const jahresStart = new Date(jahr, 0, 1);
+    const tageImJahr = (new Date(jahr, 11, 31) - jahresStart) / 86400000 + 1;
+    const tagImJahr = Math.floor((heute - jahresStart) / 86400000) + 1;
+
+    const tageImMonat = new Date(jahr, heute.getMonth() + 1, 0).getDate();
+    const tagImMonat = heute.getDate();
+
+    function setzen(prefix, tag, gesamt, titel){
+      const pct = Math.max(0, Math.min(100, tag / gesamt * 100));
+      document.getElementById(prefix+'Label').textContent = titel;
+      document.getElementById(prefix+'Pct').textContent = Math.round(pct) + ' %';
+      document.getElementById(prefix+'Fill').style.width = pct.toFixed(1) + '%';
+      document.getElementById(prefix+'Sub').textContent =
+        'Tag ' + tag + ' von ' + gesamt + ' · noch ' + (gesamt - tag) + ' Tage';
+    }
+    setzen('jdYear', tagImJahr, tageImJahr, String(jahr));
+    setzen('jdMonth', tagImMonat, tageImMonat,
+      heute.toLocaleDateString('de-DE',{month:'long'}));
+  }
+
+  zeichne();
+  // Falls die Seite ueber Mitternacht offen bleibt: stuendlich nachrechnen.
+  setInterval(zeichne, 3600000);
+})();
+
 /* ---------- Quote of the Day ---------- */
 (function(){
   const QUOTES = [
