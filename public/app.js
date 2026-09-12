@@ -864,11 +864,13 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       const cx0 = x(new Date(datum+'T00:00:00').getTime());
       const cy0 = yPreis(preis);
       gruppe.forEach((s, i) => {
-        const dx = (i - (gruppe.length - 1) / 2) * 24;
-        const cx = cx0 + dx;
-        if (cx < PADL - 20 || cx > B - PADR + 20) return;
+        // Mehrere Signale am selben Tag werden UNTEREINANDER gestapelt (nicht nebeneinander),
+        // damit die X-Position (= Datum) immer eindeutig bleibt.
+        const dy = (i - (gruppe.length - 1) / 2) * 24;
+        const cy = cy0 + dy;
+        if (cx0 < PADL - 20 || cx0 > B - PADR + 20) return;
         const titel = s.label+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[s.status]+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+(clusterVonSignal.has(s) ? ' · Teil einer Signal-Häufung' : '');
-        marker.push({ cx, cy: cy0, farbe: WL_FARBEN[s.status], titel, asset: s.asset, geclustert: clusterVonSignal.has(s) });
+        marker.push({ cx: cx0, cy, farbe: WL_FARBEN[s.status], titel, asset: s.asset, geclustert: clusterVonSignal.has(s) });
       });
     });
 
