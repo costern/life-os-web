@@ -804,6 +804,11 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     if (s.label && s.label.trim()) return s.label;
     return new Date(s.date+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
   }
+  // Uhrzeit = Kerzen-Close. Ohne Eintrag steht der Tageschart-Close (02:00) dahinter,
+  // aber nur angedeutet, damit man sieht: das ist der Standard, nicht von Hand gesetzt.
+  function wlZeitLabel(s){
+    return s.uhrzeit ? s.uhrzeit + ' Uhr' : '';
+  }
 
   // Icon je Asset: bekannte Ticker als farbiges SVG-Logo (CDN, mit Fallback-Buchstaben-Icon
   // bei fehlendem Logo), damit gleiche Assets im Chart und in der Tabelle immer gleich aussehen.
@@ -995,7 +1000,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
     const tabelleSortiert = signale.slice().sort((a,b) => {
       let cmp;
       if (sortSpalte === 'asset') cmp = a.asset.localeCompare(b.asset) || a.date.localeCompare(b.date);
-      else cmp = a.date.localeCompare(b.date);
+      else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'');
       return sortRichtung === 'asc' ? cmp : -cmp;
     });
     const tabelle = tabelleSortiert.map((s, idx) => {
@@ -1014,7 +1019,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       const setup = wlSetupText(s);
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
       return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'"'+tradeAttr+' title="Doppelklick für Details">' +
-        '<td class="muted">'+esc(wlDatumLabel(s))+tagBadge+'</td>' +
+        '<td class="muted">'+esc(wlDatumLabel(s)) +
+          (s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') + tagBadge + '</td>' +
         '<td class="wl-trade-cell">' +
           (s.tradeId
             ? '<span class="wl-trade-bar" style="background:'+wlTradeFarbe(s.tradeId)+'"></span>' +
@@ -1041,9 +1047,11 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       '</tr>' +
       // Detailansicht: klappt per Doppelklick auf die Zeile (oder ueber ✎) auf
       '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="12"><div class="wl-detail">' +
-        '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+'</span></div>' +
+        '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
         '<div class="wl-detail-grid">' +
           '<label>Datum<input type="date" class="wle-date" value="'+s.date+'"></label>' +
+          '<label>Uhrzeit <span class="wl-hint">Kerzen-Close, leer = 02:00 (Tageschart)</span>' +
+            '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
           '<label>Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
           '<label>Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
           '<label>Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
@@ -1100,6 +1108,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       '<form class="addbar" id="wlAddForm" autocomplete="off" style="margin-top:16px">' +
         '<div class="addrow">' +
           '<input type="date" id="wlNewDate" required>' +
+          '<input type="time" id="wlNewZeit" value="02:00" title="Kerzen-Close – 02:00 ist der Tageschart-Close">' +
           '<input type="text" id="wlNewAsset" placeholder="Asset (z.B. BTC)" maxlength="20" required style="max-width:110px">' +
           '<input type="text" id="wlNewTf" placeholder="TF (z.B. 1D)" maxlength="20" style="max-width:90px">' +
           '<select id="wlNewStatus">'+statusOptionsHtml('')+'</select>' +
@@ -1186,6 +1195,7 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
       if (!date || !asset) return;
       const body = {
         date, asset,
+        uhrzeit: document.getElementById('wlNewZeit').value || null,
         tf: document.getElementById('wlNewTf').value.trim() || null,
         status: document.getElementById('wlNewStatus').value,
         notiz: document.getElementById('wlNewNotiz').value.trim() || null
@@ -1261,7 +1271,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
           pattern: row.querySelector('.wle-pattern').value,
           candles: row.querySelector('.wle-candles').value,
           divLokal: row.querySelector('.wle-divlokal').value,
-          divStruktur: row.querySelector('.wle-divstruktur').value
+          divStruktur: row.querySelector('.wle-divstruktur').value,
+          uhrzeit: row.querySelector('.wle-uhrzeit').value
         };
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
         try { await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) }); await ladeUndZeichne(); }

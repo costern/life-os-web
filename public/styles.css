@@ -143,6 +143,8 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-trade-cell { position:relative; padding-left:16px !important; white-space:nowrap; }
 .wl-trade-bar { position:absolute; left:4px; top:0; bottom:0; width:4px; border-radius:2px; }
 .wl-trade-chip { display:inline-block; font-size:12px; font-weight:700; white-space:nowrap; }
+.wl-zeit { display:inline-block; margin-left:4px; padding:0 5px; border-radius:5px;
+  background:var(--hover-bg); font-size:10px; font-weight:600; white-space:nowrap; }
 .wl-note { display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px; font-weight:700;
   border:1.5px solid; white-space:nowrap; }
 .wl-table tr.wl-trade-hover td { background:var(--badge-blue-bg); }

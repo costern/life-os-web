@@ -19,6 +19,13 @@ const PATTERN = new Set(['valid', 'clean', 'choppy']);
 const CANDLES = new Set(['pivot', 'decent', 'gap', 'mini']);
 const DIVERGENZEN = new Set(['rsi', 'none', 'hidden']);
 
+// Uhrzeit: "HH:MM" bzw. "HH:MM:SS" aus dem Formular, sonst nicht gesetzt
+function zeitOrNull(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  const m = String(v).match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+  return m ? m[1] + ':' + m[2] : null;
+}
+
 // Leerstring aus dem Formular als "nicht gesetzt" behandeln
 function orNull(v) { return v === '' || v === undefined ? null : v; }
 function mtfOrNull(v) {
@@ -46,12 +53,13 @@ function rowOut(r) {
     pattern: r.pattern,
     candles: r.candles,
     divLokal: r.div_lokal,
-    divStruktur: r.div_struktur
+    divStruktur: r.div_struktur,
+    uhrzeit: r.uhrzeit ? String(r.uhrzeit).slice(0, 5) : null
   };
 }
 
 router.get('/', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM watchlist_signals ORDER BY date ASC, id ASC');
+  const { rows } = await pool.query('SELECT * FROM watchlist_signals ORDER BY date ASC, uhrzeit ASC NULLS FIRST, id ASC');
   res.json(rows.map(rowOut));
 });
 
@@ -61,8 +69,8 @@ router.post('/', async (req, res) => {
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const status = STATI.has(b.status) ? b.status : null;
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, uhrzeit)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
@@ -71,7 +79,8 @@ router.post('/', async (req, res) => {
      PATTERN.has(b.pattern) ? b.pattern : null,
      CANDLES.has(b.candles) ? b.candles : null,
      DIVERGENZEN.has(b.divLokal) ? b.divLokal : null,
-     DIVERGENZEN.has(b.divStruktur) ? b.divStruktur : null]
+     DIVERGENZEN.has(b.divStruktur) ? b.divStruktur : null,
+     zeitOrNull(b.uhrzeit)]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -85,7 +94,8 @@ router.patch('/:id', async (req, res) => {
                             ['mtf','mtf'],['multiAsset','multi_asset'],['form','form'],['details','details'],
                             ['tradeId','trade_id'],['note','note'],['marktphase','marktphase'],
                             ['pattern','pattern'],['candles','candles'],
-                            ['divLokal','div_lokal'],['divStruktur','div_struktur']]) {
+                            ['divLokal','div_lokal'],['divStruktur','div_struktur'],
+                            ['uhrzeit','uhrzeit']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -94,6 +104,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'pattern') wert = PATTERN.has(wert) ? wert : null;
     else if (key === 'candles') wert = CANDLES.has(wert) ? wert : null;
     else if (key === 'divLokal' || key === 'divStruktur') wert = DIVERGENZEN.has(wert) ? wert : null;
+    else if (key === 'uhrzeit') wert = zeitOrNull(wert);
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);

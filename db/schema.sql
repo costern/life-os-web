@@ -149,3 +149,6 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS pattern TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS candles TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS div_lokal TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS div_struktur TEXT;
+-- uhrzeit: Kerzen-Close des Signals. Standard 02:00 = Tageschart-Close; 12:00 = 12H-Close
+-- mitten am Tag; kuerzere Timeframes werden von Hand eingetragen. NULL = unbekannt.
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS uhrzeit TIME;
