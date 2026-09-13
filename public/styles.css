@@ -123,10 +123,17 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-tooltip { position:absolute; transform:translate(-50%,-115%); background:var(--card); border:1px solid var(--line);
   border-radius:8px; padding:5px 9px; font-size:12px; box-shadow:0 4px 12px rgba(0,0,0,.12); pointer-events:none;
   white-space:normal; max-width:280px; z-index:5; }
-.wl-table-wrap { overflow-x:auto; margin-top:16px; }
+/* Eigener Scrollbereich, damit die Kopfzeile beim Scrollen oben stehen bleiben kann:
+   sticky braucht einen scrollenden Vorfahren, und overflow-x macht den Wrapper
+   ohnehin schon zu einem. */
+.wl-table-wrap { overflow:auto; margin-top:16px; max-height:70vh; }
 .wl-table { width:100%; border-collapse:collapse; font-size:13px; }
+.wl-table thead th { position:sticky; top:0; z-index:3; background:var(--card);
+  /* box-shadow statt border-bottom: bei border-collapse wandert der Rahmen beim
+     Scrollen sonst mit der ersten Zeile weg */
+  box-shadow:inset 0 -1px 0 var(--line); }
 .wl-table th { text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
-  padding:6px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  padding:6px 10px; white-space:nowrap; }
 .wl-table th.wl-sortable { cursor:pointer; user-select:none; }
 .wl-table th.wl-sortable:hover { color:var(--accent); }
 .wl-table td { padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:middle; border-left:3px solid transparent; }
