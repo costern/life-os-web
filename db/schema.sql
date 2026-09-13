@@ -138,3 +138,14 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS details TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS trade_id TEXT;
 -- note: Setup-Qualitaet A++ | A+ | A | B (bewertet das Signal, nicht den Ausgang)
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS note TEXT;
+-- Chart-Eigenschaften, aus denen (plus eigener Einschaetzung) die Note entsteht:
+-- marktphase   uptrend | downtrend | ranging
+-- pattern      valid | clean | choppy          (Qualitaet der Struktur)
+-- candles      pivot | decent | gap | mini     (Kerzenbild am Boden)
+-- div_lokal    rsi | none | hidden             (lokale RSI-Divergenz)
+-- div_struktur rsi | none | hidden             (strukturelle RSI-Divergenz)
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS marktphase TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS pattern TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS candles TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS div_lokal TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS div_struktur TEXT;

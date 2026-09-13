@@ -14,6 +14,10 @@ const EVENT_TYPEN = new Set(['single', 'double']);
 const FORMEN = new Set(['bogen', 'bogen_unsauber', 'kein_bogen']);
 // note = Setup-Qualitaet (bewertet das Signal, nicht den Ausgang des Trades)
 const NOTEN = new Set(['A++', 'A+', 'A', 'B']);
+const MARKTPHASEN = new Set(['uptrend', 'downtrend', 'ranging']);
+const PATTERN = new Set(['valid', 'clean', 'choppy']);
+const CANDLES = new Set(['pivot', 'decent', 'gap', 'mini']);
+const DIVERGENZEN = new Set(['rsi', 'none', 'hidden']);
 
 // Leerstring aus dem Formular als "nicht gesetzt" behandeln
 function orNull(v) { return v === '' || v === undefined ? null : v; }
@@ -37,7 +41,12 @@ function rowOut(r) {
     form: r.form,
     details: r.details,
     tradeId: r.trade_id,
-    note: r.note
+    note: r.note,
+    marktphase: r.marktphase,
+    pattern: r.pattern,
+    candles: r.candles,
+    divLokal: r.div_lokal,
+    divStruktur: r.div_struktur
   };
 }
 
@@ -52,12 +61,17 @@ router.post('/', async (req, res) => {
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const status = STATI.has(b.status) ? b.status : null;
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
-     NOTEN.has(b.note) ? b.note : null]
+     NOTEN.has(b.note) ? b.note : null,
+     MARKTPHASEN.has(b.marktphase) ? b.marktphase : null,
+     PATTERN.has(b.pattern) ? b.pattern : null,
+     CANDLES.has(b.candles) ? b.candles : null,
+     DIVERGENZEN.has(b.divLokal) ? b.divLokal : null,
+     DIVERGENZEN.has(b.divStruktur) ? b.divStruktur : null]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -69,11 +83,17 @@ router.patch('/:id', async (req, res) => {
   for (const [key, col] of [['date','date'],['label','label'],['asset','asset'],['tf','tf'],
                             ['notiz','notiz'],['status','status'],['eventTyp','event_typ'],
                             ['mtf','mtf'],['multiAsset','multi_asset'],['form','form'],['details','details'],
-                            ['tradeId','trade_id'],['note','note']]) {
+                            ['tradeId','trade_id'],['note','note'],['marktphase','marktphase'],
+                            ['pattern','pattern'],['candles','candles'],
+                            ['divLokal','div_lokal'],['divStruktur','div_struktur']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
     else if (key === 'note') wert = NOTEN.has(wert) ? wert : null;
+    else if (key === 'marktphase') wert = MARKTPHASEN.has(wert) ? wert : null;
+    else if (key === 'pattern') wert = PATTERN.has(wert) ? wert : null;
+    else if (key === 'candles') wert = CANDLES.has(wert) ? wert : null;
+    else if (key === 'divLokal' || key === 'divStruktur') wert = DIVERGENZEN.has(wert) ? wert : null;
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);

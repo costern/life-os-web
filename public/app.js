@@ -736,6 +736,12 @@ const WL_STATUS_HINT = { win:'Win', be_win:'BE Win (2R erreicht)',
   be_loss:'BE Loss (2R nicht erreicht)', lose:'Lose',
   no_entry:'No Entry (kein Einstieg, aber auch nicht gefallen)', '':'Noch nicht bewertet' };
 const WL_FORM_LABEL = { bogen:'Bogen', bogen_unsauber:'Bogen unsauber', kein_bogen:'kein Bogen', '':'' };
+// Chart-Eigenschaften, aus denen zusammen mit der eigenen Einschaetzung die Note entsteht
+const WL_PHASE_LABEL = { uptrend:'Uptrend', downtrend:'Downtrend', ranging:'Range', '':'–' };
+const WL_PATTERN_LABEL = { valid:'valid', clean:'clean', choppy:'choppy', '':'–' };
+const WL_CANDLE_LABEL = { pivot:'Pivot Candles', decent:'Decent Candles', gap:'Gap Candles', mini:'Mini Candles', '':'–' };
+const WL_DIV_LABEL = { rsi:'RSI Div.', none:'No Div.', hidden:'RSI Hidden Div.', '':'–' };
+const WL_DIV_KURZ = { rsi:'RSI', none:'keine', hidden:'Hidden', '':'–' };
 const wlStatus = s => s.status || '';
 // Setup-Qualitaet (bewertet das Signal selbst, unabhaengig vom Ausgang des Trades)
 const WL_NOTEN = ['A++', 'A+', 'A', 'B'];
@@ -1018,13 +1024,23 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+esc(s.tf||'–')+'</td>' +
         '<td class="muted">'+(setup ? esc(setup) : '–')+'</td>' +
+        '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+'</td>' +
+        '<td class="muted">'+
+          ([s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '']
+            .filter(Boolean).join(' · ') || '–') +
+        '</td>' +
+        '<td class="muted">'+
+          ((s.divLokal || s.divStruktur)
+            ? 'L: '+WL_DIV_KURZ[s.divLokal || '']+' · S: '+WL_DIV_KURZ[s.divStruktur || '']
+            : '–') +
+        '</td>' +
         '<td>'+(s.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span>' : '<span class="muted">–</span>')+'</td>' +
         '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span></td>' +
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
       '</tr>' +
       // Detailansicht: klappt per Doppelklick auf die Zeile (oder ueber ✎) auf
-      '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="9"><div class="wl-detail">' +
+      '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="12"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+'</span></div>' +
         '<div class="wl-detail-grid">' +
           '<label>Datum<input type="date" class="wle-date" value="'+s.date+'"></label>' +
@@ -1034,6 +1050,11 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
           '<label>Setup-Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
           '<label>Event'+auswahlHtml('wle-event', [['','–'],['single','Single Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
           '<label>Multi-Timeframe'+auswahlHtml('wle-mtf', [['','–'],['1','1 Timeframe'],['2','2 Timeframes'],['3','3 Timeframes']], s.mtf ? String(s.mtf) : '')+'</label>' +
+          '<label>Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
+          '<label>Pattern'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
+          '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['pivot','Pivot Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles']], s.candles)+'</label>' +
+          '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['rsi','RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
+          '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['rsi','RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
         '</div>' +
@@ -1093,7 +1114,8 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
             '<th class="wl-sortable" data-sort="date">Datum'+(sortSpalte==='date'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
             '<th>Trade</th>' +
             '<th class="wl-sortable" data-sort="asset">Asset'+(sortSpalte==='asset'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
-            '<th>TF</th><th>Setup</th><th>Note</th><th>Ergebnis</th><th>Notiz</th><th></th>' +
+            '<th>TF</th><th>Setup</th><th>Phase</th><th>Pattern</th><th>Divergenz</th>' +
+            '<th>Note</th><th>Ergebnis</th><th>Notiz</th><th></th>' +
           '</tr></thead>' +
           '<tbody>'+tabelle+'</tbody>' +
         '</table>' +
@@ -1234,7 +1256,12 @@ const BTC_DAILY = [["2021-06-01",36693],["2021-06-02",37569],["2021-06-03",39247
           notiz: row.querySelector('.wle-notiz').value.trim() || null,
           details: row.querySelector('.wle-details').value.trim() || null,
           tradeId: row.querySelector('.wle-tradeid').value.trim() || null,
-          note: row.querySelector('.wle-note').value
+          note: row.querySelector('.wle-note').value,
+          marktphase: row.querySelector('.wle-phase').value,
+          pattern: row.querySelector('.wle-pattern').value,
+          candles: row.querySelector('.wle-candles').value,
+          divLokal: row.querySelector('.wle-divlokal').value,
+          divStruktur: row.querySelector('.wle-divstruktur').value
         };
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
         try { await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) }); await ladeUndZeichne(); }
