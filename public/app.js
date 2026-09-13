@@ -833,8 +833,8 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     '</select>';
   }
 
-  const B = 860, PADL = 54, PADR = 16, PADT = 18, PADB = 30, H = 340;
-  const PLOTW = B - PADL - PADR, PLOTH = H - PADT - PADB;
+  const B = 860, PADL = 54, PADR = 16, PADT = 18, PADB = 30, H = 400;
+  const PLOTW = B - PADL - PADR;
   let domain = [fullMinT, fullMaxT];
   let signale = [];
   let sortSpalte = 'date', sortRichtung = 'desc';
@@ -877,11 +877,50 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const minP = Math.min(...visPreis), maxP = Math.max(...visPreis);
     const logMin = Math.log(Math.max(minP * 0.9, 1)), logMax = Math.log(maxP * 1.1);
     const logSpanne = Math.max(logMax - logMin, 0.0001);
-    const yPreis = p => PADT + PLOTH - (Math.log(p) - logMin) / logSpanne * PLOTH;
+
+    // Die Coin-Icons liegen in eigenen Spuren UNTER dem Kurs, damit sie die Kurslinie
+    // nicht zudecken; ein duenner Strich fuehrt von dort hoch zur Stelle im Kurs.
+    // Ueberschneiden sich zwei Icons horizontal, rutscht das zweite eine Spur tiefer -
+    // beim Reinzoomen loest sich der Stapel von selbst wieder auf.
+    const sichtbar = signale.filter(s => {
+      const t = new Date(s.date+'T00:00:00').getTime();
+      return t >= minT - CLUSTER_GRENZE && t <= maxT + CLUSTER_GRENZE;
+    }).slice().sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
+
+    const ICON = 22, MAXSPUREN = 5;
+    const spurBelegt = [];
+    const marker = [];
+    sichtbar.forEach(s => {
+      const cx = x(new Date(s.date+'T00:00:00').getTime());
+      if (cx < PADL - 20 || cx > B - PADR + 20) return;
+      let spur = MAXSPUREN - 1;
+      for (let r = 0; r < MAXSPUREN; r++) {
+        if (spurBelegt[r] === undefined || cx - spurBelegt[r] >= ICON) { spur = r; break; }
+      }
+      spurBelegt[spur] = cx;
+      const preis = btcPreisAm(s.date);
+      const tagAnzahl = gleicherTag(s);
+      const zusatz = tagAnzahl ? ' · '+tagAnzahl+'× am selben Tag' : (clusterVonSignal.has(s) ? ' · Teil einer Signal-Häufung' : '');
+      const setup = wlSetupText(s);
+      const titel = wlDatumLabel(s)+(s.uhrzeit?' '+s.uhrzeit:'')+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[wlStatus(s)]+
+        (setup?' · '+setup:'')+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+zusatz;
+      marker.push({ cx, spur, preis, farbe: WL_FARBEN[wlStatus(s)], titel, asset: s.asset,
+        geclustert: clusterVonSignal.has(s), selberTag: !!tagAnzahl,
+        tradeId: s.tradeId || null, datum: s.date });
+    });
+
+    const spurAnzahl = Math.max(1, spurBelegt.length);
+    const LANE_H = spurAnzahl * ICON + 6;
+    const PLOTP = H - PADT - PADB - LANE_H;        // Hoehe nur fuer den Kurs
+    const LANE_TOP = PADT + PLOTP;
+    const spurY = r => LANE_TOP + ICON / 2 + 3 + r * ICON;
+
+    const yPreis = p => PADT + PLOTP - (Math.log(p) - logMin) / logSpanne * PLOTP;
+    marker.forEach(m => { m.cy = yPreis(m.preis); m.iconY = spurY(m.spur); });
 
     const linie = visZeit.map((t,i) => (i===0?'M':'L') + x(t).toFixed(1) + ',' + yPreis(visPreis[i]).toFixed(1)).join(' ');
-    const flaeche = linie + ' L' + x(visZeit[visZeit.length-1]).toFixed(1) + ',' + (H-PADB).toFixed(1) +
-      ' L' + x(visZeit[0]).toFixed(1) + ',' + (H-PADB).toFixed(1) + ' Z';
+    const flaeche = linie + ' L' + x(visZeit[visZeit.length-1]).toFixed(1) + ',' + LANE_TOP.toFixed(1) +
+      ' L' + x(visZeit[0]).toFixed(1) + ',' + LANE_TOP.toFixed(1) + ' Z';
 
     // Preis-Gitterlinien: bei weiter Spanne logarithmisch (1-2-5 je Dekade), damit sie
     // sich auf der log-Achse gleichmaessig verteilen; beim Reinzoomen in ein enges Band
@@ -937,53 +976,32 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       if (c.maxT < minT || c.minT > maxT) return '';
       const x0 = Math.max(x(c.minT) - 6, PADL), x1 = Math.min(x(c.maxT) + 6, B - PADR);
       if (x1 <= x0) return '';
-      return '<rect class="wl-cluster-band '+(ci % 2 === 0 ? 'wl-band-a' : 'wl-band-b')+'" x="'+x0.toFixed(1)+'" y="'+PADT+'" width="'+(x1-x0).toFixed(1)+'" height="'+PLOTH+'" rx="4"/>';
+      return '<rect class="wl-cluster-band '+(ci % 2 === 0 ? 'wl-band-a' : 'wl-band-b')+'" x="'+x0.toFixed(1)+'" y="'+PADT+'" width="'+(x1-x0).toFixed(1)+'" height="'+(H-PADB-PADT)+'" rx="4"/>';
     }).join('');
 
-    // Signale im sichtbaren Zeitraum, nach Datum gruppiert (Stapel bei Mehrfach-Signalen am selben Tag)
-    const sichtbar = signale.filter(s => {
-      const t = new Date(s.date+'T00:00:00').getTime();
-      return t >= minT - CLUSTER_GRENZE && t <= maxT + CLUSTER_GRENZE;
-    });
-    const nachDatum = {};
-    sichtbar.forEach(s => { (nachDatum[s.date] = nachDatum[s.date] || []).push(s); });
+    // Vom Icon in der Spur fuehrt ein duenner Strich hoch zum Kurspunkt, dort sitzt
+    // ein kleiner Punkt in der Ergebnisfarbe. So bleibt die Kurslinie frei.
+    const stiele = marker.map(p =>
+      '<line class="wl-stiel" x1="'+p.cx.toFixed(1)+'" y1="'+(p.cy + 3).toFixed(1)+'" ' +
+        'x2="'+p.cx.toFixed(1)+'" y2="'+(p.iconY - ICON/2).toFixed(1)+'"/>'
+    ).join('');
+    const kursPunkte = marker.map(p =>
+      '<circle class="wl-kurspunkt" cx="'+p.cx.toFixed(1)+'" cy="'+p.cy.toFixed(1)+'" r="3.5" fill="'+p.farbe+'"/>'
+    ).join('');
 
-    const marker = [];
-    Object.keys(nachDatum).forEach(datum => {
-      const gruppe = nachDatum[datum];
-      const preis = btcPreisAm(datum);
-      const cx0 = x(new Date(datum+'T00:00:00').getTime());
-      const cy0 = yPreis(preis);
-      gruppe.forEach((s, i) => {
-        // Mehrere Signale am selben Tag werden UNTEREINANDER gestapelt (nicht nebeneinander),
-        // damit die X-Position (= Datum) immer eindeutig bleibt.
-        const dy = (i - (gruppe.length - 1) / 2) * 24;
-        const cy = cy0 + dy;
-        if (cx0 < PADL - 20 || cx0 > B - PADR + 20) return;
-        const tagAnzahl = gleicherTag(s);
-        const zusatz = tagAnzahl ? ' · '+tagAnzahl+'× am selben Tag' : (clusterVonSignal.has(s) ? ' · Teil einer Signal-Häufung' : '');
-        const setup = wlSetupText(s);
-        const titel = wlDatumLabel(s)+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[wlStatus(s)]+
-          (setup?' · '+setup:'')+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+zusatz;
-        marker.push({ cx: cx0, cy, farbe: WL_FARBEN[wlStatus(s)], titel, asset: s.asset,
-          geclustert: clusterVonSignal.has(s), selberTag: !!tagAnzahl,
-          tradeId: s.tradeId || null, datum: datum });
-      });
-    });
-
-    // Signale, die zu einem Trade gehoeren, im Chart mit einer Linie verbinden -
+    // Signale, die zu einem Trade gehoeren, in der Icon-Spur mit einer Linie verbinden -
     // dann sieht man auf einen Blick, dass das ein Trade ueber mehrere Zeitpunkte ist.
     const nachTrade = {};
     marker.forEach(p => { if (p.tradeId) (nachTrade[p.tradeId] = nachTrade[p.tradeId] || []).push(p); });
     const tradeLinien = Object.keys(nachTrade).map(tid => {
-      const gruppe = nachTrade[tid].slice().sort((a,b) => a.datum.localeCompare(b.datum) || a.cy - b.cy);
+      const gruppe = nachTrade[tid].slice().sort((a,b) => a.cx - b.cx);
       if (gruppe.length < 2) return '';
-      const d = gruppe.map((p,i) => (i===0?'M':'L') + p.cx.toFixed(1) + ',' + p.cy.toFixed(1)).join(' ');
+      const d = gruppe.map((p,i) => (i===0?'M':'L') + p.cx.toFixed(1) + ',' + p.iconY.toFixed(1)).join(' ');
       return '<path class="wl-trade-linie" d="'+d+'" stroke="'+wlTradeFarbe(tid)+'"/>';
     }).join('');
 
     const markerHtml = marker.map((p,i) =>
-      '<span class="wl-marker'+(p.geclustert?' geclustert':'')+(p.selberTag?' selber-tag':'')+'" data-i="'+i+'" style="left:'+(p.cx/B*100).toFixed(2)+'%;top:'+(p.cy/H*100).toFixed(2)+'%;border-color:'+p.farbe+'">' +
+      '<span class="wl-marker'+(p.geclustert?' geclustert':'')+(p.selberTag?' selber-tag':'')+'" data-i="'+i+'" style="left:'+(p.cx/B*100).toFixed(2)+'%;top:'+(p.iconY/H*100).toFixed(2)+'%;border-color:'+p.farbe+'">' +
         assetIconHtml(p.asset) +
       '</span>'
     ).join('');
@@ -1108,9 +1126,9 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           preisGitter + zeitGitter + clusterBaender +
           '<path class="wl-btc-area" d="'+flaeche+'"/>' +
           '<path class="wl-btc-line" d="'+linie+'"/>' +
-          tradeLinien +
-          '<rect id="wlSelRect" class="wl-sel-rect" x="0" y="'+PADT+'" width="0" height="'+PLOTH+'" style="display:none"/>' +
-          '<rect id="wlHitArea" x="'+PADL+'" y="'+PADT+'" width="'+PLOTW+'" height="'+PLOTH+'" fill="transparent" style="cursor:crosshair"/>' +
+          stiele + tradeLinien + kursPunkte +
+          '<rect id="wlSelRect" class="wl-sel-rect" x="0" y="'+PADT+'" width="0" height="'+(H-PADB-PADT)+'" style="display:none"/>' +
+          '<rect id="wlHitArea" x="'+PADL+'" y="'+PADT+'" width="'+PLOTW+'" height="'+(H-PADB-PADT)+'" fill="transparent" style="cursor:crosshair"/>' +
         '</svg>' +
         '<div class="wl-markers">'+markerHtml+'</div>' +
         '<div id="wlTooltip" class="wl-tooltip" style="display:none"></div>' +
