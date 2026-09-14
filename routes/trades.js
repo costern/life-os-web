@@ -39,12 +39,15 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const id = +req.params.id;
   const b = req.body || {};
+  if (b.asset !== undefined && !String(b.asset).trim()) return res.status(400).json({ error: 'asset darf nicht leer sein' });
+  if (b.side !== undefined && !['Long','Short'].includes(b.side)) return res.status(400).json({ error: 'side muss Long oder Short sein' });
   const fields = []; const vals = []; let i = 1;
   for (const [key, col] of [['sl','sl'],['tp','tp'],['exit','exit_price'],['pnl','pnl'],
                              ['fundingFees','funding_fees'],['closedAt','closed_at'],
                              ['entry1','entry1'],['entry2','entry2'],['size1','size1'],['size2','size2'],
                              ['realizedPnl','realized_pnl'],['strategy','strategy'],['tf','tf'],
-                             ['name','trade_name'],['riskUsd','risk_usd']]) {
+                             ['name','trade_name'],['riskUsd','risk_usd'],
+                             ['asset','asset'],['ticker','ticker'],['side','side'],['openedAt','opened_at']]) {
     if (b[key] !== undefined) { fields.push(`${col} = $${i++}`); vals.push(b[key]); }
   }
   if (!fields.length) return res.status(400).json({ error: 'nichts zu ändern' });
@@ -136,6 +139,13 @@ router.post('/:id/close', async (req, res) => {
     [exit, pnl, id]
   );
   res.json(rowOut(rows[0]));
+});
+
+router.delete('/:id', async (req, res) => {
+  const id = +req.params.id;
+  const { rowCount } = await pool.query('DELETE FROM trades WHERE id = $1', [id]);
+  if (!rowCount) return res.status(404).json({ error: 'Trade nicht gefunden' });
+  res.json({ ok: true });
 });
 
 module.exports = router;

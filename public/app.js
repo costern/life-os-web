@@ -859,24 +859,46 @@ async function tlOeffneDetail(id){
   renderTradeLogDetail(trade, events, kl, zielEl);
 }
 
-function tlDetailFeld(label, wert){
-  return '<div class="tl-feld"><div class="tl-feld-l">'+label+'</div><div class="tl-feld-v">'+wert+'</div></div>';
+function tlDatetimeInputWert(iso){
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+function tlFeldInput(label, klasse, wert, typ){
+  const v = (wert === null || wert === undefined) ? '' : wert;
+  return '<div class="tl-feld"><div class="tl-feld-l">'+label+'</div>' +
+    '<input class="tl-feld-input '+klasse+'" type="'+(typ||'text')+'"'+(typ==='number'?' step="any"':'')+' value="'+esc(String(v))+'"></div>';
+}
+function tlFeldSelect(label, klasse, wert, optionen){
+  return '<div class="tl-feld"><div class="tl-feld-l">'+label+'</div>' +
+    '<select class="tl-feld-input '+klasse+'">' +
+    optionen.map(o => '<option value="'+o+'"'+(o===wert?' selected':'')+'>'+o+'</option>').join('') +
+    '</select></div>';
 }
 
 function renderTradeLogDetail(trade, events, kl, zielEl){
-  const felder = [];
-  felder.push(tlDetailFeld('Entry', trade.entry1 != null ? trade.entry1 : '–'));
-  if (trade.entry2 != null) felder.push(tlDetailFeld('Entry 2', trade.entry2));
-  felder.push(tlDetailFeld('Size', trade.size1 != null ? trade.size1 : '–'));
-  if (trade.size2 != null) felder.push(tlDetailFeld('Size 2', trade.size2));
-  felder.push(tlDetailFeld('Stop Loss', trade.sl != null ? trade.sl : '–'));
-  felder.push(tlDetailFeld('Take Profit', trade.tp != null ? trade.tp : '–'));
-  if (trade.exit != null) felder.push(tlDetailFeld('Exit', trade.exit));
-  felder.push(tlDetailFeld('Eröffnet', tlZeit(trade.openedAt)));
-  felder.push(tlDetailFeld('Geschlossen', trade.closedAt ? tlZeit(trade.closedAt) : 'noch offen'));
-  if (trade.fundingFees != null) felder.push(tlDetailFeld('Funding Fees', fmt(trade.fundingFees)));
-  if (trade.realizedPnl) felder.push(tlDetailFeld('Teilrealisiert', fmt(trade.realizedPnl)));
-  if (trade.riskUsd != null) felder.push(tlDetailFeld('Risiko', fmt(trade.riskUsd)));
+  const felder = [
+    tlFeldInput('Datum', 'tle-opened', tlDatetimeInputWert(trade.openedAt), 'datetime-local'),
+    tlFeldSelect('Side', 'tle-side', trade.side, ['Long','Short']),
+    tlFeldInput('Asset', 'tle-asset', trade.asset, 'text'),
+    tlFeldInput('Ticker (für Icon/Kurs)', 'tle-ticker', trade.ticker || '', 'text'),
+    tlFeldInput('Timeframe', 'tle-tf', trade.tf || '', 'text'),
+    tlFeldInput('Trade-Name', 'tle-name', trade.name || '', 'text'),
+    tlFeldInput('Strategie', 'tle-strategy', trade.strategy || '', 'text'),
+    tlFeldInput('Entry', 'tle-entry1', trade.entry1, 'number'),
+    tlFeldInput('Entry 2', 'tle-entry2', trade.entry2, 'number'),
+    tlFeldInput('Size', 'tle-size1', trade.size1, 'number'),
+    tlFeldInput('Size 2', 'tle-size2', trade.size2, 'number'),
+    tlFeldInput('Stop Loss', 'tle-sl', trade.sl, 'number'),
+    tlFeldInput('Take Profit', 'tle-tp', trade.tp, 'number'),
+    tlFeldInput('Exit', 'tle-exit', trade.exit, 'number'),
+    tlFeldInput('PnL', 'tle-pnl', trade.pnl, 'number'),
+    tlFeldInput('Geschlossen (leer = offen)', 'tle-closed', tlDatetimeInputWert(trade.closedAt), 'datetime-local'),
+    tlFeldInput('Funding Fees', 'tle-funding', trade.fundingFees, 'number'),
+    tlFeldInput('Teilrealisiert', 'tle-realized', trade.realizedPnl, 'number'),
+    tlFeldInput('Risiko ($)', 'tle-risk', trade.riskUsd, 'number')
+  ];
 
   zielEl.innerHTML =
     '<div class="tl-legend">' +
@@ -886,8 +908,62 @@ function renderTradeLogDetail(trade, events, kl, zielEl){
       '<span class="tl-legend-item"><span class="tl-swatch" style="background:var(--muted);opacity:.5"></span>Kurs</span>' +
     '</div>' +
     '<div class="tl-chart-wrap" id="tl-chart-'+trade.id+'"></div>' +
-    '<div class="tl-details-grid">'+felder.join('')+'</div>';
+    '<div class="tl-details-grid">'+felder.join('')+'</div>' +
+    '<div class="tl-save-row">' +
+      '<button type="button" class="btn tle-save">Speichern</button>' +
+      '<button type="button" class="btn ghost tle-delete">Trade löschen</button>' +
+      '<span class="te-msg tle-msg"></span>' +
+    '</div>';
   zeichneTradeLog(trade, events, kl, document.getElementById('tl-chart-'+trade.id));
+
+  zielEl.querySelector('.tle-save').addEventListener('click', () => tlSpeichereDetail(trade.id, zielEl));
+  zielEl.querySelector('.tle-delete').addEventListener('click', () => tlLoescheTrade(trade.id, zielEl));
+}
+
+async function tlSpeichereDetail(id, zielEl){
+  const val = klasse => zielEl.querySelector('.'+klasse).value;
+  const num = v => v === '' ? null : Number(v);
+  const zeit = v => v ? new Date(v).toISOString() : undefined;
+  const body = {
+    asset: val('tle-asset').trim(),
+    ticker: val('tle-ticker').trim() || val('tle-asset').trim(),
+    side: val('tle-side'),
+    name: val('tle-name').trim() || null,
+    strategy: val('tle-strategy').trim() || null,
+    tf: val('tle-tf').trim() || null,
+    entry1: num(val('tle-entry1')), entry2: num(val('tle-entry2')),
+    size1: num(val('tle-size1')), size2: num(val('tle-size2')),
+    sl: num(val('tle-sl')), tp: num(val('tle-tp')), exit: num(val('tle-exit')),
+    pnl: num(val('tle-pnl')), fundingFees: num(val('tle-funding')),
+    realizedPnl: num(val('tle-realized')), riskUsd: num(val('tle-risk')),
+    openedAt: zeit(val('tle-opened')),
+    closedAt: val('tle-closed') ? new Date(val('tle-closed')).toISOString() : null
+  };
+  const btn = zielEl.querySelector('.tle-save');
+  const msg = zielEl.querySelector('.tle-msg');
+  btn.disabled = true; btn.textContent = 'speichert…'; msg.textContent = ''; msg.className = 'te-msg tle-msg';
+  try {
+    await api('/trades/'+id, { method:'PATCH', body: JSON.stringify(body) });
+    await ladeHistorie();
+  } catch(e){
+    msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg tle-msg bad';
+    btn.disabled = false; btn.textContent = 'Speichern';
+  }
+}
+
+async function tlLoescheTrade(id, zielEl){
+  const btn = zielEl.querySelector('.tle-delete');
+  if (btn.textContent !== 'Wirklich löschen?') { btn.textContent = 'Wirklich löschen?'; return; }
+  btn.disabled = true;
+  try {
+    await api('/trades/'+id, { method:'DELETE' });
+    tlOffenId = null;
+    await ladeHistorie();
+  } catch(e){
+    zielEl.querySelector('.tle-msg').textContent = 'Fehler: '+e.message;
+    zielEl.querySelector('.tle-msg').className = 'te-msg tle-msg bad';
+    btn.disabled = false; btn.textContent = 'Trade löschen';
+  }
 }
 
 function zeichneTradeLog(trade, events, kl, el){
