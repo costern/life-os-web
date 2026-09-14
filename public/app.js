@@ -966,24 +966,38 @@ async function tlLoescheTrade(id, zielEl){
   }
 }
 
+// Zoom-Zustand je Trade (per Ziehen mit der Maus gesetzt, wie in TradingView). null = volle
+// Ansicht. Bleibt bestehen, solange die Detailansicht offen ist bzw. bis "Zoom zurücksetzen".
+let tlZoomDomains = {};
+let tlLetzteDaten = {};
+
 function zeichneTradeLog(trade, events, kl, el){
+  tlLetzteDaten[trade.id] = { trade, events, kl };
   const B = 860, H = 300, PADL = 60, PADR = 16, PADT = 16, PADB = 26;
   const kurse = (kl && Array.isArray(kl.candles)) ? kl.candles : []; // [zeit, open, high, low, close]
 
-  // Zeitspanne: Kerzen (inkl. Vorlauf vom Server) plus Trade-Start/-Ende, damit die
-  // Treppenlinien nie ueber den sichtbaren Bereich hinauslaufen.
-  const zeiten = kurse.map(c => c[0]);
-  zeiten.push(new Date(trade.openedAt).getTime());
+  // Voller Zeitbereich: Kerzen (inkl. Vorlauf vom Server) plus Trade-Start/-Ende.
+  const alleZeiten = kurse.map(c => c[0]);
+  alleZeiten.push(new Date(trade.openedAt).getTime());
   const ende = trade.closedAt ? new Date(trade.closedAt).getTime() : Date.now();
-  zeiten.push(ende);
-  const start = Math.min(...zeiten);
-  const endeGesamt = Math.max(...zeiten, ende);
-  const spanne = Math.max(endeGesamt - start, 60000);
-  const x = t => PADL + (t - start) / spanne * (B - PADL - PADR);
+  alleZeiten.push(ende);
+  const vollStart = Math.min(...alleZeiten);
+  const vollEnde = Math.max(...alleZeiten, ende);
 
+  // Sichtbarer Ausschnitt: entweder der volle Bereich, oder das, was per Ziehen gezoomt wurde.
+  const zoom = tlZoomDomains[trade.id];
+  const start = zoom ? Math.max(zoom[0], vollStart) : vollStart;
+  const endeSicht = zoom ? Math.min(zoom[1], vollEnde) : vollEnde;
+  const spanne = Math.max(endeSicht - start, 60000);
+  const x = t => PADL + (t - start) / spanne * (B - PADL - PADR);
+  const tVonX = px => start + (px - PADL) / (B - PADL - PADR) * spanne;
+
+  // Nur die im sichtbaren Ausschnitt liegenden Kerzen fuer die Preisspanne heranziehen -
+  // sonst zieht ein weit entfernter SL/TP oder eine alte Kerze die Skala flach.
+  const sichtbareKerzen = kurse.filter(c => c[0] >= start - spanne*0.02 && c[0] <= endeSicht + spanne*0.02);
   const werte = [];
-  kurse.forEach(c => { werte.push(c[2]); werte.push(c[3]); }); // high, low
-  events.forEach(e => werte.push(e.value));
+  sichtbareKerzen.forEach(c => { werte.push(c[2]); werte.push(c[3]); }); // high, low
+  events.forEach(e => { const t = new Date(e.changedAt).getTime(); if (t <= endeSicht) werte.push(e.value); });
   if (trade.exit != null) werte.push(trade.exit);
   if (!werte.length) { el.innerHTML = '<div class="empty">Keine Daten für diesen Trade.</div>'; return; }
   let min = Math.min(...werte), max = Math.max(...werte);
@@ -995,7 +1009,7 @@ function zeichneTradeLog(trade, events, kl, el){
   // Kerzen: Docht als duenne Linie, Koerper als Rechteck (gruen/rot je nach open/close).
   let kerzenHtml = '';
   if (kurse.length) {
-    const spacing = kurse.length > 1 ? (x(kurse[1][0]) - x(kurse[0][0])) : 8;
+    const spacing = kurse.length > 1 ? Math.abs(x(kurse[1][0]) - x(kurse[0][0])) : 8;
     const breite = Math.max(1, Math.min(spacing * 0.6, 14));
     kerzenHtml = kurse.map(c => {
       const [t, o, h, l, close] = c;
@@ -1011,8 +1025,14 @@ function zeichneTradeLog(trade, events, kl, el){
   }
 
   // Treppenlinien fuer entry/sl/tp: waagerecht bis zur naechsten Aenderung, dann Sprung.
+  // Faengt schon vor dem sichtbaren Rand an (letzter Wert vor "start"), damit die Linie beim
+  // Reinzoomen nicht ploetzlich in der Mitte anfaengt.
   function treppe(feld){
-    const punkte = events.filter(e => e.field === feld).sort((a,b) => new Date(a.changedAt)-new Date(b.changedAt));
+    const alle = events.filter(e => e.field === feld).sort((a,b) => new Date(a.changedAt)-new Date(b.changedAt));
+    if (!alle.length) return '';
+    const vorStart = alle.filter(p => new Date(p.changedAt).getTime() <= start).pop();
+    const sichtbar = alle.filter(p => new Date(p.changedAt).getTime() > start);
+    const punkte = vorStart ? [{ ...vorStart, changedAt: new Date(start).toISOString() }, ...sichtbar] : sichtbar;
     if (!punkte.length) return '';
     let d = '';
     let letzterWert = null;
@@ -1023,8 +1043,8 @@ function zeichneTradeLog(trade, events, kl, el){
       else { d += ' L '+px.toFixed(1)+' '+letzterWert.toFixed(1)+' L '+px.toFixed(1)+' '+py.toFixed(1); }
       letzterWert = py;
     });
-    // bis zum Ende (bzw. Exit) waagerecht weiterziehen
-    d += ' L '+x(ende).toFixed(1)+' '+letzterWert.toFixed(1);
+    // bis zum sichtbaren Ende (bzw. Trade-Ende) waagerecht weiterziehen
+    d += ' L '+x(Math.min(ende, endeSicht)).toFixed(1)+' '+letzterWert.toFixed(1);
     return d;
   }
   const entryPfad = treppe('entry');
@@ -1040,26 +1060,71 @@ function zeichneTradeLog(trade, events, kl, el){
     gitterHtml += '<line class="tl-grid" x1="'+PADL+'" y1="'+gy.toFixed(1)+'" x2="'+(B-PADR)+'" y2="'+gy.toFixed(1)+'"/>' +
       '<text class="tl-grid-label" x="'+(PADL-8)+'" y="'+gy.toFixed(1)+'" text-anchor="end" dominant-baseline="middle">'+p.toPrecision(4)+'</text>';
   }
-  // X-Achse: Start und Ende des sichtbaren Bereichs (inkl. Vorlauf)
   const xLabelHtml =
     '<text class="tl-grid-label" x="'+PADL+'" y="'+(H-6)+'" text-anchor="start">'+tlDatKurz(start)+'</text>' +
-    '<text class="tl-grid-label" x="'+(B-PADR)+'" y="'+(H-6)+'" text-anchor="end">'+(trade.closedAt ? tlDatKurz(trade.closedAt) : 'jetzt')+'</text>';
+    '<text class="tl-grid-label" x="'+(B-PADR)+'" y="'+(H-6)+'" text-anchor="end">'+(endeSicht >= ende && !trade.closedAt ? 'jetzt' : tlDatKurz(endeSicht))+'</text>';
 
-  const exitHtml = (trade.exit != null)
+  const exitHtml = (trade.exit != null && ende >= start && ende <= endeSicht)
     ? '<circle class="tl-exit-dot" cx="'+x(ende).toFixed(1)+'" cy="'+y(trade.exit).toFixed(1)+'" r="4"/>'
     : '';
 
   const fehlerHtml = (kl && kl.error) ? '<div class="tl-kursfehler muted">Kursverlauf nicht ladbar: '+esc(kl.error)+'</div>' : '';
+  const resetHtml = zoom ? '<button type="button" class="btn ghost tl-zoom-reset">Zoom zurücksetzen</button>' : '';
 
   el.innerHTML =
-    '<svg viewBox="0 0 '+B+' '+H+'" class="tl-svg" preserveAspectRatio="none">' +
+    '<div class="tl-chart-toolbar">'+resetHtml+'<span class="muted tl-zoom-hinweis">zum Reinzoomen einen Bereich aufziehen · Doppelklick setzt zurück</span></div>' +
+    '<svg viewBox="0 0 '+B+' '+H+'" class="tl-svg" preserveAspectRatio="none" id="tl-svg-'+trade.id+'">' +
       gitterHtml + xLabelHtml +
       kerzenHtml +
       (slPfad ? '<path class="tl-slpfad" d="'+slPfad+'"/>' : '') +
       (tpPfad ? '<path class="tl-tppfad" d="'+tpPfad+'"/>' : '') +
       (entryPfad ? '<path class="tl-entrypfad" d="'+entryPfad+'"/>' : '') +
       exitHtml +
+      '<rect id="tl-hit-'+trade.id+'" x="'+PADL+'" y="'+PADT+'" width="'+(B-PADL-PADR)+'" height="'+(H-PADT-PADB)+'" fill="transparent" style="cursor:crosshair"/>' +
+      '<rect id="tl-sel-'+trade.id+'" class="tl-sel-rect" x="0" y="'+PADT+'" width="0" height="'+(H-PADT-PADB)+'" style="display:none"/>' +
     '</svg>' + fehlerHtml;
+
+  const svg = document.getElementById('tl-svg-'+trade.id);
+  const hit = document.getElementById('tl-hit-'+trade.id);
+  const selRect = document.getElementById('tl-sel-'+trade.id);
+  let ziehStart = null;
+  function pxVonEvent(ev){
+    const rect = svg.getBoundingClientRect();
+    return Math.min(Math.max((ev.clientX - rect.left) / rect.width * B, PADL), B - PADR);
+  }
+  function neuZeichnen(){
+    const d = tlLetzteDaten[trade.id];
+    if (d) zeichneTradeLog(d.trade, d.events, d.kl, el);
+  }
+  hit.addEventListener('pointerdown', ev => {
+    ziehStart = pxVonEvent(ev);
+    hit.setPointerCapture(ev.pointerId);
+    selRect.style.display = '';
+    selRect.setAttribute('x', ziehStart.toFixed(1));
+    selRect.setAttribute('width', '0');
+  });
+  hit.addEventListener('pointermove', ev => {
+    if (ziehStart === null) return;
+    const cur = pxVonEvent(ev);
+    const a = Math.min(ziehStart, cur), b = Math.max(ziehStart, cur);
+    selRect.setAttribute('x', a.toFixed(1));
+    selRect.setAttribute('width', (b-a).toFixed(1));
+  });
+  hit.addEventListener('pointerup', ev => {
+    if (ziehStart === null) return;
+    const cur = pxVonEvent(ev);
+    selRect.style.display = 'none';
+    const distanz = Math.abs(cur - ziehStart);
+    if (distanz > 10) {
+      const a = Math.min(ziehStart, cur), b = Math.max(ziehStart, cur);
+      const neuMin = tVonX(a), neuMax = tVonX(b);
+      if (neuMax - neuMin > 60000) { tlZoomDomains[trade.id] = [neuMin, neuMax]; neuZeichnen(); }
+    }
+    ziehStart = null;
+  });
+  hit.addEventListener('dblclick', () => { delete tlZoomDomains[trade.id]; neuZeichnen(); });
+  const resetBtn = el.querySelector('.tl-zoom-reset');
+  if (resetBtn) resetBtn.addEventListener('click', () => { delete tlZoomDomains[trade.id]; neuZeichnen(); });
 }
 
 /* ---------- Double-Bottom-Watchlist: urspruenglich aus Obsidian importiert, jetzt direkt
