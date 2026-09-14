@@ -336,6 +336,10 @@ a { color:var(--accent); }
 .tl-row2:hover td { background:var(--hover-bg); }
 .tl-detail-row td { padding:0; border-bottom:1px solid var(--line); white-space:normal; }
 .tl-detail-row > td > div { padding:14px 10px 18px; }
+.tl-side { font-size:11px; font-weight:700; padding:2px 9px; border-radius:99px; }
+.tl-side-long { background:var(--badge-blue-bg); color:var(--accent); }
+.tl-side-short { background:var(--badge-amber-bg); color:var(--amber); }
+.tl-asset-cell { display:flex; align-items:center; gap:7px; }
 .tl-legend { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
 .tl-legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
 .tl-swatch { width:10px; height:10px; border-radius:2px; flex:none; }

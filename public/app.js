@@ -761,6 +761,22 @@ function tlBadgesHtml(text){
   return text.split(/[,/]/).map(s => s.trim()).filter(Boolean)
     .map(s => '<span class="badge">'+esc(s)+'</span>').join(' ');
 }
+function tlSideHtml(side){
+  const kurz = side === 'Short' ? 'Short' : 'Long';
+  return '<span class="tl-side tl-side-'+kurz.toLowerCase()+'">'+kurz+'</span>';
+}
+function tlAssetIconHtml(r){
+  const ticker = String(r.ticker || r.asset || '').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const buchstabe = esc((r.asset || '?').trim().slice(0,3).toUpperCase());
+  return '<span class="tl-asset-cell">' +
+    '<span class="wl-icon">' +
+      '<img src="https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/'+ticker+'.svg" alt="" ' +
+        'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+      '<span class="wl-icon-fallback" style="display:none">'+buchstabe+'</span>' +
+    '</span>' +
+    esc(r.asset) +
+  '</span>';
+}
 
 function renderTradeLogTabelle(){
   const el = document.getElementById('tradeLogTabelle');
@@ -778,21 +794,20 @@ function renderTradeLogTabelle(){
   });
   el.innerHTML =
     '<table class="tl-table">' +
-      '<thead><tr><th>Trade</th><th>Datum</th><th>Asset</th><th>Side</th><th>Strategie</th><th>TF</th><th>Ergebnis</th></tr></thead>' +
+      '<thead><tr><th>Datum</th><th>Side</th><th>Asset</th><th>Trade</th><th>Strategie</th><th>Ergebnis</th></tr></thead>' +
       gruppen.map(g => (
         '<tbody>' +
-          '<tr class="tl-monat-row"><td colspan="7">'+esc(g.label)+'</td></tr>' +
+          '<tr class="tl-monat-row"><td colspan="6">'+esc(g.label)+'</td></tr>' +
           g.rows.map(r => (
             '<tr class="tl-row2" data-id="'+r.id+'" title="Doppelklick für Details">' +
-              '<td>'+esc(r.name||r.asset)+'</td>' +
               '<td>'+tlDatKurz(r.openedAt)+'</td>' +
-              '<td><span class="badge">'+esc(r.asset)+'</span></td>' +
-              '<td>'+esc(r.side)+'</td>' +
+              '<td>'+tlSideHtml(r.side)+'</td>' +
+              '<td>'+tlAssetIconHtml(r)+'</td>' +
+              '<td>'+(r.name ? esc(r.name) : '<span class="muted">–</span>')+'</td>' +
               '<td>'+(r.strategy ? esc(r.strategy) : '<span class="muted">–</span>')+'</td>' +
-              '<td>'+tlBadgesHtml(r.tf)+'</td>' +
               '<td>'+tlErgebnisHtml(r)+'</td>' +
             '</tr>' +
-            '<tr class="tl-detail-row" data-detail-id="'+r.id+'" hidden><td colspan="7"><div id="tl-detail-'+r.id+'"></div></td></tr>'
+            '<tr class="tl-detail-row" data-detail-id="'+r.id+'" hidden><td colspan="6"><div id="tl-detail-'+r.id+'"></div></td></tr>'
           )).join('') +
         '</tbody>'
       )).join('') +
@@ -833,6 +848,7 @@ function tlDetailFeld(label, wert){
 
 function renderTradeLogDetail(trade, events, kl, zielEl){
   const felder = [];
+  if (trade.tf) felder.push(tlDetailFeld('Timeframe', tlBadgesHtml(trade.tf)));
   felder.push(tlDetailFeld('Entry', trade.entry1 != null ? trade.entry1 : '–'));
   if (trade.entry2 != null) felder.push(tlDetailFeld('Entry 2', trade.entry2));
   felder.push(tlDetailFeld('Size', trade.size1 != null ? trade.size1 : '–'));
