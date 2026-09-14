@@ -1333,6 +1333,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
   }
 
   ladeUndZeichne();
+  window.ladeUndZeichneWatchlist = ladeUndZeichne;
 })();
 
 function rundPreis(v){
@@ -2085,6 +2086,7 @@ function seiteAuffrischen(id){
   else if (id === 'news'){ ladeMacro(); ladeNews(); }
   else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); ladeKalender(); ladeOvTrades(); if (window.ladeTodos) window.ladeTodos(); }
   else if (id === 'portfolio'){ if (window.ladePortfolioListe) window.ladePortfolioListe(); }
+  else if (id === 'watchlist'){ if (window.ladeUndZeichneWatchlist) window.ladeUndZeichneWatchlist(); }
 }
 
 document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });
