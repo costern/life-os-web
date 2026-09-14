@@ -66,12 +66,18 @@ router.get('/:id/events', async (req, res) => {
   res.json(rows.map(r => ({ field: r.field, value: num(r.value), changedAt: r.changed_at })));
 });
 
-// Kursverlauf (Binance-Klines) fuer den Hintergrund des Trading-Log-Charts, vom
-// Trade-Start bis zum Trade-Ende bzw. jetzt bei noch offenen Positionen.
+// Kursverlauf (Binance-Klines, als Kerzen) fuer den Hintergrund des Trading-Log-Charts,
+// vom Trade-Start (minus etwas Vorlauf) bis zum Trade-Ende bzw. jetzt bei offenen Trades.
 const KLINE_INTERVALLE = [
   ['1m', 60000], ['5m', 300000], ['15m', 900000], ['1h', 3600000],
   ['4h', 14400000], ['1d', 86400000]
 ];
+// Erlaubte Binance-Intervalle, damit ?interval= nicht ungeprueft durchgereicht wird.
+const ERLAUBTE_INTERVALLE = {
+  '1m': 60000, '3m': 180000, '5m': 300000, '15m': 900000, '30m': 1800000,
+  '1h': 3600000, '2h': 7200000, '4h': 14400000, '6h': 21600000, '8h': 28800000,
+  '12h': 43200000, '1d': 86400000, '3d': 259200000, '1w': 604800000
+};
 router.get('/:id/klines', async (req, res) => {
   const id = +req.params.id;
   const { rows } = await pool.query('SELECT ticker, opened_at, closed_at FROM trades WHERE id=$1', [id]);
@@ -80,13 +86,23 @@ router.get('/:id/klines', async (req, res) => {
   const symbol = String(t.ticker || '').toUpperCase().trim() + 'USDT';
   const start = new Date(t.opened_at).getTime();
   const end = t.closed_at ? new Date(t.closed_at).getTime() : Date.now();
-  const spanMs = Math.max(end - start, 3600000);
-  let interval = '1d', ms = 86400000;
-  for (const [iv, msVal] of KLINE_INTERVALLE) {
-    if (spanMs / msVal <= 1000) { interval = iv; ms = msVal; break; }
+
+  let interval, ms;
+  const gewuenscht = String(req.query.interval || '');
+  if (ERLAUBTE_INTERVALLE[gewuenscht]) {
+    interval = gewuenscht; ms = ERLAUBTE_INTERVALLE[gewuenscht];
+  } else {
+    const spanMs = Math.max(end - start, 3600000);
+    interval = '1d'; ms = 86400000;
+    for (const [iv, msVal] of KLINE_INTERVALLE) {
+      if (spanMs / msVal <= 1000) { interval = iv; ms = msVal; break; }
+    }
   }
+  // Etwas Vorlauf vor dem Trade-Start zeigen, damit man den Kontext (z.B. den Boden vorm
+  // Einstieg) noch sieht - 15 Kerzen des gewaehlten Intervalls, min. 1 Tag, max. 20 Tage.
+  const vorlauf = Math.min(Math.max(ms * 15, 86400000), 20 * 86400000);
   const url = 'https://api.binance.com/api/v3/klines?symbol=' + encodeURIComponent(symbol) +
-    '&interval=' + interval + '&startTime=' + (start - ms) + '&endTime=' + (end + ms) + '&limit=1000';
+    '&interval=' + interval + '&startTime=' + (start - vorlauf) + '&endTime=' + (end + ms) + '&limit=1000';
   try {
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 8000);
@@ -95,7 +111,10 @@ router.get('/:id/klines', async (req, res) => {
     if (!r.ok) throw new Error('Binance ' + r.status);
     const data = await r.json();
     if (!Array.isArray(data)) throw new Error((data && data.msg) || 'unerwartete Antwort');
-    res.json({ interval, candles: data.map(k => [k[0], Number(k[4])]) });
+    res.json({
+      interval,
+      candles: data.map(k => [k[0], Number(k[1]), Number(k[2]), Number(k[3]), Number(k[4])])
+    });
   } catch (e) {
     res.status(502).json({ error: 'Kursdaten fuer ' + symbol + ' nicht ladbar: ' + e.message });
   }

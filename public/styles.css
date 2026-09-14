@@ -340,6 +340,8 @@ a { color:var(--accent); }
 .tl-side-long { background:var(--badge-blue-bg); color:var(--accent); }
 .tl-side-short { background:var(--badge-amber-bg); color:var(--amber); }
 .tl-asset-cell { display:flex; align-items:center; gap:7px; }
+.tl-asset-cell .wl-icon { width:18px; height:18px; border-radius:50%; flex:none; }
+.tl-table td { vertical-align:middle; }
 .tl-legend { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
 .tl-legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
 .tl-swatch { width:10px; height:10px; border-radius:2px; flex:none; }
@@ -350,7 +352,9 @@ a { color:var(--accent); }
 .tl-svg { display:block; width:100%; height:100%; }
 .tl-grid { stroke:var(--line); stroke-width:1; }
 .tl-grid-label { font-size:10px; fill:var(--muted); font-family:inherit; }
-.tl-kurslinie { fill:none; stroke:var(--muted); stroke-width:1.5; opacity:.5; vector-effect:non-scaling-stroke; }
+.tl-docht { stroke-width:1; vector-effect:non-scaling-stroke; }
+.tl-kerze-auf.tl-docht, .tl-kerze-auf.tl-kerze { stroke:var(--green); fill:var(--green); opacity:.65; }
+.tl-kerze-ab.tl-docht, .tl-kerze-ab.tl-kerze { stroke:var(--red); fill:var(--red); opacity:.65; }
 .tl-entrypfad { fill:none; stroke:var(--accent); stroke-width:2; vector-effect:non-scaling-stroke; }
 .tl-slpfad { fill:none; stroke:var(--red); stroke-width:2; vector-effect:non-scaling-stroke; stroke-dasharray:5,3; }
 .tl-tppfad { fill:none; stroke:var(--green); stroke-width:2; vector-effect:non-scaling-stroke; stroke-dasharray:5,3; }

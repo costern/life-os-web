@@ -794,20 +794,21 @@ function renderTradeLogTabelle(){
   });
   el.innerHTML =
     '<table class="tl-table">' +
-      '<thead><tr><th>Datum</th><th>Side</th><th>Asset</th><th>Trade</th><th>Strategie</th><th>Ergebnis</th></tr></thead>' +
+      '<thead><tr><th>Datum</th><th>Side</th><th>Asset</th><th>TF</th><th>Trade</th><th>Strategie</th><th>Ergebnis</th></tr></thead>' +
       gruppen.map(g => (
         '<tbody>' +
-          '<tr class="tl-monat-row"><td colspan="6">'+esc(g.label)+'</td></tr>' +
+          '<tr class="tl-monat-row"><td colspan="7">'+esc(g.label)+'</td></tr>' +
           g.rows.map(r => (
             '<tr class="tl-row2" data-id="'+r.id+'" title="Doppelklick für Details">' +
               '<td>'+tlDatKurz(r.openedAt)+'</td>' +
               '<td>'+tlSideHtml(r.side)+'</td>' +
               '<td>'+tlAssetIconHtml(r)+'</td>' +
+              '<td>'+tlBadgesHtml(r.tf)+'</td>' +
               '<td>'+(r.name ? esc(r.name) : '<span class="muted">–</span>')+'</td>' +
               '<td>'+(r.strategy ? esc(r.strategy) : '<span class="muted">–</span>')+'</td>' +
               '<td>'+tlErgebnisHtml(r)+'</td>' +
             '</tr>' +
-            '<tr class="tl-detail-row" data-detail-id="'+r.id+'" hidden><td colspan="6"><div id="tl-detail-'+r.id+'"></div></td></tr>'
+            '<tr class="tl-detail-row" data-detail-id="'+r.id+'" hidden><td colspan="7"><div id="tl-detail-'+r.id+'"></div></td></tr>'
           )).join('') +
         '</tbody>'
       )).join('') +
@@ -825,6 +826,20 @@ function tlToggleDetail(id){
   tlOeffneDetail(id);
 }
 
+// Wandelt Colins Timeframe-Kuerzel (wie in der Watchlist/im Trading-Log geschrieben)
+// in ein Binance-Kerzen-Intervall um, damit der Chart im selben Timeframe wie der
+// Trade gezeichnet wird. Bei mehreren Timeframes (z.B. "3D, 1W") zaehlt das erste.
+const TL_TF_ZU_INTERVALL = {
+  '1M':'1m', '3M':'3m', '5M':'5m', '15M':'15m', '30M':'30m',
+  '1H':'1h', '2H':'2h', '4H':'4h', '6H':'6h', '8H':'8h', '12H':'12h',
+  '1D':'1d', '3D':'3d', '1W':'1w'
+};
+function tlIntervallVonTf(tf){
+  if (!tf) return null;
+  const erstes = String(tf).split(/[,/]/)[0].trim().toUpperCase().replace(/\s+/g,'');
+  return TL_TF_ZU_INTERVALL[erstes] || null;
+}
+
 async function tlOeffneDetail(id){
   const zeile = document.querySelector('.tl-detail-row[data-detail-id="'+id+'"]');
   if (!zeile) return;
@@ -834,9 +849,11 @@ async function tlOeffneDetail(id){
   const zielEl = document.getElementById('tl-detail-'+id);
   if (!trade || !zielEl) return;
   zielEl.innerHTML = '<div class="empty">Lade…</div>';
+  const intervall = tlIntervallVonTf(trade.tf);
+  const klinesUrl = '/trades/'+id+'/klines' + (intervall ? '?interval='+intervall : '');
   const [events, kl] = await Promise.all([
     api('/trades/'+id+'/events').catch(() => []),
-    api('/trades/'+id+'/klines').catch(e => ({ error: e.message }))
+    api(klinesUrl).catch(e => ({ error: e.message }))
   ]);
   if (tlOffenId !== id) return; // Auswahl hat sich schon wieder geaendert
   renderTradeLogDetail(trade, events, kl, zielEl);
@@ -848,7 +865,6 @@ function tlDetailFeld(label, wert){
 
 function renderTradeLogDetail(trade, events, kl, zielEl){
   const felder = [];
-  if (trade.tf) felder.push(tlDetailFeld('Timeframe', tlBadgesHtml(trade.tf)));
   felder.push(tlDetailFeld('Entry', trade.entry1 != null ? trade.entry1 : '–'));
   if (trade.entry2 != null) felder.push(tlDetailFeld('Entry 2', trade.entry2));
   felder.push(tlDetailFeld('Size', trade.size1 != null ? trade.size1 : '–'));
@@ -876,14 +892,21 @@ function renderTradeLogDetail(trade, events, kl, zielEl){
 
 function zeichneTradeLog(trade, events, kl, el){
   const B = 860, H = 300, PADL = 60, PADR = 16, PADT = 16, PADB = 26;
-  const start = new Date(trade.openedAt).getTime();
+  const kurse = (kl && Array.isArray(kl.candles)) ? kl.candles : []; // [zeit, open, high, low, close]
+
+  // Zeitspanne: Kerzen (inkl. Vorlauf vom Server) plus Trade-Start/-Ende, damit die
+  // Treppenlinien nie ueber den sichtbaren Bereich hinauslaufen.
+  const zeiten = kurse.map(c => c[0]);
+  zeiten.push(new Date(trade.openedAt).getTime());
   const ende = trade.closedAt ? new Date(trade.closedAt).getTime() : Date.now();
-  const spanne = Math.max(ende - start, 60000);
+  zeiten.push(ende);
+  const start = Math.min(...zeiten);
+  const endeGesamt = Math.max(...zeiten, ende);
+  const spanne = Math.max(endeGesamt - start, 60000);
   const x = t => PADL + (t - start) / spanne * (B - PADL - PADR);
 
-  const kurse = (kl && Array.isArray(kl.candles)) ? kl.candles : [];
   const werte = [];
-  kurse.forEach(c => werte.push(c[1]));
+  kurse.forEach(c => { werte.push(c[2]); werte.push(c[3]); }); // high, low
   events.forEach(e => werte.push(e.value));
   if (trade.exit != null) werte.push(trade.exit);
   if (!werte.length) { el.innerHTML = '<div class="empty">Keine Daten für diesen Trade.</div>'; return; }
@@ -893,10 +916,22 @@ function zeichneTradeLog(trade, events, kl, el){
   min -= spannePreis * 0.08; max += spannePreis * 0.08;
   const y = p => PADT + (1 - (p - min) / (max - min)) * (H - PADT - PADB);
 
-  // Kurslinie
-  let kursPfad = '';
+  // Kerzen: Docht als duenne Linie, Koerper als Rechteck (gruen/rot je nach open/close).
+  let kerzenHtml = '';
   if (kurse.length) {
-    kursPfad = kurse.map((c,i) => (i===0?'M':'L') + x(c[0]).toFixed(1) + ' ' + y(c[1]).toFixed(1)).join(' ');
+    const spacing = kurse.length > 1 ? (x(kurse[1][0]) - x(kurse[0][0])) : 8;
+    const breite = Math.max(1, Math.min(spacing * 0.6, 14));
+    kerzenHtml = kurse.map(c => {
+      const [t, o, h, l, close] = c;
+      const cx = x(t);
+      const steigend = close >= o;
+      const klasse = steigend ? 'tl-kerze-auf' : 'tl-kerze-ab';
+      const koerperTop = y(Math.max(o, close));
+      const koerperUnten = y(Math.min(o, close));
+      const koerperH = Math.max(koerperUnten - koerperTop, 1);
+      return '<line class="tl-docht '+klasse+'" x1="'+cx.toFixed(1)+'" y1="'+y(h).toFixed(1)+'" x2="'+cx.toFixed(1)+'" y2="'+y(l).toFixed(1)+'"/>' +
+        '<rect class="tl-kerze '+klasse+'" x="'+(cx-breite/2).toFixed(1)+'" y="'+koerperTop.toFixed(1)+'" width="'+breite.toFixed(1)+'" height="'+koerperH.toFixed(1)+'"/>';
+    }).join('');
   }
 
   // Treppenlinien fuer entry/sl/tp: waagerecht bis zur naechsten Aenderung, dann Sprung.
@@ -929,9 +964,9 @@ function zeichneTradeLog(trade, events, kl, el){
     gitterHtml += '<line class="tl-grid" x1="'+PADL+'" y1="'+gy.toFixed(1)+'" x2="'+(B-PADR)+'" y2="'+gy.toFixed(1)+'"/>' +
       '<text class="tl-grid-label" x="'+(PADL-8)+'" y="'+gy.toFixed(1)+'" text-anchor="end" dominant-baseline="middle">'+p.toPrecision(4)+'</text>';
   }
-  // X-Achse: Start und Ende
+  // X-Achse: Start und Ende des sichtbaren Bereichs (inkl. Vorlauf)
   const xLabelHtml =
-    '<text class="tl-grid-label" x="'+PADL+'" y="'+(H-6)+'" text-anchor="start">'+tlDatKurz(trade.openedAt)+'</text>' +
+    '<text class="tl-grid-label" x="'+PADL+'" y="'+(H-6)+'" text-anchor="start">'+tlDatKurz(start)+'</text>' +
     '<text class="tl-grid-label" x="'+(B-PADR)+'" y="'+(H-6)+'" text-anchor="end">'+(trade.closedAt ? tlDatKurz(trade.closedAt) : 'jetzt')+'</text>';
 
   const exitHtml = (trade.exit != null)
@@ -943,7 +978,7 @@ function zeichneTradeLog(trade, events, kl, el){
   el.innerHTML =
     '<svg viewBox="0 0 '+B+' '+H+'" class="tl-svg" preserveAspectRatio="none">' +
       gitterHtml + xLabelHtml +
-      (kursPfad ? '<path class="tl-kurslinie" d="'+kursPfad+'"/>' : '') +
+      kerzenHtml +
       (slPfad ? '<path class="tl-slpfad" d="'+slPfad+'"/>' : '') +
       (tpPfad ? '<path class="tl-tppfad" d="'+tpPfad+'"/>' : '') +
       (entryPfad ? '<path class="tl-entrypfad" d="'+entryPfad+'"/>' : '') +
