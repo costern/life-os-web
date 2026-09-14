@@ -722,57 +722,143 @@ async function ladeHistorie(){
       '</div>'
     )).join('') || '<div class="empty">Noch keine Trades</div>';
     tlTrades = rows;
-    renderTradeLogListe();
+    renderTradeLogTabelle();
   } catch(e){ el.innerHTML = '<div class="err">Historie nicht ladbar: '+esc(e.message)+'</div>'; }
 }
 
-/* ---------- Trading-Log: Entry/SL/TP-Verlauf je Trade als Chart ----------
+/* ---------- Trading-Log: Uebersichtstabelle (nach Monat gruppiert, wie Colins Notion-
+   Tabelle) mit Doppelklick-Detailansicht pro Trade. Die Detailansicht zeigt die genauen
+   Zahlen (Entry, Size, SL, TP, Uhrzeiten) sowie den Entry/SL/TP-Verlauf als Chart.
    Jede Aenderung an entry1/sl/tp wird serverseitig per DB-Trigger in trade_events
    protokolliert (siehe schema.sql) - hier wird nur gelesen und gezeichnet.
    Der Kursverlauf im Hintergrund kommt live von Binance (/api/trades/:id/klines). */
 let tlTrades = [];
-let tlAuswahl = null;
+let tlOffenId = null;
 
 function tlDatKurz(iso){
   return new Date(iso).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
 }
-
-function renderTradeLogListe(){
-  const el = document.getElementById('tradeLogListe');
-  if (!el) return;
-  if (!tlTrades.length){ el.innerHTML = '<div class="empty">Noch keine Trades</div>'; return; }
-  if (tlAuswahl == null) tlAuswahl = tlTrades[0].id;
-  el.innerHTML = tlTrades.slice(0,20).map(r => (
-    '<button type="button" class="tl-row'+(r.id===tlAuswahl?' active':'')+'" data-id="'+r.id+'">' +
-      '<span class="tl-row-asset">'+esc(r.asset)+' <span class="muted">'+esc(r.side)+'</span></span>' +
-      (r.exit==null ? '<span class="badge amber">LIVE</span>' : '<span class="muted">'+tlDatKurz(r.closedAt||r.openedAt)+'</span>') +
-    '</button>'
-  )).join('');
-  el.querySelectorAll('.tl-row').forEach(b => b.addEventListener('click', () => {
-    tlAuswahl = +b.dataset.id;
-    renderTradeLogListe();
-  }));
-  ladeTradeLogChart(tlAuswahl);
+function tlZeit(iso){
+  return new Date(iso).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+function tlMonatSchluessel(iso){
+  const d = new Date(iso);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function tlMonatLabel(iso){
+  const s = new Date(iso).toLocaleDateString('de-DE', { month:'long', year:'numeric' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function tlErgebnisHtml(r){
+  if (r.exit == null) {
+    return '<span class="badge amber">LIVE</span>' + (r.realizedPnl ? ' <span class="'+(Number(r.realizedPnl)>=0?'pnl-pos':'pnl-neg')+'">'+fmt(r.realizedPnl)+'</span>' : '');
+  }
+  if (r.pnl == null) return '<span class="muted">–</span>';
+  return '<span class="'+(Number(r.pnl)>=0?'pnl-pos':'pnl-neg')+'">'+fmt(r.pnl)+'</span>';
+}
+function tlBadgesHtml(text){
+  if (!text) return '<span class="muted">–</span>';
+  return text.split(/[,/]/).map(s => s.trim()).filter(Boolean)
+    .map(s => '<span class="badge">'+esc(s)+'</span>').join(' ');
 }
 
-let tlLetzteAnfrage = 0;
-async function ladeTradeLogChart(id){
-  const anfrage = ++tlLetzteAnfrage;
-  const el = document.getElementById('tradeLogChart');
+function renderTradeLogTabelle(){
+  const el = document.getElementById('tradeLogTabelle');
   if (!el) return;
+  if (!tlTrades.length){ el.innerHTML = '<div class="empty">Noch keine Trades</div>'; return; }
+  const gruppen = [];
+  let letzterSchluessel = null;
+  tlTrades.forEach(r => {
+    const schluessel = tlMonatSchluessel(r.openedAt);
+    if (schluessel !== letzterSchluessel) {
+      gruppen.push({ label: tlMonatLabel(r.openedAt), rows: [] });
+      letzterSchluessel = schluessel;
+    }
+    gruppen[gruppen.length-1].rows.push(r);
+  });
+  el.innerHTML =
+    '<table class="tl-table">' +
+      '<thead><tr><th>Trade</th><th>Datum</th><th>Asset</th><th>Side</th><th>Strategie</th><th>TF</th><th>Ergebnis</th></tr></thead>' +
+      gruppen.map(g => (
+        '<tbody>' +
+          '<tr class="tl-monat-row"><td colspan="7">'+esc(g.label)+'</td></tr>' +
+          g.rows.map(r => (
+            '<tr class="tl-row2" data-id="'+r.id+'" title="Doppelklick für Details">' +
+              '<td>'+esc(r.name||r.asset)+'</td>' +
+              '<td>'+tlDatKurz(r.openedAt)+'</td>' +
+              '<td><span class="badge">'+esc(r.asset)+'</span></td>' +
+              '<td>'+esc(r.side)+'</td>' +
+              '<td>'+(r.strategy ? esc(r.strategy) : '<span class="muted">–</span>')+'</td>' +
+              '<td>'+tlBadgesHtml(r.tf)+'</td>' +
+              '<td>'+tlErgebnisHtml(r)+'</td>' +
+            '</tr>' +
+            '<tr class="tl-detail-row" data-detail-id="'+r.id+'" hidden><td colspan="7"><div id="tl-detail-'+r.id+'"></div></td></tr>'
+          )).join('') +
+        '</tbody>'
+      )).join('') +
+    '</table>';
+  el.querySelectorAll('.tl-row2').forEach(tr => tr.addEventListener('dblclick', () => tlToggleDetail(+tr.dataset.id)));
+  // Falls gerade ein Detail offen war, nach dem Neuaufbau der Tabelle wieder aufklappen.
+  if (tlOffenId != null && tlTrades.some(r => r.id === tlOffenId)) tlOeffneDetail(tlOffenId);
+}
+
+function tlToggleDetail(id){
+  const zeile = document.querySelector('.tl-detail-row[data-detail-id="'+id+'"]');
+  if (!zeile) return;
+  if (!zeile.hidden && tlOffenId === id) { zeile.hidden = true; tlOffenId = null; return; }
+  document.querySelectorAll('.tl-detail-row').forEach(z => { z.hidden = true; });
+  tlOeffneDetail(id);
+}
+
+async function tlOeffneDetail(id){
+  const zeile = document.querySelector('.tl-detail-row[data-detail-id="'+id+'"]');
+  if (!zeile) return;
+  zeile.hidden = false;
+  tlOffenId = id;
   const trade = tlTrades.find(r => r.id === id);
-  if (!trade) { el.innerHTML = ''; return; }
-  el.innerHTML = '<div class="empty">Lade…</div>';
+  const zielEl = document.getElementById('tl-detail-'+id);
+  if (!trade || !zielEl) return;
+  zielEl.innerHTML = '<div class="empty">Lade…</div>';
   const [events, kl] = await Promise.all([
     api('/trades/'+id+'/events').catch(() => []),
     api('/trades/'+id+'/klines').catch(e => ({ error: e.message }))
   ]);
-  if (anfrage !== tlLetzteAnfrage) return; // Auswahl hat sich schon wieder geaendert
-  zeichneTradeLog(trade, events, kl);
+  if (tlOffenId !== id) return; // Auswahl hat sich schon wieder geaendert
+  renderTradeLogDetail(trade, events, kl, zielEl);
 }
 
-function zeichneTradeLog(trade, events, kl){
-  const el = document.getElementById('tradeLogChart');
+function tlDetailFeld(label, wert){
+  return '<div class="tl-feld"><div class="tl-feld-l">'+label+'</div><div class="tl-feld-v">'+wert+'</div></div>';
+}
+
+function renderTradeLogDetail(trade, events, kl, zielEl){
+  const felder = [];
+  felder.push(tlDetailFeld('Entry', trade.entry1 != null ? trade.entry1 : '–'));
+  if (trade.entry2 != null) felder.push(tlDetailFeld('Entry 2', trade.entry2));
+  felder.push(tlDetailFeld('Size', trade.size1 != null ? trade.size1 : '–'));
+  if (trade.size2 != null) felder.push(tlDetailFeld('Size 2', trade.size2));
+  felder.push(tlDetailFeld('Stop Loss', trade.sl != null ? trade.sl : '–'));
+  felder.push(tlDetailFeld('Take Profit', trade.tp != null ? trade.tp : '–'));
+  if (trade.exit != null) felder.push(tlDetailFeld('Exit', trade.exit));
+  felder.push(tlDetailFeld('Eröffnet', tlZeit(trade.openedAt)));
+  felder.push(tlDetailFeld('Geschlossen', trade.closedAt ? tlZeit(trade.closedAt) : 'noch offen'));
+  if (trade.fundingFees != null) felder.push(tlDetailFeld('Funding Fees', fmt(trade.fundingFees)));
+  if (trade.realizedPnl) felder.push(tlDetailFeld('Teilrealisiert', fmt(trade.realizedPnl)));
+  if (trade.riskUsd != null) felder.push(tlDetailFeld('Risiko', fmt(trade.riskUsd)));
+
+  zielEl.innerHTML =
+    '<div class="tl-legend">' +
+      '<span class="tl-legend-item"><span class="tl-swatch" style="background:var(--accent)"></span>Entry</span>' +
+      '<span class="tl-legend-item"><span class="tl-swatch" style="background:var(--red)"></span>Stop Loss</span>' +
+      '<span class="tl-legend-item"><span class="tl-swatch" style="background:var(--green)"></span>Take Profit</span>' +
+      '<span class="tl-legend-item"><span class="tl-swatch" style="background:var(--muted);opacity:.5"></span>Kurs</span>' +
+    '</div>' +
+    '<div class="tl-chart-wrap" id="tl-chart-'+trade.id+'"></div>' +
+    '<div class="tl-details-grid">'+felder.join('')+'</div>';
+  zeichneTradeLog(trade, events, kl, document.getElementById('tl-chart-'+trade.id));
+}
+
+function zeichneTradeLog(trade, events, kl, el){
   const B = 860, H = 300, PADL = 60, PADR = 16, PADT = 16, PADB = 26;
   const start = new Date(trade.openedAt).getTime();
   const ende = trade.closedAt ? new Date(trade.closedAt).getTime() : Date.now();

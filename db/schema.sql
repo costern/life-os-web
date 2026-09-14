@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS trades (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS realized_pnl NUMERIC DEFAULT 0;
+-- tf: Timeframe-Badge(s) fuers Trading-Log, z.B. "4H" oder "3D, 1W" bei mehreren. Rein
+-- informativ, wie in Colins Notion-Tabelle.
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS tf TEXT;
 CREATE INDEX IF NOT EXISTS idx_trades_open ON trades ((exit_price IS NULL));
 
 CREATE TABLE IF NOT EXISTS todos (
