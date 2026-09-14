@@ -152,3 +152,47 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS div_struktur TEXT;
 -- uhrzeit: Kerzen-Close des Signals. Standard 02:00 = Tageschart-Close; 12:00 = 12H-Close
 -- mitten am Tag; kuerzere Timeframes werden von Hand eingetragen. NULL = unbekannt.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS uhrzeit TIME;
+
+-- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
+-- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).
+CREATE TABLE IF NOT EXISTS trade_events (
+  id SERIAL PRIMARY KEY,
+  trade_id INTEGER NOT NULL REFERENCES trades(id) ON DELETE CASCADE,
+  field TEXT NOT NULL CHECK (field IN ('entry','sl','tp')),
+  value NUMERIC NOT NULL,
+  changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_trade_events_trade ON trade_events (trade_id, field, changed_at);
+
+-- Automatisches Protokollieren: jede tatsaechliche Aenderung an entry1/sl/tp wird als neuer
+-- Trade-Event gespeichert - egal ob sie ueber das Dashboard-Formular oder per direktem
+-- SQL-Update (z.B. wenn Colin einen Screenshot schickt und die Position von Hand angepasst
+-- wird) passiert. Beim Anlegen eines Trades wird der Startwert gleich als erster Punkt
+-- gespeichert, sonst haette das Log am Anfang keine Linie zum Einzeichnen.
+CREATE OR REPLACE FUNCTION trg_trade_log_change() RETURNS trigger AS $$
+BEGIN
+  IF NEW.entry1 IS NOT NULL AND NEW.entry1 IS DISTINCT FROM OLD.entry1 THEN
+    INSERT INTO trade_events (trade_id, field, value) VALUES (NEW.id, 'entry', NEW.entry1);
+  END IF;
+  IF NEW.sl IS NOT NULL AND NEW.sl IS DISTINCT FROM OLD.sl THEN
+    INSERT INTO trade_events (trade_id, field, value) VALUES (NEW.id, 'sl', NEW.sl);
+  END IF;
+  IF NEW.tp IS NOT NULL AND NEW.tp IS DISTINCT FROM OLD.tp THEN
+    INSERT INTO trade_events (trade_id, field, value) VALUES (NEW.id, 'tp', NEW.tp);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trades_log_change ON trades;
+CREATE TRIGGER trades_log_change AFTER UPDATE ON trades FOR EACH ROW EXECUTE FUNCTION trg_trade_log_change();
+
+CREATE OR REPLACE FUNCTION trg_trade_log_initial() RETURNS trigger AS $$
+BEGIN
+  IF NEW.entry1 IS NOT NULL THEN INSERT INTO trade_events (trade_id, field, value, changed_at) VALUES (NEW.id, 'entry', NEW.entry1, NEW.opened_at); END IF;
+  IF NEW.sl IS NOT NULL THEN INSERT INTO trade_events (trade_id, field, value, changed_at) VALUES (NEW.id, 'sl', NEW.sl, NEW.opened_at); END IF;
+  IF NEW.tp IS NOT NULL THEN INSERT INTO trade_events (trade_id, field, value, changed_at) VALUES (NEW.id, 'tp', NEW.tp, NEW.opened_at); END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trades_log_initial ON trades;
+CREATE TRIGGER trades_log_initial AFTER INSERT ON trades FOR EACH ROW EXECUTE FUNCTION trg_trade_log_initial();

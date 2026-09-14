@@ -54,6 +54,52 @@ router.patch('/:id', async (req, res) => {
   res.json(rowOut(rows[0]));
 });
 
+// Entry/SL/TP-Verlauf fuers Trading-Log-Chart. Wird automatisch von einem DB-Trigger
+// befuellt (siehe schema.sql) - hier wird nur gelesen.
+router.get('/:id/events', async (req, res) => {
+  const id = +req.params.id;
+  const { rows } = await pool.query(
+    'SELECT field, value, changed_at FROM trade_events WHERE trade_id=$1 ORDER BY changed_at ASC, id ASC',
+    [id]
+  );
+  res.json(rows.map(r => ({ field: r.field, value: num(r.value), changedAt: r.changed_at })));
+});
+
+// Kursverlauf (Binance-Klines) fuer den Hintergrund des Trading-Log-Charts, vom
+// Trade-Start bis zum Trade-Ende bzw. jetzt bei noch offenen Positionen.
+const KLINE_INTERVALLE = [
+  ['1m', 60000], ['5m', 300000], ['15m', 900000], ['1h', 3600000],
+  ['4h', 14400000], ['1d', 86400000]
+];
+router.get('/:id/klines', async (req, res) => {
+  const id = +req.params.id;
+  const { rows } = await pool.query('SELECT ticker, opened_at, closed_at FROM trades WHERE id=$1', [id]);
+  if (!rows.length) return res.status(404).json({ error: 'Trade nicht gefunden' });
+  const t = rows[0];
+  const symbol = String(t.ticker || '').toUpperCase().trim() + 'USDT';
+  const start = new Date(t.opened_at).getTime();
+  const end = t.closed_at ? new Date(t.closed_at).getTime() : Date.now();
+  const spanMs = Math.max(end - start, 3600000);
+  let interval = '1d', ms = 86400000;
+  for (const [iv, msVal] of KLINE_INTERVALLE) {
+    if (spanMs / msVal <= 1000) { interval = iv; ms = msVal; break; }
+  }
+  const url = 'https://api.binance.com/api/v3/klines?symbol=' + encodeURIComponent(symbol) +
+    '&interval=' + interval + '&startTime=' + (start - ms) + '&endTime=' + (end + ms) + '&limit=1000';
+  try {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timeout);
+    if (!r.ok) throw new Error('Binance ' + r.status);
+    const data = await r.json();
+    if (!Array.isArray(data)) throw new Error((data && data.msg) || 'unerwartete Antwort');
+    res.json({ interval, candles: data.map(k => [k[0], Number(k[4])]) });
+  } catch (e) {
+    res.status(502).json({ error: 'Kursdaten fuer ' + symbol + ' nicht ladbar: ' + e.message });
+  }
+});
+
 router.post('/:id/close', async (req, res) => {
   const id = +req.params.id;
   const { exit } = req.body || {};

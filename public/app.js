@@ -721,7 +721,132 @@ async function ladeHistorie(){
         : (r.pnl!=null ? '<span class="'+(r.pnl>=0?'pnl-pos':'pnl-neg')+'">'+fmt(r.pnl)+'</span>' : '<span class="muted">PnL fehlt</span>')) +
       '</div>'
     )).join('') || '<div class="empty">Noch keine Trades</div>';
+    tlTrades = rows;
+    renderTradeLogListe();
   } catch(e){ el.innerHTML = '<div class="err">Historie nicht ladbar: '+esc(e.message)+'</div>'; }
+}
+
+/* ---------- Trading-Log: Entry/SL/TP-Verlauf je Trade als Chart ----------
+   Jede Aenderung an entry1/sl/tp wird serverseitig per DB-Trigger in trade_events
+   protokolliert (siehe schema.sql) - hier wird nur gelesen und gezeichnet.
+   Der Kursverlauf im Hintergrund kommt live von Binance (/api/trades/:id/klines). */
+let tlTrades = [];
+let tlAuswahl = null;
+
+function tlDatKurz(iso){
+  return new Date(iso).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
+}
+
+function renderTradeLogListe(){
+  const el = document.getElementById('tradeLogListe');
+  if (!el) return;
+  if (!tlTrades.length){ el.innerHTML = '<div class="empty">Noch keine Trades</div>'; return; }
+  if (tlAuswahl == null) tlAuswahl = tlTrades[0].id;
+  el.innerHTML = tlTrades.slice(0,20).map(r => (
+    '<button type="button" class="tl-row'+(r.id===tlAuswahl?' active':'')+'" data-id="'+r.id+'">' +
+      '<span class="tl-row-asset">'+esc(r.asset)+' <span class="muted">'+esc(r.side)+'</span></span>' +
+      (r.exit==null ? '<span class="badge amber">LIVE</span>' : '<span class="muted">'+tlDatKurz(r.closedAt||r.openedAt)+'</span>') +
+    '</button>'
+  )).join('');
+  el.querySelectorAll('.tl-row').forEach(b => b.addEventListener('click', () => {
+    tlAuswahl = +b.dataset.id;
+    renderTradeLogListe();
+  }));
+  ladeTradeLogChart(tlAuswahl);
+}
+
+let tlLetzteAnfrage = 0;
+async function ladeTradeLogChart(id){
+  const anfrage = ++tlLetzteAnfrage;
+  const el = document.getElementById('tradeLogChart');
+  if (!el) return;
+  const trade = tlTrades.find(r => r.id === id);
+  if (!trade) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="empty">Lade…</div>';
+  const [events, kl] = await Promise.all([
+    api('/trades/'+id+'/events').catch(() => []),
+    api('/trades/'+id+'/klines').catch(e => ({ error: e.message }))
+  ]);
+  if (anfrage !== tlLetzteAnfrage) return; // Auswahl hat sich schon wieder geaendert
+  zeichneTradeLog(trade, events, kl);
+}
+
+function zeichneTradeLog(trade, events, kl){
+  const el = document.getElementById('tradeLogChart');
+  const B = 860, H = 300, PADL = 60, PADR = 16, PADT = 16, PADB = 26;
+  const start = new Date(trade.openedAt).getTime();
+  const ende = trade.closedAt ? new Date(trade.closedAt).getTime() : Date.now();
+  const spanne = Math.max(ende - start, 60000);
+  const x = t => PADL + (t - start) / spanne * (B - PADL - PADR);
+
+  const kurse = (kl && Array.isArray(kl.candles)) ? kl.candles : [];
+  const werte = [];
+  kurse.forEach(c => werte.push(c[1]));
+  events.forEach(e => werte.push(e.value));
+  if (trade.exit != null) werte.push(trade.exit);
+  if (!werte.length) { el.innerHTML = '<div class="empty">Keine Daten für diesen Trade.</div>'; return; }
+  let min = Math.min(...werte), max = Math.max(...werte);
+  if (min === max) { min *= 0.98; max *= 1.02; }
+  const spannePreis = max - min;
+  min -= spannePreis * 0.08; max += spannePreis * 0.08;
+  const y = p => PADT + (1 - (p - min) / (max - min)) * (H - PADT - PADB);
+
+  // Kurslinie
+  let kursPfad = '';
+  if (kurse.length) {
+    kursPfad = kurse.map((c,i) => (i===0?'M':'L') + x(c[0]).toFixed(1) + ' ' + y(c[1]).toFixed(1)).join(' ');
+  }
+
+  // Treppenlinien fuer entry/sl/tp: waagerecht bis zur naechsten Aenderung, dann Sprung.
+  function treppe(feld){
+    const punkte = events.filter(e => e.field === feld).sort((a,b) => new Date(a.changedAt)-new Date(b.changedAt));
+    if (!punkte.length) return '';
+    let d = '';
+    let letzterWert = null;
+    punkte.forEach((p,i) => {
+      const px = x(new Date(p.changedAt).getTime());
+      const py = y(p.value);
+      if (i === 0) { d += 'M '+px.toFixed(1)+' '+py.toFixed(1); }
+      else { d += ' L '+px.toFixed(1)+' '+letzterWert.toFixed(1)+' L '+px.toFixed(1)+' '+py.toFixed(1); }
+      letzterWert = py;
+    });
+    // bis zum Ende (bzw. Exit) waagerecht weiterziehen
+    d += ' L '+x(ende).toFixed(1)+' '+letzterWert.toFixed(1);
+    return d;
+  }
+  const entryPfad = treppe('entry');
+  const slPfad = treppe('sl');
+  const tpPfad = treppe('tp');
+
+  // Y-Gitterlinien (4 Stueck, "schoene" Zahlen)
+  const anzGitter = 4;
+  let gitterHtml = '';
+  for (let i = 0; i <= anzGitter; i++) {
+    const p = min + (max - min) * i / anzGitter;
+    const gy = y(p);
+    gitterHtml += '<line class="tl-grid" x1="'+PADL+'" y1="'+gy.toFixed(1)+'" x2="'+(B-PADR)+'" y2="'+gy.toFixed(1)+'"/>' +
+      '<text class="tl-grid-label" x="'+(PADL-8)+'" y="'+gy.toFixed(1)+'" text-anchor="end" dominant-baseline="middle">'+p.toPrecision(4)+'</text>';
+  }
+  // X-Achse: Start und Ende
+  const xLabelHtml =
+    '<text class="tl-grid-label" x="'+PADL+'" y="'+(H-6)+'" text-anchor="start">'+tlDatKurz(trade.openedAt)+'</text>' +
+    '<text class="tl-grid-label" x="'+(B-PADR)+'" y="'+(H-6)+'" text-anchor="end">'+(trade.closedAt ? tlDatKurz(trade.closedAt) : 'jetzt')+'</text>';
+
+  const exitHtml = (trade.exit != null)
+    ? '<circle class="tl-exit-dot" cx="'+x(ende).toFixed(1)+'" cy="'+y(trade.exit).toFixed(1)+'" r="4"/>'
+    : '';
+
+  const fehlerHtml = (kl && kl.error) ? '<div class="tl-kursfehler muted">Kursverlauf nicht ladbar: '+esc(kl.error)+'</div>' : '';
+
+  el.innerHTML =
+    '<svg viewBox="0 0 '+B+' '+H+'" class="tl-svg" preserveAspectRatio="none">' +
+      gitterHtml + xLabelHtml +
+      (kursPfad ? '<path class="tl-kurslinie" d="'+kursPfad+'"/>' : '') +
+      (slPfad ? '<path class="tl-slpfad" d="'+slPfad+'"/>' : '') +
+      (tpPfad ? '<path class="tl-tppfad" d="'+tpPfad+'"/>' : '') +
+      (entryPfad ? '<path class="tl-entrypfad" d="'+entryPfad+'"/>' : '') +
+      exitHtml +
+    '</svg>' + fehlerHtml;
 }
 
 /* ---------- Double-Bottom-Watchlist: urspruenglich aus Obsidian importiert, jetzt direkt
