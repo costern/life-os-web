@@ -992,13 +992,18 @@ function zeichneTradeLog(trade, events, kl, el){
   const x = t => PADL + (t - start) / spanne * (B - PADL - PADR);
   const tVonX = px => start + (px - PADL) / (B - PADL - PADR) * spanne;
 
-  // Nur die im sichtbaren Ausschnitt liegenden Kerzen fuer die Preisspanne heranziehen -
-  // sonst zieht ein weit entfernter SL/TP oder eine alte Kerze die Skala flach.
+  // Preisspanne richtet sich NUR nach den sichtbaren Kerzen (High/Low) - Entry/SL/TP
+  // ziehen die Skala nicht mehr breit, sonst wirkt der Kurs bei einem weit entfernten
+  // SL/TP komplett flach. Ein SL/TP, der ausserhalb der Kerzenspanne liegt, faellt dann
+  // einfach ausserhalb des sichtbaren Charts (genau wie bei einer Preislinie in TradingView).
   const sichtbareKerzen = kurse.filter(c => c[0] >= start - spanne*0.02 && c[0] <= endeSicht + spanne*0.02);
   const werte = [];
   sichtbareKerzen.forEach(c => { werte.push(c[2]); werte.push(c[3]); }); // high, low
-  events.forEach(e => { const t = new Date(e.changedAt).getTime(); if (t <= endeSicht) werte.push(e.value); });
-  if (trade.exit != null) werte.push(trade.exit);
+  if (!werte.length) {
+    // Keine Kerzen geladen (z.B. Binance-Fehler) - dann wenigstens Entry/SL/TP/Exit zeigen.
+    events.forEach(e => { const t = new Date(e.changedAt).getTime(); if (t <= endeSicht) werte.push(e.value); });
+    if (trade.exit != null) werte.push(trade.exit);
+  }
   if (!werte.length) { el.innerHTML = '<div class="empty">Keine Daten für diesen Trade.</div>'; return; }
   let min = Math.min(...werte), max = Math.max(...werte);
   if (min === max) { min *= 0.98; max *= 1.02; }
