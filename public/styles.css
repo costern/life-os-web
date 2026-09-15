@@ -342,9 +342,6 @@ a { color:var(--accent); }
 .tl-asset-cell { display:flex; align-items:center; gap:7px; }
 .tl-asset-cell .wl-icon { width:18px; height:18px; border-radius:50%; flex:none; }
 .tl-table td { vertical-align:middle; }
-.tl-legend { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
-.tl-legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
-.tl-swatch { width:10px; height:10px; border-radius:2px; flex:none; }
 .tl-details-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:10px 16px; margin-top:14px; }
 .tl-feld-l { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
 .tl-feld-v { font-size:14px; font-weight:600; margin-top:2px; }
@@ -352,22 +349,20 @@ a { color:var(--accent); }
   border:1px solid var(--line); border-radius:7px; background:var(--input-bg); color:var(--ink); }
 .tl-feld-input:focus { outline:none; border-color:var(--accent); }
 .tl-save-row { display:flex; align-items:center; gap:10px; margin-top:16px; }
-.tl-chart-wrap { position:relative; height:300px; }
-.tl-svg { display:block; width:100%; height:100%; }
-.tl-grid { stroke:var(--line); stroke-width:1; }
-.tl-grid-label { font-size:10px; fill:var(--muted); font-family:inherit; }
-.tl-docht { stroke-width:1; vector-effect:non-scaling-stroke; }
-.tl-kerze-auf.tl-docht, .tl-kerze-auf.tl-kerze { stroke:var(--green); fill:var(--green); opacity:.65; }
-.tl-kerze-ab.tl-docht, .tl-kerze-ab.tl-kerze { stroke:var(--red); fill:var(--red); opacity:.65; }
-.tl-entrypfad { fill:none; stroke:var(--accent); stroke-width:2; vector-effect:non-scaling-stroke; }
-.tl-slpfad { fill:none; stroke:var(--red); stroke-width:2; vector-effect:non-scaling-stroke; stroke-dasharray:5,3; }
-.tl-tppfad { fill:none; stroke:var(--green); stroke-width:2; vector-effect:non-scaling-stroke; stroke-dasharray:5,3; }
-.tl-exit-dot { fill:var(--card); stroke:var(--ink); stroke-width:1.5; }
-.tl-kursfehler { margin-top:6px; font-size:11.5px; }
-.tl-chart-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; min-height:22px; }
-.tl-zoom-hinweis { font-size:11.5px; }
-.tl-sel-rect { fill:var(--accent); opacity:.12; stroke:var(--accent); stroke-width:1; stroke-dasharray:3,3; pointer-events:none; }
-.tl-vorlauf-label { display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted); }
-.tl-vorlauf-input { width:64px; font-family:inherit; font-size:12px; padding:3px 6px;
-  border:1px solid var(--line); border-radius:6px; background:var(--input-bg); color:var(--ink); }
-.tl-vorlauf-input:focus { outline:none; border-color:var(--accent); }
+
+/* Trading-Log: Screenshots (z.B. aus TradingView mit eigenen Einzeichnungen) statt
+   automatisch gezeichnetem Chart. */
+.tl-shots-wrap { margin-bottom:6px; }
+.tl-shots-grid { display:flex; flex-wrap:wrap; gap:10px; }
+.tl-shot-thumb { position:relative; width:120px; height:80px; border-radius:8px; overflow:hidden;
+  border:1px solid var(--line); cursor:zoom-in; flex:none; background:var(--hover-bg); }
+.tl-shot-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.tl-shot-del { position:absolute; top:3px; right:3px; font-size:10px; line-height:1; padding:3px 5px;
+  border-radius:5px; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; }
+.tl-shot-upload { display:flex; align-items:center; justify-content:center; width:120px; height:80px;
+  border-radius:8px; border:1px dashed var(--line); color:var(--muted); font-size:24px; cursor:pointer;
+  flex:none; background:transparent; }
+.tl-shot-upload:hover { border-color:var(--accent); color:var(--accent); }
+.tl-lightbox { position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex;
+  align-items:center; justify-content:center; z-index:999; cursor:zoom-out; padding:24px; }
+.tl-lightbox img { max-width:100%; max-height:100%; border-radius:6px; }

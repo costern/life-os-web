@@ -23,7 +23,8 @@ const ledgerRoutes = require('./routes/ledger');
 const watchlistRoutes = require('./routes/watchlist');
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+// 12mb, damit Trading-Log-Screenshots (als Base64-JSON) hochgeladen werden koennen.
+app.use(express.json({ limit: '12mb' }));
 app.use(cookieSession({
   name: 'session',
   secret: process.env.SESSION_SECRET || 'change-me-please',

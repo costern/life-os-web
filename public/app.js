@@ -728,10 +728,8 @@ async function ladeHistorie(){
 
 /* ---------- Trading-Log: Uebersichtstabelle (nach Monat gruppiert, wie Colins Notion-
    Tabelle) mit Doppelklick-Detailansicht pro Trade. Die Detailansicht zeigt die genauen
-   Zahlen (Entry, Size, SL, TP, Uhrzeiten) sowie den Entry/SL/TP-Verlauf als Chart.
-   Jede Aenderung an entry1/sl/tp wird serverseitig per DB-Trigger in trade_events
-   protokolliert (siehe schema.sql) - hier wird nur gelesen und gezeichnet.
-   Der Kursverlauf im Hintergrund kommt live von Binance (/api/trades/:id/klines). */
+   Zahlen (Entry, Size, SL, TP, Uhrzeiten) sowie Colins eigene TradingView-Screenshots
+   (mit seinen Einzeichnungen) statt eines im Dashboard nachgebauten Charts. */
 let tlTrades = [];
 let tlOffenId = null;
 
@@ -826,21 +824,6 @@ function tlToggleDetail(id){
   tlOeffneDetail(id);
 }
 
-// Wie viele Kerzen Vorlauf vor dem Trade-Start geladen werden - je Trade einstellbar (Eingabefeld
-// im Chart), damit Colin selbst entscheiden kann, wie viel Chart er vorher noch sehen will.
-const TL_VORLAUF_STANDARD = 100;
-let tlVorlaufKerzen = {};
-
-// Die eigentliche Kerzenlaenge (z.B. "2W" -> 2-Wochen-Kerzen) legt der Server anhand des
-// Timeframes des Trades fest (siehe /trades/:id/klines) - hier wird das TF-Feld nur
-// durchgereicht, ohne 1D falls es fehlt (Server faellt dann selbst auf Tageschart zurueck).
-function tlKlinesUrl(id, trade, vorlaufKerzen){
-  const params = [];
-  if (trade.tf) params.push('tf='+encodeURIComponent(trade.tf));
-  params.push('vorlaufKerzen='+vorlaufKerzen);
-  return '/trades/'+id+'/klines?'+params.join('&');
-}
-
 async function tlOeffneDetail(id){
   const zeile = document.querySelector('.tl-detail-row[data-detail-id="'+id+'"]');
   if (!zeile) return;
@@ -850,29 +833,9 @@ async function tlOeffneDetail(id){
   const zielEl = document.getElementById('tl-detail-'+id);
   if (!trade || !zielEl) return;
   zielEl.innerHTML = '<div class="empty">Lade…</div>';
-  const vorlauf = tlVorlaufKerzen[id] || TL_VORLAUF_STANDARD;
-  const [events, kl] = await Promise.all([
-    api('/trades/'+id+'/events').catch(() => []),
-    api(tlKlinesUrl(id, trade, vorlauf)).catch(e => ({ error: e.message }))
-  ]);
+  const shots = await api('/trades/'+id+'/screenshots').catch(() => []);
   if (tlOffenId !== id) return; // Auswahl hat sich schon wieder geaendert
-  renderTradeLogDetail(trade, events, kl, zielEl);
-}
-
-// Vorlauf (Anzahl Kerzen vor Trade-Start) neu laden, ohne den Rest der Detailansicht
-// (Felder etc.) neu aufzubauen - nur Kursdaten neu holen und Chart neu zeichnen.
-async function tlAendereVorlauf(id, kerzen){
-  const n = Math.max(5, Math.min(1000, Math.round(kerzen) || TL_VORLAUF_STANDARD));
-  tlVorlaufKerzen[id] = n;
-  delete tlZoomDomains[id];
-  const el = document.getElementById('tl-chart-'+id);
-  const d = tlLetzteDaten[id];
-  const trade = d ? d.trade : tlTrades.find(r => r.id === id);
-  if (!el || !trade) return;
-  el.innerHTML = '<div class="empty">Lade…</div>';
-  const events = d ? d.events : await api('/trades/'+id+'/events').catch(() => []);
-  const kl = await api(tlKlinesUrl(id, trade, n)).catch(e => ({ error: e.message }));
-  zeichneTradeLog(trade, events, kl, el);
+  renderTradeLogDetail(trade, shots, zielEl);
 }
 
 function tlDatetimeInputWert(iso){
@@ -893,7 +856,7 @@ function tlFeldSelect(label, klasse, wert, optionen){
     '</select></div>';
 }
 
-function renderTradeLogDetail(trade, events, kl, zielEl){
+function renderTradeLogDetail(trade, shots, zielEl){
   const felder = [
     tlFeldInput('Datum', 'tle-opened', tlDatetimeInputWert(trade.openedAt), 'datetime-local'),
     tlFeldSelect('Side', 'tle-side', trade.side, ['Long','Short']),
@@ -917,20 +880,14 @@ function renderTradeLogDetail(trade, events, kl, zielEl){
   ];
 
   zielEl.innerHTML =
-    '<div class="tl-legend">' +
-      '<span class="tl-legend-item"><span class="tl-swatch" style="background:var(--accent)"></span>Entry</span>' +
-      '<span class="tl-legend-item"><span class="tl-swatch" style="background:var(--red)"></span>Stop Loss</span>' +
-      '<span class="tl-legend-item"><span class="tl-swatch" style="background:var(--green)"></span>Take Profit</span>' +
-      '<span class="tl-legend-item"><span class="tl-swatch" style="background:var(--muted);opacity:.5"></span>Kurs</span>' +
-    '</div>' +
-    '<div class="tl-chart-wrap" id="tl-chart-'+trade.id+'"></div>' +
+    '<div class="tl-shots-wrap" id="tl-shots-'+trade.id+'"></div>' +
     '<div class="tl-details-grid">'+felder.join('')+'</div>' +
     '<div class="tl-save-row">' +
       '<button type="button" class="btn tle-save">Speichern</button>' +
       '<button type="button" class="btn ghost tle-delete">Trade löschen</button>' +
       '<span class="te-msg tle-msg"></span>' +
     '</div>';
-  zeichneTradeLog(trade, events, kl, document.getElementById('tl-chart-'+trade.id));
+  renderTradeLogShots(trade.id, shots, document.getElementById('tl-shots-'+trade.id));
 
   zielEl.querySelector('.tle-save').addEventListener('click', () => tlSpeichereDetail(trade.id, zielEl));
   zielEl.querySelector('.tle-delete').addEventListener('click', () => tlLoescheTrade(trade.id, zielEl));
@@ -982,176 +939,91 @@ async function tlLoescheTrade(id, zielEl){
   }
 }
 
-// Zoom-Zustand je Trade (per Ziehen mit der Maus gesetzt, wie in TradingView). null = volle
-// Ansicht. Bleibt bestehen, solange die Detailansicht offen ist bzw. bis "Zoom zurücksetzen".
-let tlZoomDomains = {};
-let tlLetzteDaten = {};
+// Trading-Log-Screenshots: Colin zeichnet seine Analyse (Entry/SL/TP, Marken) selbst in
+// TradingView ein, macht einen Screenshot und laedt den hier hoch - ein automatisch
+// gezeichneter Chart im Dashboard kommt da ohnehin nie ran.
+const TL_MAX_BILDGROESSE = 8 * 1024 * 1024; // 8 MB Rohgroesse vorm Base64-Encoding
 
-function zeichneTradeLog(trade, events, kl, el){
-  tlLetzteDaten[trade.id] = { trade, events, kl };
-  const B = 860, H = 300, PADL = 60, PADR = 16, PADT = 16, PADB = 26;
-  const kurse = (kl && Array.isArray(kl.candles)) ? kl.candles : []; // [zeit, open, high, low, close]
-
-  // Voller Zeitbereich: Kerzen (inkl. Vorlauf vom Server) plus Trade-Start/-Ende.
-  const alleZeiten = kurse.map(c => c[0]);
-  alleZeiten.push(new Date(trade.openedAt).getTime());
-  const ende = trade.closedAt ? new Date(trade.closedAt).getTime() : Date.now();
-  alleZeiten.push(ende);
-  const vollStart = Math.min(...alleZeiten);
-  const vollEnde = Math.max(...alleZeiten, ende);
-
-  // Sichtbarer Ausschnitt: entweder der volle Bereich, oder das, was per Ziehen gezoomt wurde.
-  const zoom = tlZoomDomains[trade.id];
-  const start = zoom ? Math.max(zoom[0], vollStart) : vollStart;
-  const endeSicht = zoom ? Math.min(zoom[1], vollEnde) : vollEnde;
-  const spanne = Math.max(endeSicht - start, 60000);
-  const x = t => PADL + (t - start) / spanne * (B - PADL - PADR);
-  const tVonX = px => start + (px - PADL) / (B - PADL - PADR) * spanne;
-
-  // Preisspanne richtet sich NUR nach den sichtbaren Kerzen (High/Low) - Entry/SL/TP
-  // ziehen die Skala nicht mehr breit, sonst wirkt der Kurs bei einem weit entfernten
-  // SL/TP komplett flach. Ein SL/TP, der ausserhalb der Kerzenspanne liegt, faellt dann
-  // einfach ausserhalb des sichtbaren Charts (genau wie bei einer Preislinie in TradingView).
-  const sichtbareKerzen = kurse.filter(c => c[0] >= start - spanne*0.02 && c[0] <= endeSicht + spanne*0.02);
-  const werte = [];
-  sichtbareKerzen.forEach(c => { werte.push(c[2]); werte.push(c[3]); }); // high, low
-  if (!werte.length) {
-    // Keine Kerzen geladen (z.B. Binance-Fehler) - dann wenigstens Entry/SL/TP/Exit zeigen.
-    events.forEach(e => { const t = new Date(e.changedAt).getTime(); if (t <= endeSicht) werte.push(e.value); });
-    if (trade.exit != null) werte.push(trade.exit);
-  }
-  if (!werte.length) { el.innerHTML = '<div class="empty">Keine Daten für diesen Trade.</div>'; return; }
-  let min = Math.min(...werte), max = Math.max(...werte);
-  if (min === max) { min *= 0.98; max *= 1.02; }
-  const spannePreis = max - min;
-  min -= spannePreis * 0.08; max += spannePreis * 0.08;
-  const y = p => PADT + (1 - (p - min) / (max - min)) * (H - PADT - PADB);
-
-  // Kerzen: Docht als duenne Linie, Koerper als Rechteck (gruen/rot je nach open/close).
-  let kerzenHtml = '';
-  if (kurse.length) {
-    const spacing = kurse.length > 1 ? Math.abs(x(kurse[1][0]) - x(kurse[0][0])) : 8;
-    const breite = Math.max(1, Math.min(spacing * 0.6, 14));
-    kerzenHtml = kurse.map(c => {
-      const [t, o, h, l, close] = c;
-      const cx = x(t);
-      const steigend = close >= o;
-      const klasse = steigend ? 'tl-kerze-auf' : 'tl-kerze-ab';
-      const koerperTop = y(Math.max(o, close));
-      const koerperUnten = y(Math.min(o, close));
-      const koerperH = Math.max(koerperUnten - koerperTop, 1);
-      return '<line class="tl-docht '+klasse+'" x1="'+cx.toFixed(1)+'" y1="'+y(h).toFixed(1)+'" x2="'+cx.toFixed(1)+'" y2="'+y(l).toFixed(1)+'"/>' +
-        '<rect class="tl-kerze '+klasse+'" x="'+(cx-breite/2).toFixed(1)+'" y="'+koerperTop.toFixed(1)+'" width="'+breite.toFixed(1)+'" height="'+koerperH.toFixed(1)+'"/>';
-    }).join('');
-  }
-
-  // Treppenlinien fuer entry/sl/tp: waagerecht bis zur naechsten Aenderung, dann Sprung.
-  // Faengt schon vor dem sichtbaren Rand an (letzter Wert vor "start"), damit die Linie beim
-  // Reinzoomen nicht ploetzlich in der Mitte anfaengt.
-  function treppe(feld){
-    const alle = events.filter(e => e.field === feld).sort((a,b) => new Date(a.changedAt)-new Date(b.changedAt));
-    if (!alle.length) return '';
-    const vorStart = alle.filter(p => new Date(p.changedAt).getTime() <= start).pop();
-    const sichtbar = alle.filter(p => new Date(p.changedAt).getTime() > start);
-    const punkte = vorStart ? [{ ...vorStart, changedAt: new Date(start).toISOString() }, ...sichtbar] : sichtbar;
-    if (!punkte.length) return '';
-    let d = '';
-    let letzterWert = null;
-    punkte.forEach((p,i) => {
-      const px = x(new Date(p.changedAt).getTime());
-      const py = y(p.value);
-      if (i === 0) { d += 'M '+px.toFixed(1)+' '+py.toFixed(1); }
-      else { d += ' L '+px.toFixed(1)+' '+letzterWert.toFixed(1)+' L '+px.toFixed(1)+' '+py.toFixed(1); }
-      letzterWert = py;
-    });
-    // bis zum sichtbaren Ende (bzw. Trade-Ende) waagerecht weiterziehen
-    d += ' L '+x(Math.min(ende, endeSicht)).toFixed(1)+' '+letzterWert.toFixed(1);
-    return d;
-  }
-  const entryPfad = treppe('entry');
-  const slPfad = treppe('sl');
-  const tpPfad = treppe('tp');
-
-  // Y-Gitterlinien (4 Stueck, "schoene" Zahlen)
-  const anzGitter = 4;
-  let gitterHtml = '';
-  for (let i = 0; i <= anzGitter; i++) {
-    const p = min + (max - min) * i / anzGitter;
-    const gy = y(p);
-    gitterHtml += '<line class="tl-grid" x1="'+PADL+'" y1="'+gy.toFixed(1)+'" x2="'+(B-PADR)+'" y2="'+gy.toFixed(1)+'"/>' +
-      '<text class="tl-grid-label" x="'+(PADL-8)+'" y="'+gy.toFixed(1)+'" text-anchor="end" dominant-baseline="middle">'+p.toPrecision(4)+'</text>';
-  }
-  const xLabelHtml =
-    '<text class="tl-grid-label" x="'+PADL+'" y="'+(H-6)+'" text-anchor="start">'+tlDatKurz(start)+'</text>' +
-    '<text class="tl-grid-label" x="'+(B-PADR)+'" y="'+(H-6)+'" text-anchor="end">'+(endeSicht >= ende && !trade.closedAt ? 'jetzt' : tlDatKurz(endeSicht))+'</text>';
-
-  const exitHtml = (trade.exit != null && ende >= start && ende <= endeSicht)
-    ? '<circle class="tl-exit-dot" cx="'+x(ende).toFixed(1)+'" cy="'+y(trade.exit).toFixed(1)+'" r="4"/>'
-    : '';
-
-  const fehlerHtml = (kl && kl.error) ? '<div class="tl-kursfehler muted">Kursverlauf nicht ladbar: '+esc(kl.error)+'</div>' : '';
-  const resetHtml = zoom ? '<button type="button" class="btn ghost tl-zoom-reset">Zoom zurücksetzen</button>' : '';
-  const vorlaufHtml =
-    '<label class="tl-vorlauf-label">Kerzen davor ' +
-      '<input type="number" class="tl-vorlauf-input" min="5" max="1000" step="5" value="'+(tlVorlaufKerzen[trade.id] || TL_VORLAUF_STANDARD)+'">' +
-    '</label>';
-
+function renderTradeLogShots(tradeId, shots, el){
+  const kacheln = shots.map(s =>
+    '<div class="tl-shot-thumb" data-shot-id="'+s.id+'">' +
+      '<img src="/api/trades/'+tradeId+'/screenshots/'+s.id+'/image" loading="lazy" alt="Screenshot">' +
+      '<button type="button" class="tl-shot-del" title="Löschen">✕</button>' +
+    '</div>'
+  ).join('');
   el.innerHTML =
-    '<div class="tl-chart-toolbar">'+resetHtml+vorlaufHtml+'<span class="muted tl-zoom-hinweis">zum Reinzoomen einen Bereich aufziehen · Doppelklick setzt zurück</span></div>' +
-    '<svg viewBox="0 0 '+B+' '+H+'" class="tl-svg" preserveAspectRatio="none" id="tl-svg-'+trade.id+'">' +
-      gitterHtml + xLabelHtml +
-      kerzenHtml +
-      (slPfad ? '<path class="tl-slpfad" d="'+slPfad+'"/>' : '') +
-      (tpPfad ? '<path class="tl-tppfad" d="'+tpPfad+'"/>' : '') +
-      (entryPfad ? '<path class="tl-entrypfad" d="'+entryPfad+'"/>' : '') +
-      exitHtml +
-      '<rect id="tl-hit-'+trade.id+'" x="'+PADL+'" y="'+PADT+'" width="'+(B-PADL-PADR)+'" height="'+(H-PADT-PADB)+'" fill="transparent" style="cursor:crosshair"/>' +
-      '<rect id="tl-sel-'+trade.id+'" class="tl-sel-rect" x="0" y="'+PADT+'" width="0" height="'+(H-PADT-PADB)+'" style="display:none"/>' +
-    '</svg>' + fehlerHtml;
+    '<div class="tl-shots-grid">' + kacheln +
+      '<label class="tl-shot-upload" title="Screenshot hochladen">+' +
+        '<input type="file" accept="image/*" hidden class="tl-shot-input">' +
+      '</label>' +
+    '</div>' +
+    '<span class="te-msg tl-shots-msg"></span>';
 
-  const svg = document.getElementById('tl-svg-'+trade.id);
-  const hit = document.getElementById('tl-hit-'+trade.id);
-  const selRect = document.getElementById('tl-sel-'+trade.id);
-  let ziehStart = null;
-  function pxVonEvent(ev){
-    const rect = svg.getBoundingClientRect();
-    return Math.min(Math.max((ev.clientX - rect.left) / rect.width * B, PADL), B - PADR);
+  el.querySelectorAll('.tl-shot-thumb img').forEach(img => {
+    img.addEventListener('click', () => tlZeigeLightbox(img.src));
+  });
+  el.querySelectorAll('.tl-shot-del').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const kachel = btn.closest('.tl-shot-thumb');
+      tlLoescheScreenshot(tradeId, +kachel.dataset.shotId, el);
+    });
+  });
+  const input = el.querySelector('.tl-shot-input');
+  input.addEventListener('change', () => {
+    if (input.files && input.files[0]) tlLadeScreenshotHoch(tradeId, input.files[0], el);
+  });
+}
+
+function tlZeigeLightbox(src){
+  const overlay = document.createElement('div');
+  overlay.className = 'tl-lightbox';
+  overlay.innerHTML = '<img src="'+src+'">';
+  overlay.addEventListener('click', () => overlay.remove());
+  document.addEventListener('keydown', function esc(ev){
+    if (ev.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+  });
+  document.body.appendChild(overlay);
+}
+
+function tlLiesAlsDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function tlLadeScreenshotHoch(tradeId, file, el){
+  const msg = el.querySelector('.tl-shots-msg');
+  msg.textContent = ''; msg.className = 'te-msg tl-shots-msg';
+  if (file.size > TL_MAX_BILDGROESSE) {
+    msg.textContent = 'Bild zu groß (max. 8 MB)'; msg.className = 'te-msg tl-shots-msg bad';
+    return;
   }
-  function neuZeichnen(){
-    const d = tlLetzteDaten[trade.id];
-    if (d) zeichneTradeLog(d.trade, d.events, d.kl, el);
+  try {
+    const dataUrl = await tlLiesAlsDataUrl(file);
+    await api('/trades/'+tradeId+'/screenshots', { method:'POST', body: JSON.stringify({ imageBase64: dataUrl }) });
+    const shots = await api('/trades/'+tradeId+'/screenshots').catch(() => []);
+    renderTradeLogShots(tradeId, shots, el);
+  } catch(e){
+    msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg tl-shots-msg bad';
   }
-  hit.addEventListener('pointerdown', ev => {
-    ziehStart = pxVonEvent(ev);
-    hit.setPointerCapture(ev.pointerId);
-    selRect.style.display = '';
-    selRect.setAttribute('x', ziehStart.toFixed(1));
-    selRect.setAttribute('width', '0');
-  });
-  hit.addEventListener('pointermove', ev => {
-    if (ziehStart === null) return;
-    const cur = pxVonEvent(ev);
-    const a = Math.min(ziehStart, cur), b = Math.max(ziehStart, cur);
-    selRect.setAttribute('x', a.toFixed(1));
-    selRect.setAttribute('width', (b-a).toFixed(1));
-  });
-  hit.addEventListener('pointerup', ev => {
-    if (ziehStart === null) return;
-    const cur = pxVonEvent(ev);
-    selRect.style.display = 'none';
-    const distanz = Math.abs(cur - ziehStart);
-    if (distanz > 10) {
-      const a = Math.min(ziehStart, cur), b = Math.max(ziehStart, cur);
-      const neuMin = tVonX(a), neuMax = tVonX(b);
-      if (neuMax - neuMin > 60000) { tlZoomDomains[trade.id] = [neuMin, neuMax]; neuZeichnen(); }
-    }
-    ziehStart = null;
-  });
-  hit.addEventListener('dblclick', () => { delete tlZoomDomains[trade.id]; neuZeichnen(); });
-  const resetBtn = el.querySelector('.tl-zoom-reset');
-  if (resetBtn) resetBtn.addEventListener('click', () => { delete tlZoomDomains[trade.id]; neuZeichnen(); });
-  const vorlaufInput = el.querySelector('.tl-vorlauf-input');
-  if (vorlaufInput) vorlaufInput.addEventListener('change', () => tlAendereVorlauf(trade.id, Number(vorlaufInput.value)));
+}
+
+async function tlLoescheScreenshot(tradeId, shotId, el){
+  const kachel = el.querySelector('.tl-shot-thumb[data-shot-id="'+shotId+'"]');
+  const btn = kachel && kachel.querySelector('.tl-shot-del');
+  if (btn && btn.textContent !== '✓') { btn.textContent = '✓'; btn.title = 'Wirklich löschen?'; return; }
+  try {
+    await api('/trades/'+tradeId+'/screenshots/'+shotId, { method:'DELETE' });
+    const shots = await api('/trades/'+tradeId+'/screenshots').catch(() => []);
+    renderTradeLogShots(tradeId, shots, el);
+  } catch(e){
+    const msg = el.querySelector('.tl-shots-msg');
+    msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg tl-shots-msg bad';
+  }
 }
 
 /* ---------- Double-Bottom-Watchlist: urspruenglich aus Obsidian importiert, jetzt direkt

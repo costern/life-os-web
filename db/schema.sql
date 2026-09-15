@@ -199,3 +199,15 @@ END;
 $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trades_log_initial ON trades;
 CREATE TRIGGER trades_log_initial AFTER INSERT ON trades FOR EACH ROW EXECUTE FUNCTION trg_trade_log_initial();
+
+-- Trading-Log: Screenshots statt automatisch gezeichnetem Chart. Colin zeichnet seine
+-- Analyse (Entry/SL/TP, Marken) selbst in TradingView ein, macht einen Screenshot und
+-- laedt den hier hoch - das ersetzt den Versuch, TradingView im Dashboard nachzubauen.
+CREATE TABLE IF NOT EXISTS trade_screenshots (
+  id SERIAL PRIMARY KEY,
+  trade_id INTEGER NOT NULL REFERENCES trades(id) ON DELETE CASCADE,
+  content_type TEXT NOT NULL,
+  image_data BYTEA NOT NULL,
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_trade_screenshots_trade ON trade_screenshots (trade_id, uploaded_at);
