@@ -12,6 +12,15 @@ function rowOut(r) {
   };
 }
 function num(v) { return v === null || v === undefined ? null : Number(v); }
+// tf kommt vom Frontend entweder schon als Array (Checkbox-Auswahl) oder - fuer alte
+// Aufrufer - als kommagetrennter Text. Leere Auswahl/Text wird zu null (kein Timeframe).
+function tfArray(v) {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  const liste = Array.isArray(v) ? v : String(v).split(/[,/]+/);
+  const bereinigt = liste.map(s => String(s).trim()).filter(Boolean);
+  return bereinigt.length ? bereinigt : null;
+}
 
 router.get('/', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM trades ORDER BY opened_at DESC');
@@ -31,7 +40,7 @@ router.post('/', async (req, res) => {
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, COALESCE($14, now()), $15) RETURNING *`,
     [b.asset, b.ticker || b.asset, b.name || null, b.side || 'Long', b.entry1 || null, b.entry2 || null,
      b.size1 || null, b.size2 || null, b.sl || null, b.tp || null, b.strategy || null, b.riskUsd || null,
-     b.tf || null, b.openedAt || null, b.source || 'manual']
+     tfArray(b.tf) || null, b.openedAt || null, b.source || 'manual']
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -45,11 +54,13 @@ router.patch('/:id', async (req, res) => {
   for (const [key, col] of [['sl','sl'],['tp','tp'],['exit','exit_price'],['pnl','pnl'],
                              ['fundingFees','funding_fees'],['closedAt','closed_at'],
                              ['entry1','entry1'],['entry2','entry2'],['size1','size1'],['size2','size2'],
-                             ['realizedPnl','realized_pnl'],['strategy','strategy'],['tf','tf'],
+                             ['realizedPnl','realized_pnl'],['strategy','strategy'],
                              ['name','trade_name'],['riskUsd','risk_usd'],
                              ['asset','asset'],['ticker','ticker'],['side','side'],['openedAt','opened_at']]) {
     if (b[key] !== undefined) { fields.push(`${col} = $${i++}`); vals.push(b[key]); }
   }
+  // tf ist ein TEXT[] (mehrere Timeframes moeglich) - separat normalisieren statt roh durchreichen.
+  if (b.tf !== undefined) { fields.push(`tf = $${i++}`); vals.push(tfArray(b.tf)); }
   if (!fields.length) return res.status(400).json({ error: 'nichts zu ändern' });
   fields.push(`updated_at = now()`);
   vals.push(id);

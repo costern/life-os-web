@@ -23,9 +23,18 @@ CREATE TABLE IF NOT EXISTS trades (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS realized_pnl NUMERIC DEFAULT 0;
--- tf: Timeframe-Badge(s) fuers Trading-Log, z.B. "4H" oder "3D, 1W" bei mehreren. Rein
--- informativ, wie in Colins Notion-Tabelle.
+-- tf: Timeframe-Badges fuers Trading-Log, z.B. ["4H"] oder ["3D","1W"] bei mehreren.
+-- Rein informativ, wie Colins Notion-Tabelle (dort ein Multi-Select). Als TEXT[] statt
+-- einem einzelnen TEXT, damit ein Trade mehrere Timeframes gleichzeitig haben kann.
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS tf TEXT;
+DO $$
+BEGIN
+  IF (SELECT data_type FROM information_schema.columns WHERE table_name = 'trades' AND column_name = 'tf') = 'text' THEN
+    ALTER TABLE trades ALTER COLUMN tf TYPE TEXT[] USING (
+      CASE WHEN tf IS NULL OR btrim(tf) = '' THEN NULL ELSE ARRAY[tf] END
+    );
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_trades_open ON trades ((exit_price IS NULL));
 
 CREATE TABLE IF NOT EXISTS todos (

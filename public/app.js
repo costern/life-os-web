@@ -21,11 +21,15 @@ const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;',
 const COIN_ICONS = new Set(['eth','link','sui','render']);
 const COIN_ICON_ALIAS = { rndr: 'render' };
 function coinIcon(ticker, name){
-  const key = String(ticker || name || '').toLowerCase();
+  const key = String(ticker || name || '').toLowerCase().replace(/[^a-z0-9]/g,'');
   const file = COIN_ICON_ALIAS[key] || key;
-  if (COIN_ICONS.has(file)) return '<img class="coin-icon" src="/icons/'+file+'.svg" alt="">';
   const buchstabe = esc((ticker || name || '?').trim().charAt(0).toUpperCase() || '?');
-  return '<span class="coin-icon coin-icon-fallback">'+buchstabe+'</span>';
+  if (COIN_ICONS.has(file)) return '<img class="coin-icon" src="/icons/'+file+'.svg" alt="">';
+  // Lokal kein Icon hinterlegt: breite CDN-Abdeckung versuchen (viele "grosse" Coins),
+  // mit Buchstaben-Badge als letzter Fallback, falls auch die CDN den Coin nicht kennt.
+  return '<img class="coin-icon" src="https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/'+file+'.svg" alt="" ' +
+      'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\'">' +
+    '<span class="coin-icon coin-icon-fallback" style="display:none">'+buchstabe+'</span>';
 }
 const fmt = n => (n >= 0 ? '+' : '') + Number(n).toFixed(2) + ' $';
 const fmtAmount = n => {
@@ -754,25 +758,35 @@ function tlErgebnisHtml(r){
   if (r.pnl == null) return '<span class="muted">–</span>';
   return '<span class="'+(Number(r.pnl)>=0?'pnl-pos':'pnl-neg')+'">'+fmt(r.pnl)+'</span>';
 }
-function tlBadgesHtml(text){
-  if (!text) return '<span class="muted">–</span>';
-  return text.split(/[,/]/).map(s => s.trim()).filter(Boolean)
-    .map(s => '<span class="badge">'+esc(s)+'</span>').join(' ');
+function tlBadgesHtml(tf){
+  // tf ist normalerweise ein Array (mehrere Timeframes moeglich), aus Kompatibilitaet
+  // wird aber auch noch ein alter kommagetrennter Text akzeptiert.
+  const liste = Array.isArray(tf) ? tf : (tf ? String(tf).split(/[,/]/) : []);
+  const bereinigt = liste.map(s => String(s).trim()).filter(Boolean);
+  if (!bereinigt.length) return '<span class="muted">–</span>';
+  return bereinigt.map(s => '<span class="badge">'+esc(s)+'</span>').join(' ');
 }
 function tlSideHtml(side){
   const kurz = side === 'Short' ? 'Short' : 'Long';
   return '<span class="tl-side tl-side-'+kurz.toLowerCase()+'">'+kurz+'</span>';
 }
 function tlAssetIconHtml(r){
-  const ticker = String(r.ticker || r.asset || '').toLowerCase().replace(/[^a-z0-9]/g,'');
-  const buchstabe = esc((r.asset || '?').trim().slice(0,3).toUpperCase());
-  return '<span class="tl-asset-cell">' +
-    '<span class="wl-icon">' +
-      '<img src="https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/'+ticker+'.svg" alt="" ' +
-        'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
-      '<span class="wl-icon-fallback" style="display:none">'+buchstabe+'</span>' +
-    '</span>' +
-    esc(r.asset) +
+  return '<span class="tl-asset-cell">' + coinIconWlHtml(r.ticker || r.asset, r.asset) + esc(r.asset) + '</span>';
+}
+// Icon fuer eine Kachel im "wl-icon"-Stil (Trading-Log-Tabelle, Watchlist): zuerst das
+// lokal kuratierte Icon-Set pruefen (fuer Coins, die die CDN unten nicht kennt, z.B. SUI,
+// RENDER), sonst die breite CDN-Abdeckung versuchen, mit Buchstaben als letzter Fallback.
+function coinIconWlHtml(ticker, name){
+  const key = String(ticker || name || '').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const datei = COIN_ICON_ALIAS[key] || key;
+  const buchstabe = esc((ticker || name || '?').trim().slice(0,3).toUpperCase());
+  if (COIN_ICONS.has(datei)) {
+    return '<span class="wl-icon"><img src="/icons/'+datei+'.svg" alt=""></span>';
+  }
+  return '<span class="wl-icon">' +
+    '<img src="https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/'+datei+'.svg" alt="" ' +
+      'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
+    '<span class="wl-icon-fallback" style="display:none">'+buchstabe+'</span>' +
   '</span>';
 }
 
@@ -855,6 +869,20 @@ function tlFeldSelect(label, klasse, wert, optionen){
     optionen.map(o => '<option value="'+o+'"'+(o===wert?' selected':'')+'>'+o+'</option>').join('') +
     '</select></div>';
 }
+// Timeframe(s): Colins Notion hat TF als Multi-Select, ein Trade kann also mehrere
+// gleichzeitig haben (z.B. "3D" + "1W"). Deshalb Checkboxen statt einem Text-/Zahlenfeld.
+const TL_TF_OPTIONEN = ['15m','1H','4H','12H','1D','3D','1W','2W'];
+function tlFeldTfMulti(klasse, ausgewaehlt){
+  const sel = new Set((Array.isArray(ausgewaehlt) ? ausgewaehlt : (ausgewaehlt ? [ausgewaehlt] : [])).map(String));
+  return '<div class="tl-feld tl-feld-tf-multi"><div class="tl-feld-l">Timeframe(s)</div>' +
+    '<div class="tl-tf-chips '+klasse+'">' +
+    TL_TF_OPTIONEN.map(tf =>
+      '<label class="tl-tf-chip'+(sel.has(tf)?' checked':'')+'">' +
+        '<input type="checkbox" value="'+tf+'"'+(sel.has(tf)?' checked':'')+'> '+tf +
+      '</label>'
+    ).join('') +
+    '</div></div>';
+}
 
 function renderTradeLogDetail(trade, shots, zielEl){
   const felder = [
@@ -862,7 +890,7 @@ function renderTradeLogDetail(trade, shots, zielEl){
     tlFeldSelect('Side', 'tle-side', trade.side, ['Long','Short']),
     tlFeldInput('Asset', 'tle-asset', trade.asset, 'text'),
     tlFeldInput('Ticker (für Icon/Kurs)', 'tle-ticker', trade.ticker || '', 'text'),
-    tlFeldInput('Timeframe', 'tle-tf', trade.tf || '', 'text'),
+    tlFeldTfMulti('tle-tf', trade.tf),
     tlFeldInput('Trade-Name', 'tle-name', trade.name || '', 'text'),
     tlFeldInput('Strategie', 'tle-strategy', trade.strategy || '', 'text'),
     tlFeldInput('Entry', 'tle-entry1', trade.entry1, 'number'),
@@ -888,6 +916,9 @@ function renderTradeLogDetail(trade, shots, zielEl){
       '<span class="te-msg tle-msg"></span>' +
     '</div>';
   renderTradeLogShots(trade.id, shots, document.getElementById('tl-shots-'+trade.id));
+  zielEl.querySelectorAll('.tle-tf .tl-tf-chip input').forEach(cb => {
+    cb.addEventListener('change', () => cb.closest('.tl-tf-chip').classList.toggle('checked', cb.checked));
+  });
 
   zielEl.querySelector('.tle-save').addEventListener('click', () => tlSpeichereDetail(trade.id, zielEl));
   zielEl.querySelector('.tle-delete').addEventListener('click', () => tlLoescheTrade(trade.id, zielEl));
@@ -903,7 +934,7 @@ async function tlSpeichereDetail(id, zielEl){
     side: val('tle-side'),
     name: val('tle-name').trim() || null,
     strategy: val('tle-strategy').trim() || null,
-    tf: val('tle-tf').trim() || null,
+    tf: Array.from(zielEl.querySelectorAll('.tle-tf input:checked')).map(cb => cb.value),
     entry1: num(val('tle-entry1')), entry2: num(val('tle-entry2')),
     size1: num(val('tle-size1')), size2: num(val('tle-size2')),
     sl: num(val('tle-sl')), tp: num(val('tle-tp')), exit: num(val('tle-exit')),
@@ -1115,13 +1146,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
   // Icon je Asset: bekannte Ticker als farbiges SVG-Logo (CDN, mit Fallback-Buchstaben-Icon
   // bei fehlendem Logo), damit gleiche Assets im Chart und in der Tabelle immer gleich aussehen.
   function assetIconHtml(asset){
-    const ticker = String(asset || '').toLowerCase().replace(/[^a-z0-9]/g,'');
-    const buchstabe = esc((asset || '?').trim().slice(0,3).toUpperCase());
-    return '<span class="wl-icon">' +
-      '<img src="https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/'+ticker+'.svg" alt="" ' +
-        'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
-      '<span class="wl-icon-fallback" style="display:none">'+buchstabe+'</span>' +
-    '</span>';
+    return coinIconWlHtml(asset, asset);
   }
   function statusOptionsHtml(aktuell){
     const a = aktuell || '';

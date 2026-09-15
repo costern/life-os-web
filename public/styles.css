@@ -349,6 +349,12 @@ a { color:var(--accent); }
   border:1px solid var(--line); border-radius:7px; background:var(--input-bg); color:var(--ink); }
 .tl-feld-input:focus { outline:none; border-color:var(--accent); }
 .tl-save-row { display:flex; align-items:center; gap:10px; margin-top:16px; }
+.tl-feld-tf-multi { grid-column: span 2; }
+.tl-tf-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.tl-tf-chip { display:inline-flex; align-items:center; gap:4px; font-size:12px; padding:4px 9px;
+  border-radius:99px; border:1px solid var(--line); background:var(--input-bg); color:var(--muted); cursor:pointer; user-select:none; }
+.tl-tf-chip input { margin:0; accent-color: var(--accent); }
+.tl-tf-chip.checked { border-color:var(--accent); background:var(--badge-blue-bg); color:var(--accent); }
 
 /* Trading-Log: Screenshots (z.B. aus TradingView mit eigenen Einzeichnungen) statt
    automatisch gezeichnetem Chart. */
