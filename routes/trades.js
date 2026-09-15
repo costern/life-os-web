@@ -101,9 +101,19 @@ router.get('/:id/klines', async (req, res) => {
       if (spanMs / msVal <= 1000) { interval = iv; ms = msVal; break; }
     }
   }
-  // Etwas Vorlauf vor dem Trade-Start zeigen, damit man den Kontext (z.B. den Boden vorm
-  // Einstieg) noch sieht - 15 Kerzen des gewaehlten Intervalls, min. 1 Tag, max. 20 Tage.
-  const vorlauf = Math.min(Math.max(ms * 15, 86400000), 20 * 86400000);
+  // Vorlauf vor dem Trade-Start, damit man den Kontext (z.B. den Boden vorm Einstieg) noch
+  // sieht - standardmaessig 100 Kerzen des gewaehlten Intervalls, per ?vorlaufKerzen=
+  // vom Frontend aus einstellbar (Colin will selbst entscheiden, wie viel Chart er sieht).
+  const gewuenschteVorlaufKerzen = parseInt(req.query.vorlaufKerzen, 10);
+  const vorlaufKerzen = (Number.isFinite(gewuenschteVorlaufKerzen) && gewuenschteVorlaufKerzen > 0)
+    ? Math.min(gewuenschteVorlaufKerzen, 1000) : 100;
+  let vorlauf = Math.max(ms * vorlaufKerzen, ms);
+  // Binance liefert max. 1000 Kerzen pro Anfrage. Wuerde die Gesamtspanne (Vorlauf + Trade-
+  // Dauer) das ueberschreiten, wird der Vorlauf gekuerzt - sonst wuerden die neueren Kerzen
+  // (also der eigentliche Trade) abgeschnitten statt der alten.
+  const dauerMs = (end - start) + ms;
+  const maxGesamtMs = ms * 950;
+  if (vorlauf + dauerMs > maxGesamtMs) vorlauf = Math.max(maxGesamtMs - dauerMs, ms);
   const url = 'https://api.binance.com/api/v3/klines?symbol=' + encodeURIComponent(symbol) +
     '&interval=' + interval + '&startTime=' + (start - vorlauf) + '&endTime=' + (end + ms) + '&limit=1000';
   try {
@@ -116,6 +126,7 @@ router.get('/:id/klines', async (req, res) => {
     if (!Array.isArray(data)) throw new Error((data && data.msg) || 'unerwartete Antwort');
     res.json({
       interval,
+      vorlaufKerzen,
       candles: data.map(k => [k[0], Number(k[1]), Number(k[2]), Number(k[3]), Number(k[4])])
     });
   } catch (e) {

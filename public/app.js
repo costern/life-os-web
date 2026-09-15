@@ -840,6 +840,19 @@ function tlIntervallVonTf(tf){
   return TL_TF_ZU_INTERVALL[erstes] || null;
 }
 
+// Wie viele Kerzen Vorlauf vor dem Trade-Start geladen werden - je Trade einstellbar (Eingabefeld
+// im Chart), damit Colin selbst entscheiden kann, wie viel Chart er vorher noch sehen will.
+const TL_VORLAUF_STANDARD = 100;
+let tlVorlaufKerzen = {};
+
+function tlKlinesUrl(id, trade, vorlaufKerzen){
+  const intervall = tlIntervallVonTf(trade.tf);
+  const params = [];
+  if (intervall) params.push('interval='+intervall);
+  params.push('vorlaufKerzen='+vorlaufKerzen);
+  return '/trades/'+id+'/klines?'+params.join('&');
+}
+
 async function tlOeffneDetail(id){
   const zeile = document.querySelector('.tl-detail-row[data-detail-id="'+id+'"]');
   if (!zeile) return;
@@ -849,14 +862,29 @@ async function tlOeffneDetail(id){
   const zielEl = document.getElementById('tl-detail-'+id);
   if (!trade || !zielEl) return;
   zielEl.innerHTML = '<div class="empty">Lade…</div>';
-  const intervall = tlIntervallVonTf(trade.tf);
-  const klinesUrl = '/trades/'+id+'/klines' + (intervall ? '?interval='+intervall : '');
+  const vorlauf = tlVorlaufKerzen[id] || TL_VORLAUF_STANDARD;
   const [events, kl] = await Promise.all([
     api('/trades/'+id+'/events').catch(() => []),
-    api(klinesUrl).catch(e => ({ error: e.message }))
+    api(tlKlinesUrl(id, trade, vorlauf)).catch(e => ({ error: e.message }))
   ]);
   if (tlOffenId !== id) return; // Auswahl hat sich schon wieder geaendert
   renderTradeLogDetail(trade, events, kl, zielEl);
+}
+
+// Vorlauf (Anzahl Kerzen vor Trade-Start) neu laden, ohne den Rest der Detailansicht
+// (Felder etc.) neu aufzubauen - nur Kursdaten neu holen und Chart neu zeichnen.
+async function tlAendereVorlauf(id, kerzen){
+  const n = Math.max(5, Math.min(1000, Math.round(kerzen) || TL_VORLAUF_STANDARD));
+  tlVorlaufKerzen[id] = n;
+  delete tlZoomDomains[id];
+  const el = document.getElementById('tl-chart-'+id);
+  const d = tlLetzteDaten[id];
+  const trade = d ? d.trade : tlTrades.find(r => r.id === id);
+  if (!el || !trade) return;
+  el.innerHTML = '<div class="empty">Lade…</div>';
+  const events = d ? d.events : await api('/trades/'+id+'/events').catch(() => []);
+  const kl = await api(tlKlinesUrl(id, trade, n)).catch(e => ({ error: e.message }));
+  zeichneTradeLog(trade, events, kl, el);
 }
 
 function tlDatetimeInputWert(iso){
@@ -1075,9 +1103,13 @@ function zeichneTradeLog(trade, events, kl, el){
 
   const fehlerHtml = (kl && kl.error) ? '<div class="tl-kursfehler muted">Kursverlauf nicht ladbar: '+esc(kl.error)+'</div>' : '';
   const resetHtml = zoom ? '<button type="button" class="btn ghost tl-zoom-reset">Zoom zurücksetzen</button>' : '';
+  const vorlaufHtml =
+    '<label class="tl-vorlauf-label">Kerzen davor ' +
+      '<input type="number" class="tl-vorlauf-input" min="5" max="1000" step="5" value="'+(tlVorlaufKerzen[trade.id] || TL_VORLAUF_STANDARD)+'">' +
+    '</label>';
 
   el.innerHTML =
-    '<div class="tl-chart-toolbar">'+resetHtml+'<span class="muted tl-zoom-hinweis">zum Reinzoomen einen Bereich aufziehen · Doppelklick setzt zurück</span></div>' +
+    '<div class="tl-chart-toolbar">'+resetHtml+vorlaufHtml+'<span class="muted tl-zoom-hinweis">zum Reinzoomen einen Bereich aufziehen · Doppelklick setzt zurück</span></div>' +
     '<svg viewBox="0 0 '+B+' '+H+'" class="tl-svg" preserveAspectRatio="none" id="tl-svg-'+trade.id+'">' +
       gitterHtml + xLabelHtml +
       kerzenHtml +
@@ -1130,6 +1162,8 @@ function zeichneTradeLog(trade, events, kl, el){
   hit.addEventListener('dblclick', () => { delete tlZoomDomains[trade.id]; neuZeichnen(); });
   const resetBtn = el.querySelector('.tl-zoom-reset');
   if (resetBtn) resetBtn.addEventListener('click', () => { delete tlZoomDomains[trade.id]; neuZeichnen(); });
+  const vorlaufInput = el.querySelector('.tl-vorlauf-input');
+  if (vorlaufInput) vorlaufInput.addEventListener('change', () => tlAendereVorlauf(trade.id, Number(vorlaufInput.value)));
 }
 
 /* ---------- Double-Bottom-Watchlist: urspruenglich aus Obsidian importiert, jetzt direkt
