@@ -826,29 +826,17 @@ function tlToggleDetail(id){
   tlOeffneDetail(id);
 }
 
-// Wandelt Colins Timeframe-Kuerzel (wie in der Watchlist/im Trading-Log geschrieben)
-// in ein Binance-Kerzen-Intervall um, damit der Chart im selben Timeframe wie der
-// Trade gezeichnet wird. Bei mehreren Timeframes (z.B. "3D, 1W") zaehlt das erste.
-const TL_TF_ZU_INTERVALL = {
-  '1M':'1m', '3M':'3m', '5M':'5m', '15M':'15m', '30M':'30m',
-  '1H':'1h', '2H':'2h', '4H':'4h', '6H':'6h', '8H':'8h', '12H':'12h',
-  '1D':'1d', '3D':'3d', '1W':'1w'
-};
-function tlIntervallVonTf(tf){
-  if (!tf) return null;
-  const erstes = String(tf).split(/[,/]/)[0].trim().toUpperCase().replace(/\s+/g,'');
-  return TL_TF_ZU_INTERVALL[erstes] || null;
-}
-
 // Wie viele Kerzen Vorlauf vor dem Trade-Start geladen werden - je Trade einstellbar (Eingabefeld
 // im Chart), damit Colin selbst entscheiden kann, wie viel Chart er vorher noch sehen will.
 const TL_VORLAUF_STANDARD = 100;
 let tlVorlaufKerzen = {};
 
+// Die eigentliche Kerzenlaenge (z.B. "2W" -> 2-Wochen-Kerzen) legt der Server anhand des
+// Timeframes des Trades fest (siehe /trades/:id/klines) - hier wird das TF-Feld nur
+// durchgereicht, ohne 1D falls es fehlt (Server faellt dann selbst auf Tageschart zurueck).
 function tlKlinesUrl(id, trade, vorlaufKerzen){
-  const intervall = tlIntervallVonTf(trade.tf);
   const params = [];
-  if (intervall) params.push('interval='+intervall);
+  if (trade.tf) params.push('tf='+encodeURIComponent(trade.tf));
   params.push('vorlaufKerzen='+vorlaufKerzen);
   return '/trades/'+id+'/klines?'+params.join('&');
 }
