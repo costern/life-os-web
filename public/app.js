@@ -1063,6 +1063,11 @@ async function tlLoescheScreenshot(tradeId, shotId, el){
 // geliefert hat: be_win = 2R erreicht (SL stand schon auf BE), be_loss = 2R nie erreicht.
 const WL_FARBEN = { win:'var(--green)', be_win:'var(--amber)', be_loss:'var(--orange)',
   lose:'var(--red)', no_entry:'var(--accent)', '':'var(--muted)' };
+// Event-Typ auf den ersten Blick unterscheidbar machen: Double Bottom (zwei saubere
+// Retests, schoener Bogen dazwischen) = gruen, Single Bottom (kurz, meist 1-2 Kerzen,
+// eher Konsolidierung, nur Bestaetigungssignal statt eigenes Trade-Signal) = orange.
+const WL_EVENT_FARBEN = { double:'var(--green)', single:'var(--orange)' };
+const WL_EVENT_LABEL = { double:'Double', single:'Single' };
 const WL_LABEL = { win:'Win', be_win:'BE Win', be_loss:'BE Loss', lose:'Lose',
   no_entry:'No Entry', '':'Noch nicht bewertet' };
 const WL_STATUS_HINT = { win:'Win', be_win:'BE Win (2R erreicht)',
@@ -1099,6 +1104,20 @@ function wlSetupText(s){
   if (s.multiAsset) teile.push('Multi-Asset');
   if (s.form) teile.push(WL_FORM_LABEL[s.form] || s.form);
   return teile.join(' · ');
+}
+// Wie wlSetupText, aber ohne den Event-Typ - der bekommt in der Tabelle ein eigenes,
+// farbiges Badge statt im grauen Fliesstext unterzugehen (siehe WL_EVENT_FARBEN).
+function wlSetupRestText(s){
+  const teile = [];
+  if (s.mtf > 1) teile.push('MTF ' + s.mtf);
+  if (s.multiAsset) teile.push('Multi-Asset');
+  if (s.form) teile.push(WL_FORM_LABEL[s.form] || s.form);
+  return teile.join(' · ');
+}
+function wlEventBadgeHtml(s){
+  if (!s.eventTyp) return '';
+  const farbe = WL_EVENT_FARBEN[s.eventTyp];
+  return '<span class="badge" style="background:transparent;border:1.5px solid '+farbe+';color:'+farbe+'">'+WL_EVENT_LABEL[s.eventTyp]+'</span>';
 }
 
 /* Tägliche BTC/USD-Schlusskurse (Binance BTCUSDT, ab 17.08.2017 = Handelsstart des Paares). */
@@ -1371,7 +1390,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       const tagAnzahl = gleicherTag(s);
       const tagBadge = tagAnzahl ? ' <span class="wl-sameday">'+tagAnzahl+'× selber Tag</span>' : '';
       const st = wlStatus(s);
-      const setup = wlSetupText(s);
+      const setupRest = wlSetupRestText(s);
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
       return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'"'+tradeAttr+' title="Doppelklick für Details">' +
         '<td class="muted">'+esc(wlDatumLabel(s)) +
@@ -1384,7 +1403,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '</td>' +
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+esc(s.tf||'–')+'</td>' +
-        '<td class="muted">'+(setup ? esc(setup) : '–')+'</td>' +
+        '<td class="wl-setup-cell">'+wlEventBadgeHtml(s)+(setupRest ? ' <span class="muted">'+esc(setupRest)+'</span>' : (s.eventTyp ? '' : '<span class="muted">–</span>'))+'</td>' +
         '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+'</td>' +
         '<td class="muted">'+
           ([s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '']

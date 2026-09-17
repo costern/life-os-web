@@ -157,6 +157,10 @@ section.page { display:none; } section.page.active { display:block; }
   background:var(--hover-bg); font-size:10px; font-weight:600; white-space:nowrap; }
 .wl-note { display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px; font-weight:700;
   border:1.5px solid; white-space:nowrap; }
+/* Event-Typ (Single/Double Bottom) als farbiges Badge, auf einen Blick von der grauen
+   Rest-Setup-Info (MTF, Multi-Asset, Form) unterscheidbar. */
+.wl-setup-cell { white-space:nowrap; }
+.wl-setup-cell .badge { font-weight:700; }
 .wl-table tr.wl-trade-hover td { background:var(--badge-blue-bg); }
 .wl-table tr.wl-trade-hover td:first-child { border-left-color:var(--accent); }
 .wl-trade-linie { fill:none; stroke-width:1.5; stroke-dasharray:4,3;
