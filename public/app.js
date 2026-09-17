@@ -1067,7 +1067,7 @@ const WL_FARBEN = { win:'var(--green)', be_win:'var(--amber)', be_loss:'var(--or
 // Retests, schoener Bogen dazwischen) = gruen, Single Bottom (kurz, meist 1-2 Kerzen,
 // eher Konsolidierung, nur Bestaetigungssignal statt eigenes Trade-Signal) = orange.
 const WL_EVENT_FARBEN = { double:'var(--green)', single:'var(--orange)' };
-const WL_EVENT_LABEL = { double:'Double', single:'Single' };
+const WL_EVENT_LABEL = { double:'Double', single:'Quick' };
 const WL_LABEL = { win:'Win', be_win:'BE Win', be_loss:'BE Loss', lose:'Lose',
   no_entry:'No Entry', '':'Noch nicht bewertet' };
 const WL_STATUS_HINT = { win:'Win', be_win:'BE Win (2R erreicht)',
@@ -1099,7 +1099,7 @@ const wlTradeKey = s => (s.tradeId && String(s.tradeId).trim()) ? 't:' + String(
 // Kurzfassung des Setups fuer die Tabellenspalte, z.B. "Double · MTF 2 · Multi-Asset · Bogen"
 function wlSetupText(s){
   const teile = [];
-  if (s.eventTyp) teile.push(s.eventTyp === 'double' ? 'Double' : 'Single');
+  if (s.eventTyp) teile.push(WL_EVENT_LABEL[s.eventTyp] || s.eventTyp);
   if (s.mtf > 1) teile.push('MTF ' + s.mtf);
   if (s.multiAsset) teile.push('Multi-Asset');
   if (s.form) teile.push(WL_FORM_LABEL[s.form] || s.form);
@@ -1430,7 +1430,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           '<label>Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
           '<label>Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
           '<label>Setup-Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
-          '<label>Event'+auswahlHtml('wle-event', [['','–'],['single','Single Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
+          '<label>Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
           '<label>Multi-Timeframe'+auswahlHtml('wle-mtf', [['','–'],['1','1 Timeframe'],['2','2 Timeframes'],['3','3 Timeframes']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label>Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
           '<label>Pattern'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
