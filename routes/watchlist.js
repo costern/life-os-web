@@ -16,7 +16,7 @@ const FORMEN = new Set(['bogen', 'bogen_unsauber', 'kein_bogen']);
 const NOTEN = new Set(['A++', 'A+', 'A', 'B']);
 const MARKTPHASEN = new Set(['uptrend', 'downtrend', 'ranging']);
 const PATTERN = new Set(['valid', 'clean', 'choppy']);
-const CANDLES = new Set(['pivot', 'decent', 'gap', 'mini']);
+const CANDLES = new Set(['choppy', 'decent', 'gap', 'mini']);
 const DIVERGENZEN = new Set(['rsi', 'none', 'hidden']);
 
 // Uhrzeit: "HH:MM" bzw. "HH:MM:SS" aus dem Formular, sonst nicht gesetzt

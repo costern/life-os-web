@@ -1077,7 +1077,7 @@ const WL_FORM_LABEL = { bogen:'Bogen', bogen_unsauber:'Bogen unsauber', kein_bog
 // Chart-Eigenschaften, aus denen zusammen mit der eigenen Einschaetzung die Note entsteht
 const WL_PHASE_LABEL = { uptrend:'Uptrend', downtrend:'Downtrend', ranging:'Range', '':'–' };
 const WL_PATTERN_LABEL = { valid:'valid', clean:'clean', choppy:'choppy', '':'–' };
-const WL_CANDLE_LABEL = { pivot:'Pivot Candles', decent:'Decent Candles', gap:'Gap Candles', mini:'Mini Candles', '':'–' };
+const WL_CANDLE_LABEL = { choppy:'Choppy Candles', decent:'Decent Candles', gap:'Gap Candles', mini:'Mini Candles (Doji/Hammer/Shooting Star)', '':'–' };
 const WL_DIV_LABEL = { rsi:'RSI Div.', none:'No Div.', hidden:'RSI Hidden Div.', '':'–' };
 const WL_DIV_KURZ = { rsi:'RSI', none:'keine', hidden:'Hidden', '':'–' };
 const wlStatus = s => s.status || '';
@@ -1434,7 +1434,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           '<label>Multi-Timeframe'+auswahlHtml('wle-mtf', [['','–'],['1','1 Timeframe'],['2','2 Timeframes'],['3','3 Timeframes']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label>Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
           '<label>Pattern'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
-          '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['pivot','Pivot Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles']], s.candles)+'</label>' +
+          '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
           '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['rsi','RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
           '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['rsi','RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
