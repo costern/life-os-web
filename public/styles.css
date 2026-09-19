@@ -334,13 +334,17 @@ a { color:var(--accent); }
 .tl-table th { text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
   padding:6px 10px; white-space:nowrap; border-bottom:1px solid var(--line); }
 .tl-table td { padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+/* "Trade" (5.) und "Strategie" (6.) Spalte koennen lange Texte enthalten (z.B. "Migitierte
+   Bullische Divergenz"). Mit white-space:nowrap ueberall zwingen lange Eintraege die ganze
+   Tabelle breiter zu werden, als die Karte ist - der eigentliche Grund, warum die Tabelle
+   (und damit auch die Screenshot-Zeile darunter) nur zu einem Teil sichtbar war und der
+   Rest per Horizontal-Scroll verborgen blieb. Fuer diese zwei Spalten daher Zeilenumbruch
+   statt einer festen Breite erlauben - das haelt die Tabelle innerhalb der Kartenbreite. */
+.tl-table td:nth-child(5), .tl-table td:nth-child(6) { white-space:normal; max-width:200px; }
 .tl-monat-row td { padding:10px 10px 6px; font-size:11.5px; font-weight:700; text-transform:uppercase;
   letter-spacing:.06em; color:var(--muted); border-bottom:none; background:var(--hover-bg); }
 .tl-row2 { cursor:pointer; }
 .tl-row2:hover td { background:var(--hover-bg); }
-/* width:0 zwingt den Browser, die Breite dieser (colspan-)Zelle an den Tabellenrahmen zu
-   binden statt an den Inhalt - ohne das blaeht das Screenshot-Grid unten die Zelle ueber
-   die Kartenbreite hinaus auf (klassischer Grid-in-table-cell-Bug). */
 .tl-detail-row td { padding:0; border-bottom:1px solid var(--line); white-space:normal; width:0; }
 .tl-detail-row > td > div { padding:14px 10px 18px; }
 .tl-side { font-size:11px; font-weight:700; padding:2px 9px; border-radius:99px; }
@@ -371,15 +375,14 @@ a { color:var(--accent); }
    Colins Screenshots sind sehr breite/flache Chart-Ausschnitte (kein festes Seitenverhaeltnis) -
    deshalb KEIN aspect-ratio auf der Kachel: die Kachel wird volle Spaltenbreite, das Bild
    bekommt height:auto und behaelt so sein eigenes Verhaeltnis statt in einer festen Box
-   mit viel grauem Letterboxing zu verschwinden. Flexbox statt CSS-Grid: eine
-   auto-fill/minmax-Grid-Spur bekommt innerhalb einer <td> mit Auto-Layout eine
-   unbegrenzte "max-content"-Breite (ein Track pro Bild bei der Mindestbreite), was die
-   Tabellenzelle weit ueber ihre eigentliche Breite hinaus aufblaehen kann. Flexbox mit
-   wrap blaeht die Zelle nicht auf dieselbe Weise auf, daher hier die robuste Wahl. */
+   mit viel grauem Letterboxing zu verschwinden. (Die Tabelle war zuvor nicht wegen dieses
+   Grids/Flexbox zu breit, sondern weil die Spalten "Trade"/"Strategie" lange Texte per
+   white-space:nowrap erzwungen haben, siehe Kommentar oben bei .tl-table td - das ist jetzt
+   behoben, dadurch passt diese Zeile jetzt wirklich von ganz links nach ganz rechts.) */
 .tl-shots-grid { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
 .tl-shot-thumb { position:relative; border-radius:8px; overflow:hidden;
   border:1px solid var(--line); cursor:zoom-in; background:var(--hover-bg); line-height:0;
-  flex:1 1 300px; min-width:220px; max-width:100%; }
+  flex:1 1 340px; min-width:260px; max-width:100%; }
 .tl-shot-thumb img { display:block; width:100%; height:auto; }
 .tl-shot-del { position:absolute; top:5px; right:5px; font-size:12px; line-height:1; padding:4px 7px;
   border-radius:5px; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; }
