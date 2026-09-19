@@ -838,6 +838,67 @@ function tlToggleDetail(id){
   tlOeffneDetail(id);
 }
 
+/* ---------- Trading-Log: Galerie-Ansicht (Alternative zur Tabelle) - eine Kachel pro
+   Trade mit dem ersten Screenshot als Cover, wie Colins Notion-Galerie. Nutzt denselben
+   Screenshot-Endpoint wie die Detailansicht, gecacht, damit ein Tab-Wechsel nicht jedes
+   Mal alle Trades neu abfragt. ---------- */
+let tlAnsicht = 'tabelle';
+const tlShotsCache = {};
+async function tlLiesShotsGecacht(id){
+  if (!tlShotsCache[id]) tlShotsCache[id] = api('/trades/'+id+'/screenshots').catch(() => []);
+  return tlShotsCache[id];
+}
+
+async function renderTradeLogGalerie(){
+  const el = document.getElementById('tradeLogGalerie');
+  if (!el) return;
+  if (!tlTrades.length){ el.innerHTML = '<div class="empty">Noch keine Trades</div>'; return; }
+  const shotsListen = await Promise.all(tlTrades.map(r => tlLiesShotsGecacht(r.id)));
+  el.innerHTML = '<div class="tl-gallery-grid">' +
+    tlTrades.map((r, i) => {
+      const shots = shotsListen[i] || [];
+      const cover = shots.length
+        ? '<img src="/api/trades/'+r.id+'/screenshots/'+shots[0].id+'/image" loading="lazy" alt="">' +
+          (shots.length > 1 ? '<span class="tl-gallery-count">+'+(shots.length-1)+'</span>' : '')
+        : '<div class="tl-gallery-noshot">🖼️</div>';
+      return '<div class="tl-gallery-card" data-id="'+r.id+'" title="Details öffnen">' +
+        '<div class="tl-gallery-cover">'+cover+'</div>' +
+        '<div class="tl-gallery-meta">' +
+          '<div class="tl-gallery-titel">'+tlAssetIconHtml(r)+' '+esc(r.name || r.asset)+'</div>' +
+          '<div class="tl-gallery-sub">'+tlDatKurz(r.openedAt)+' · '+tlErgebnisHtml(r)+'</div>' +
+        '</div>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+  el.querySelectorAll('.tl-gallery-card').forEach(card => {
+    card.addEventListener('click', () => tlGalerieOeffneTrade(+card.dataset.id));
+  });
+}
+
+function tlGalerieOeffneTrade(id){
+  const tabTabelle = document.querySelector('.tl-view-tab[data-tlview="tabelle"]');
+  if (tabTabelle) tabTabelle.click();
+  if (tlOffenId !== id) tlToggleDetail(id);
+  setTimeout(() => {
+    const zeile = document.querySelector('.tl-row2[data-id="'+id+'"]');
+    if (zeile) zeile.scrollIntoView({ behavior:'smooth', block:'center' });
+  }, 30);
+}
+
+function tlSetupViewTabs(){
+  document.querySelectorAll('.tl-view-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('active')) return;
+      tlAnsicht = btn.dataset.tlview;
+      document.querySelectorAll('.tl-view-tab').forEach(b => b.classList.toggle('active', b === btn));
+      document.getElementById('tradeLogTabelle').hidden = tlAnsicht !== 'tabelle';
+      document.getElementById('tradeLogGalerie').hidden = tlAnsicht !== 'galerie';
+      if (tlAnsicht === 'galerie') renderTradeLogGalerie();
+    });
+  });
+}
+tlSetupViewTabs();
+
 async function tlOeffneDetail(id){
   const zeile = document.querySelector('.tl-detail-row[data-detail-id="'+id+'"]');
   if (!zeile) return;
@@ -1036,6 +1097,7 @@ async function tlLadeScreenshotHoch(tradeId, file, el){
   try {
     const dataUrl = await tlLiesAlsDataUrl(file);
     await api('/trades/'+tradeId+'/screenshots', { method:'POST', body: JSON.stringify({ imageBase64: dataUrl }) });
+    delete tlShotsCache[tradeId]; // Galerie-Cache invalidieren, damit das neue Cover-Bild ankommt
     const shots = await api('/trades/'+tradeId+'/screenshots').catch(() => []);
     renderTradeLogShots(tradeId, shots, el);
   } catch(e){
@@ -1049,6 +1111,7 @@ async function tlLoescheScreenshot(tradeId, shotId, el){
   if (btn && btn.textContent !== '✓') { btn.textContent = '✓'; btn.title = 'Wirklich löschen?'; return; }
   try {
     await api('/trades/'+tradeId+'/screenshots/'+shotId, { method:'DELETE' });
+    delete tlShotsCache[tradeId]; // Galerie-Cache invalidieren
     const shots = await api('/trades/'+tradeId+'/screenshots').catch(() => []);
     renderTradeLogShots(tradeId, shots, el);
   } catch(e){
