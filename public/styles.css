@@ -371,17 +371,21 @@ a { color:var(--accent); }
    Colins Screenshots sind sehr breite/flache Chart-Ausschnitte (kein festes Seitenverhaeltnis) -
    deshalb KEIN aspect-ratio auf der Kachel: die Kachel wird volle Spaltenbreite, das Bild
    bekommt height:auto und behaelt so sein eigenes Verhaeltnis statt in einer festen Box
-   mit viel grauem Letterboxing zu verschwinden. align-items:start, damit unterschiedlich
-   hohe Bilder in derselben Reihe sich nicht gegenseitig auf gleiche Hoehe stauchen. */
-.tl-shots-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px; align-items:start; }
+   mit viel grauem Letterboxing zu verschwinden. Flexbox statt CSS-Grid: eine
+   auto-fill/minmax-Grid-Spur bekommt innerhalb einer <td> mit Auto-Layout eine
+   unbegrenzte "max-content"-Breite (ein Track pro Bild bei der Mindestbreite), was die
+   Tabellenzelle weit ueber ihre eigentliche Breite hinaus aufblaehen kann. Flexbox mit
+   wrap blaeht die Zelle nicht auf dieselbe Weise auf, daher hier die robuste Wahl. */
+.tl-shots-grid { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
 .tl-shot-thumb { position:relative; border-radius:8px; overflow:hidden;
-  border:1px solid var(--line); cursor:zoom-in; background:var(--hover-bg); line-height:0; }
+  border:1px solid var(--line); cursor:zoom-in; background:var(--hover-bg); line-height:0;
+  flex:1 1 300px; min-width:220px; max-width:100%; }
 .tl-shot-thumb img { display:block; width:100%; height:auto; }
 .tl-shot-del { position:absolute; top:5px; right:5px; font-size:12px; line-height:1; padding:4px 7px;
   border-radius:5px; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; }
 .tl-shot-upload { display:flex; align-items:center; justify-content:center; min-height:110px;
   border-radius:8px; border:1px dashed var(--line); color:var(--muted); font-size:28px; cursor:pointer;
-  background:transparent; }
+  background:transparent; flex:0 0 140px; }
 .tl-shot-upload:hover { border-color:var(--accent); color:var(--accent); }
 .tl-lightbox { position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex;
   align-items:center; justify-content:center; z-index:999; cursor:zoom-out; padding:24px; }
