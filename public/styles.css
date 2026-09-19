@@ -361,11 +361,17 @@ a { color:var(--accent); }
 .tl-feld-input:focus { outline:none; border-color:var(--accent); }
 .tl-save-row { display:flex; align-items:center; gap:10px; margin-top:16px; }
 .tl-feld-tf-multi { grid-column: span 2; }
-.tl-tf-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
-.tl-tf-chip { display:inline-flex; align-items:center; gap:4px; font-size:12px; padding:4px 9px;
-  border-radius:99px; border:1px solid var(--line); background:var(--input-bg); color:var(--muted); cursor:pointer; user-select:none; }
-.tl-tf-chip input { margin:0; accent-color: var(--accent); }
-.tl-tf-chip.checked { border-color:var(--accent); background:var(--badge-blue-bg); color:var(--accent); }
+/* Nur die ausgewaehlten Timeframes werden als Chip gezeigt (statt immer alle 8 Optionen);
+   neue kommen ueber das kleine "+"-Dropdown dazu, das nur noch die uebrigen Optionen listet. */
+.tl-tf-chips { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px; }
+.tl-tf-chip { display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:4px 6px 4px 9px;
+  border-radius:99px; border:1px solid var(--accent); background:var(--badge-blue-bg); color:var(--accent); }
+.tl-tf-chip-x { border:none; background:none; color:inherit; cursor:pointer; font-size:13px; line-height:1;
+  padding:0 1px; opacity:.7; }
+.tl-tf-chip-x:hover { opacity:1; }
+.tl-tf-add { font-family:inherit; font-size:12px; padding:4px 8px; border-radius:99px;
+  border:1px dashed var(--line); background:transparent; color:var(--muted); cursor:pointer; }
+.tl-tf-add:focus { outline:none; border-color:var(--accent); }
 
 /* Trading-Log: Screenshots (z.B. aus TradingView mit eigenen Einzeichnungen) statt
    automatisch gezeichnetem Chart. */
@@ -382,13 +388,13 @@ a { color:var(--accent); }
 .tl-shots-grid { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
 .tl-shot-thumb { position:relative; border-radius:8px; overflow:hidden;
   border:1px solid var(--line); cursor:zoom-in; background:var(--hover-bg); line-height:0;
-  flex:1 1 340px; min-width:260px; max-width:100%; }
+  flex:1 1 380px; min-width:290px; max-width:100%; }
 .tl-shot-thumb img { display:block; width:100%; height:auto; }
 .tl-shot-del { position:absolute; top:5px; right:5px; font-size:12px; line-height:1; padding:4px 7px;
   border-radius:5px; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; }
 .tl-shot-upload { display:flex; align-items:center; justify-content:center; min-height:110px;
   border-radius:8px; border:1px dashed var(--line); color:var(--muted); font-size:28px; cursor:pointer;
-  background:transparent; flex:0 0 140px; }
+  background:transparent; flex:0 0 110px; }
 .tl-shot-upload:hover { border-color:var(--accent); color:var(--accent); }
 .tl-lightbox { position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex;
   align-items:center; justify-content:center; z-index:999; cursor:zoom-out; padding:24px; }

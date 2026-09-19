@@ -919,10 +919,11 @@ function tlDatetimeInputWert(iso){
   const pad = n => String(n).padStart(2,'0');
   return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
 }
-function tlFeldInput(label, klasse, wert, typ){
+function tlFeldInput(label, klasse, wert, typ, placeholder){
   const v = (wert === null || wert === undefined) ? '' : wert;
   return '<div class="tl-feld"><div class="tl-feld-l">'+label+'</div>' +
-    '<input class="tl-feld-input '+klasse+'" type="'+(typ||'text')+'"'+(typ==='number'?' step="any"':'')+' value="'+esc(String(v))+'"></div>';
+    '<input class="tl-feld-input '+klasse+'" type="'+(typ||'text')+'"'+(typ==='number'?' step="any"':'')+
+    (placeholder ? ' placeholder="'+esc(placeholder)+'"' : '')+' value="'+esc(String(v))+'"></div>';
 }
 function tlFeldSelect(label, klasse, wert, optionen){
   return '<div class="tl-feld"><div class="tl-feld-l">'+label+'</div>' +
@@ -931,18 +932,46 @@ function tlFeldSelect(label, klasse, wert, optionen){
     '</select></div>';
 }
 // Timeframe(s): Colins Notion hat TF als Multi-Select, ein Trade kann also mehrere
-// gleichzeitig haben (z.B. "3D" + "1W"). Deshalb Checkboxen statt einem Text-/Zahlenfeld.
+// gleichzeitig haben (z.B. "3D" + "1W"). Statt immer alle 8 Optionen als Checkboxen
+// anzuzeigen, werden nur die ausgewaehlten als Chip dargestellt; neue kommen ueber ein
+// kleines Dropdown dazu, das nur die jeweils noch uebrigen Optionen listet.
 const TL_TF_OPTIONEN = ['15m','1H','4H','12H','1D','3D','1W','2W'];
-function tlFeldTfMulti(klasse, ausgewaehlt){
-  const sel = new Set((Array.isArray(ausgewaehlt) ? ausgewaehlt : (ausgewaehlt ? [ausgewaehlt] : [])).map(String));
-  return '<div class="tl-feld tl-feld-tf-multi"><div class="tl-feld-l">Timeframe(s)</div>' +
-    '<div class="tl-tf-chips '+klasse+'">' +
-    TL_TF_OPTIONEN.map(tf =>
-      '<label class="tl-tf-chip'+(sel.has(tf)?' checked':'')+'">' +
-        '<input type="checkbox" value="'+tf+'"'+(sel.has(tf)?' checked':'')+'> '+tf +
-      '</label>'
+function tlTfChipsRender(container){
+  const sel = (container.dataset.sel || '').split(',').filter(Boolean);
+  const rest = TL_TF_OPTIONEN.filter(tf => !sel.includes(tf));
+  container.innerHTML =
+    sel.map(tf =>
+      '<span class="tl-tf-chip" data-tf="'+tf+'">'+tf+
+        '<button type="button" class="tl-tf-chip-x" aria-label="'+tf+' entfernen">×</button>' +
+      '</span>'
     ).join('') +
-    '</div></div>';
+    (rest.length
+      ? '<select class="tl-tf-add"><option value="">+ Timeframe</option>' +
+          rest.map(tf => '<option value="'+tf+'">'+tf+'</option>').join('') +
+        '</select>'
+      : '');
+  container.querySelectorAll('.tl-tf-chip-x').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tf = btn.closest('.tl-tf-chip').dataset.tf;
+      container.dataset.sel = sel.filter(t => t !== tf).join(',');
+      tlTfChipsRender(container);
+    });
+  });
+  const add = container.querySelector('.tl-tf-add');
+  if (add) add.addEventListener('change', () => {
+    if (!add.value) return;
+    container.dataset.sel = sel.concat([add.value]).join(',');
+    tlTfChipsRender(container);
+  });
+}
+function tlFeldTfMulti(klasse, ausgewaehlt){
+  const sel = (Array.isArray(ausgewaehlt) ? ausgewaehlt : (ausgewaehlt ? [ausgewaehlt] : [])).map(String);
+  return '<div class="tl-feld tl-feld-tf-multi"><div class="tl-feld-l">Timeframe(s)</div>' +
+    '<div class="tl-tf-chips '+klasse+'" data-sel="'+sel.join(',')+'"></div></div>';
+}
+function tlTfWerte(zielEl){
+  const el = zielEl.querySelector('.tle-tf');
+  return (el.dataset.sel || '').split(',').filter(Boolean);
 }
 
 function renderTradeLogDetail(trade, shots, zielEl){
@@ -950,7 +979,12 @@ function renderTradeLogDetail(trade, shots, zielEl){
     tlFeldInput('Datum', 'tle-opened', tlDatetimeInputWert(trade.openedAt), 'datetime-local'),
     tlFeldSelect('Side', 'tle-side', trade.side, ['Long','Short']),
     tlFeldInput('Asset', 'tle-asset', trade.asset, 'text'),
-    tlFeldInput('Ticker (für Icon/Kurs)', 'tle-ticker', trade.ticker || '', 'text'),
+    // Ticker wird nur gebraucht, wenn der Kurs-/Icon-Code vom Anzeigenamen abweicht
+    // (z.B. Asset "Canton" -> Ticker "CC", "Render" -> "RENDER", "Quant" -> "QNT").
+    // Ist er identisch mit Asset, bleibt das Feld leer (Platzhalter zeigt den Fallback),
+    // statt den gleichen Wert sichtbar doppelt anzuzeigen.
+    tlFeldInput('Ticker (nur falls abweichend)', 'tle-ticker',
+      (trade.ticker && trade.ticker !== trade.asset) ? trade.ticker : '', 'text', trade.asset || 'z.B. bei Gold, Silber, Canton …'),
     tlFeldTfMulti('tle-tf', trade.tf),
     tlFeldInput('Trade-Name', 'tle-name', trade.name || '', 'text'),
     tlFeldInput('Strategie', 'tle-strategy', trade.strategy || '', 'text'),
@@ -977,9 +1011,7 @@ function renderTradeLogDetail(trade, shots, zielEl){
       '<span class="te-msg tle-msg"></span>' +
     '</div>';
   renderTradeLogShots(trade.id, shots, document.getElementById('tl-shots-'+trade.id));
-  zielEl.querySelectorAll('.tle-tf .tl-tf-chip input').forEach(cb => {
-    cb.addEventListener('change', () => cb.closest('.tl-tf-chip').classList.toggle('checked', cb.checked));
-  });
+  tlTfChipsRender(zielEl.querySelector('.tle-tf'));
 
   zielEl.querySelector('.tle-save').addEventListener('click', () => tlSpeichereDetail(trade.id, zielEl));
   zielEl.querySelector('.tle-delete').addEventListener('click', () => tlLoescheTrade(trade.id, zielEl));
@@ -995,7 +1027,7 @@ async function tlSpeichereDetail(id, zielEl){
     side: val('tle-side'),
     name: val('tle-name').trim() || null,
     strategy: val('tle-strategy').trim() || null,
-    tf: Array.from(zielEl.querySelectorAll('.tle-tf input:checked')).map(cb => cb.value),
+    tf: tlTfWerte(zielEl),
     entry1: num(val('tle-entry1')), entry2: num(val('tle-entry2')),
     size1: num(val('tle-size1')), size2: num(val('tle-size2')),
     sl: num(val('tle-sl')), tp: num(val('tle-tp')), exit: num(val('tle-exit')),
