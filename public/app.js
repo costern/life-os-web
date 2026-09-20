@@ -770,6 +770,16 @@ function tlSideHtml(side){
   const kurz = side === 'Short' ? 'Short' : 'Long';
   return '<span class="tl-side tl-side-'+kurz.toLowerCase()+'">'+kurz+'</span>';
 }
+// Regulaerer Trade (nach Strategie/Plan) vs. Mistake (Trade, der gar nicht der eigenen
+// Strategie entsprach bzw. eigentlich nicht haette genommen werden sollen) - farbiges
+// Badge analog zum Double/Quick-Badge bei der Double-Bottom-Watchlist.
+const TL_ART_LABEL = { regular:'Regular', mistake:'Mistake' };
+const TL_ART_FARBEN = { regular:'var(--green)', mistake:'var(--red)' };
+function tlArtBadgeHtml(r){
+  if (!r.tradeType || !TL_ART_LABEL[r.tradeType]) return '<span class="muted">–</span>';
+  const farbe = TL_ART_FARBEN[r.tradeType];
+  return '<span class="badge" style="background:transparent;border:1.5px solid '+farbe+';color:'+farbe+'">'+TL_ART_LABEL[r.tradeType]+'</span>';
+}
 function tlAssetIconHtml(r){
   return '<span class="tl-asset-cell">' + coinIconWlHtml(r.ticker || r.asset, r.asset) + esc(r.asset) + '</span>';
 }
@@ -806,10 +816,10 @@ function renderTradeLogTabelle(){
   });
   el.innerHTML =
     '<table class="tl-table">' +
-      '<thead><tr><th>Datum</th><th>Ergebnis</th><th>Asset</th><th>Side</th><th>TF</th><th>Trade</th><th>Strategie</th></tr></thead>' +
+      '<thead><tr><th>Datum</th><th>Ergebnis</th><th>Asset</th><th>Side</th><th>TF</th><th>Art</th><th>Trade</th><th>Strategie</th></tr></thead>' +
       gruppen.map(g => (
         '<tbody>' +
-          '<tr class="tl-monat-row"><td colspan="7">'+esc(g.label)+'</td></tr>' +
+          '<tr class="tl-monat-row"><td colspan="8">'+esc(g.label)+'</td></tr>' +
           g.rows.map(r => (
             '<tr class="tl-row2" data-id="'+r.id+'" title="Doppelklick für Details">' +
               '<td>'+tlDatKurz(r.openedAt)+'</td>' +
@@ -817,10 +827,11 @@ function renderTradeLogTabelle(){
               '<td>'+tlAssetIconHtml(r)+'</td>' +
               '<td>'+tlSideHtml(r.side)+'</td>' +
               '<td>'+tlBadgesHtml(r.tf)+'</td>' +
+              '<td>'+tlArtBadgeHtml(r)+'</td>' +
               '<td>'+(r.name ? esc(r.name) : '<span class="muted">–</span>')+'</td>' +
               '<td>'+(r.strategy ? esc(r.strategy) : '<span class="muted">–</span>')+'</td>' +
             '</tr>' +
-            '<tr class="tl-detail-row" data-detail-id="'+r.id+'" hidden><td colspan="7"><div id="tl-detail-'+r.id+'"></div></td></tr>'
+            '<tr class="tl-detail-row" data-detail-id="'+r.id+'" hidden><td colspan="8"><div id="tl-detail-'+r.id+'"></div></td></tr>'
           )).join('') +
         '</tbody>'
       )).join('') +
@@ -941,6 +952,13 @@ function tlFeldSelect(label, klasse, wert, optionen){
     optionen.map(o => '<option value="'+o+'"'+(o===wert?' selected':'')+'>'+o+'</option>').join('') +
     '</select></div>';
 }
+// Wie tlFeldSelect, aber mit getrennten Werten/Labels (z.B. '' -> '–') statt Wert=Label.
+function tlFeldSelectPaare(label, klasse, wert, paare){
+  return '<div class="tl-feld"><div class="tl-feld-l">'+label+'</div>' +
+    '<select class="tl-feld-input '+klasse+'">' +
+    paare.map(([w, l]) => '<option value="'+w+'"'+(w===(wert||'')?' selected':'')+'>'+l+'</option>').join('') +
+    '</select></div>';
+}
 // Timeframe(s): Colins Notion hat TF als Multi-Select, ein Trade kann also mehrere
 // gleichzeitig haben (z.B. "3D" + "1W"). Statt immer alle 8 Optionen als Checkboxen
 // anzuzeigen, werden nur die ausgewaehlten als Chip dargestellt; neue kommen ueber ein
@@ -989,6 +1007,7 @@ function renderTradeLogDetail(trade, shots, zielEl){
     tlFeldInput('Datum', 'tle-opened', tlDatetimeInputWert(trade.openedAt), 'datetime-local'),
     tlFeldSelect('Side', 'tle-side', trade.side, ['Long','Short']),
     tlFeldInput('Asset', 'tle-asset', trade.asset, 'text'),
+    tlFeldSelectPaare('Art', 'tle-tradetype', trade.tradeType, [['','–'],['regular','Regular'],['mistake','Mistake']]),
     tlFeldTfMulti('tle-tf', trade.tf),
     tlFeldInput('Trade-Name', 'tle-name', trade.name || '', 'text'),
     tlFeldInput('Strategie', 'tle-strategy', trade.strategy || '', 'text'),
@@ -1134,6 +1153,7 @@ async function tlSpeichereDetail(id, zielEl){
     asset: val('tle-asset').trim(),
     ticker: val('tle-asset').trim(),
     side: val('tle-side'),
+    tradeType: val('tle-tradetype') || null,
     name: val('tle-name').trim() || null,
     strategy: val('tle-strategy').trim() || null,
     tf: tlTfWerte(zielEl),
@@ -1186,7 +1206,7 @@ function renderTradeLogShots(tradeId, shots, el){
   ).join('');
   el.innerHTML =
     '<div class="tl-shots-grid">' + kacheln +
-      '<label class="tl-shot-upload" title="Screenshot hochladen">+' +
+      '<label class="tl-shot-upload" title="Screenshot hochladen (oder Strg+V / Cmd+V zum Einfügen)">+' +
         '<input type="file" accept="image/*" hidden class="tl-shot-input">' +
       '</label>' +
     '</div>' +
@@ -2645,6 +2665,21 @@ function seiteAuffrischen(id){
   else if (id === 'portfolio'){ if (window.ladePortfolioListe) window.ladePortfolioListe(); }
   else if (id === 'watchlist'){ if (window.ladeUndZeichneWatchlist) window.ladeUndZeichneWatchlist(); }
 }
+
+// Screenshot per Strg+V/Cmd+V einfuegen, statt zwingend ueber den Datei-Dialog gehen zu
+// muessen: solange im Trading-Log ein Trade aufgeklappt ist, geht ein eingefuegtes Bild
+// direkt an dessen Screenshot-Bereich - ganz ohne vorherigen Klick auf die "+"-Kachel noetig.
+document.addEventListener('paste', ev => {
+  if (tlOffenId == null) return;
+  const items = (ev.clipboardData && ev.clipboardData.items) || [];
+  const bildItem = [...items].find(it => it.type && it.type.startsWith('image/'));
+  if (!bildItem) return;
+  const datei = bildItem.getAsFile();
+  if (!datei) return;
+  ev.preventDefault();
+  const el = document.getElementById('tl-shots-'+tlOffenId);
+  if (el) tlLadeScreenshotHoch(tlOffenId, datei, el);
+});
 
 document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });
 document.querySelectorAll('nav.side button[data-page]').forEach(b =>

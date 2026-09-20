@@ -337,13 +337,13 @@ a { color:var(--accent); }
 .tl-table th { text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
   padding:6px 10px; white-space:nowrap; border-bottom:1px solid var(--line); }
 .tl-table td { padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
-/* "Trade" (6.) und "Strategie" (7.) Spalte koennen lange Texte enthalten (z.B. "Migitierte
+/* "Trade" (7.) und "Strategie" (8.) Spalte koennen lange Texte enthalten (z.B. "Migitierte
    Bullische Divergenz"). Mit white-space:nowrap ueberall zwingen lange Eintraege die ganze
    Tabelle breiter zu werden, als die Karte ist - der eigentliche Grund, warum die Tabelle
    (und damit auch die Screenshot-Zeile darunter) nur zu einem Teil sichtbar war und der
    Rest per Horizontal-Scroll verborgen blieb. Fuer diese zwei Spalten daher Zeilenumbruch
    statt einer festen Breite erlauben - das haelt die Tabelle innerhalb der Kartenbreite. */
-.tl-table td:nth-child(6), .tl-table td:nth-child(7) { white-space:normal; max-width:200px; }
+.tl-table td:nth-child(7), .tl-table td:nth-child(8) { white-space:normal; max-width:200px; }
 .tl-monat-row td { padding:10px 10px 6px; font-size:11.5px; font-weight:700; text-transform:uppercase;
   letter-spacing:.06em; color:var(--muted); border-bottom:none; background:var(--hover-bg); }
 .tl-row2 { cursor:pointer; }

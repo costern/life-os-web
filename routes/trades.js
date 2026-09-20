@@ -8,7 +8,7 @@ function rowOut(r) {
     entry1: num(r.entry1), entry2: num(r.entry2), size1: num(r.size1), size2: num(r.size2),
     sl: num(r.sl), tp: num(r.tp), exit: num(r.exit_price), pnl: num(r.pnl),
     fundingFees: num(r.funding_fees), realizedPnl: num(r.realized_pnl), strategy: r.strategy, riskUsd: num(r.risk_usd),
-    tf: r.tf, openedAt: r.opened_at, closedAt: r.closed_at, source: r.source
+    tf: r.tf, tradeType: r.trade_type, openedAt: r.opened_at, closedAt: r.closed_at, source: r.source
   };
 }
 function num(v) { return v === null || v === undefined ? null : Number(v); }
@@ -36,11 +36,11 @@ router.post('/', async (req, res) => {
   const b = req.body || {};
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const { rows } = await pool.query(
-    `INSERT INTO trades (asset, ticker, trade_name, side, entry1, entry2, size1, size2, sl, tp, strategy, risk_usd, tf, opened_at, source)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, COALESCE($14, now()), $15) RETURNING *`,
+    `INSERT INTO trades (asset, ticker, trade_name, side, entry1, entry2, size1, size2, sl, tp, strategy, risk_usd, tf, trade_type, opened_at, source)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, COALESCE($15, now()), $16) RETURNING *`,
     [b.asset, b.ticker || b.asset, b.name || null, b.side || 'Long', b.entry1 || null, b.entry2 || null,
      b.size1 || null, b.size2 || null, b.sl || null, b.tp || null, b.strategy || null, b.riskUsd || null,
-     tfArray(b.tf) || null, b.openedAt || null, b.source || 'manual']
+     tfArray(b.tf) || null, b.tradeType || null, b.openedAt || null, b.source || 'manual']
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -56,7 +56,8 @@ router.patch('/:id', async (req, res) => {
                              ['entry1','entry1'],['entry2','entry2'],['size1','size1'],['size2','size2'],
                              ['realizedPnl','realized_pnl'],['strategy','strategy'],
                              ['name','trade_name'],['riskUsd','risk_usd'],
-                             ['asset','asset'],['ticker','ticker'],['side','side'],['openedAt','opened_at']]) {
+                             ['asset','asset'],['ticker','ticker'],['side','side'],['openedAt','opened_at'],
+                             ['tradeType','trade_type']]) {
     if (b[key] !== undefined) { fields.push(`${col} = $${i++}`); vals.push(b[key]); }
   }
   // tf ist ein TEXT[] (mehrere Timeframes moeglich) - separat normalisieren statt roh durchreichen.

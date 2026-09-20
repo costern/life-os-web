@@ -36,6 +36,10 @@ BEGIN
   END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_trades_open ON trades ((exit_price IS NULL));
+-- trade_type: regular | mistake - war der Trade nach eigener Strategie geplant, oder
+-- eigentlich ein Fehlgriff (nicht die eigene Strategie, haette so nicht genommen werden
+-- sollen)? NULL = noch nicht bewertet. Rein informativ fuers Trading-Log.
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS trade_type TEXT;
 
 CREATE TABLE IF NOT EXISTS todos (
   id SERIAL PRIMARY KEY,
