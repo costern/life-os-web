@@ -864,27 +864,54 @@ async function tlLiesShotsGecacht(id){
   return tlShotsCache[id];
 }
 
+function tlGalerieKarteHtml(r, shots){
+  const cover = shots.length
+    ? '<img src="/api/trades/'+r.id+'/screenshots/'+shots[0].id+'/image" loading="lazy" alt="">' +
+      (shots.length > 1 ? '<span class="tl-gallery-count">+'+(shots.length-1)+'</span>' : '')
+    : '<div class="tl-gallery-noshot">🖼️</div>';
+  return '<div class="tl-gallery-card" data-id="'+r.id+'" title="Details öffnen">' +
+    '<div class="tl-gallery-cover">'+cover+'</div>' +
+    '<div class="tl-gallery-meta">' +
+      '<div class="tl-gallery-titel">'+tlAssetIconHtml(r)+' '+esc(r.name || r.asset)+'</div>' +
+      '<div class="tl-gallery-sub">'+tlDatKurz(r.openedAt)+' · '+tlErgebnisHtml(r)+'</div>' +
+    '</div>' +
+  '</div>';
+}
+// Galerie: offene (Live-)Trades immer zuerst, unabhaengig vom Datum (das sind die
+// aktuell relevanten); danach die geschlossenen Trades nach Monat gruppiert wie im
+// Trading-Log-Tabellen-View, jeweils neuester Monat zuerst (tlTrades kommt schon
+// absteigend sortiert von der API).
 async function renderTradeLogGalerie(){
   const el = document.getElementById('tradeLogGalerie');
   if (!el) return;
   if (!tlTrades.length){ el.innerHTML = '<div class="empty">Noch keine Trades</div>'; return; }
   const shotsListen = await Promise.all(tlTrades.map(r => tlLiesShotsGecacht(r.id)));
-  el.innerHTML = '<div class="tl-gallery-grid">' +
-    tlTrades.map((r, i) => {
-      const shots = shotsListen[i] || [];
-      const cover = shots.length
-        ? '<img src="/api/trades/'+r.id+'/screenshots/'+shots[0].id+'/image" loading="lazy" alt="">' +
-          (shots.length > 1 ? '<span class="tl-gallery-count">+'+(shots.length-1)+'</span>' : '')
-        : '<div class="tl-gallery-noshot">🖼️</div>';
-      return '<div class="tl-gallery-card" data-id="'+r.id+'" title="Details öffnen">' +
-        '<div class="tl-gallery-cover">'+cover+'</div>' +
-        '<div class="tl-gallery-meta">' +
-          '<div class="tl-gallery-titel">'+tlAssetIconHtml(r)+' '+esc(r.name || r.asset)+'</div>' +
-          '<div class="tl-gallery-sub">'+tlDatKurz(r.openedAt)+' · '+tlErgebnisHtml(r)+'</div>' +
-        '</div>' +
-      '</div>';
-    }).join('') +
-  '</div>';
+  const shotsVon = {};
+  tlTrades.forEach((r, i) => { shotsVon[r.id] = shotsListen[i] || []; });
+
+  const offene = tlTrades.filter(r => r.exit == null);
+  const geschlossen = tlTrades.filter(r => r.exit != null);
+  const gruppen = [];
+  let letzterSchluessel = null;
+  geschlossen.forEach(r => {
+    const schluessel = tlMonatSchluessel(r.openedAt);
+    if (schluessel !== letzterSchluessel) {
+      gruppen.push({ label: tlMonatLabel(r.openedAt), rows: [] });
+      letzterSchluessel = schluessel;
+    }
+    gruppen[gruppen.length-1].rows.push(r);
+  });
+
+  el.innerHTML =
+    (offene.length
+      ? '<div class="tl-gallery-monat-row tl-gallery-live-row">🔴 Live</div>' +
+        '<div class="tl-gallery-grid">' + offene.map(r => tlGalerieKarteHtml(r, shotsVon[r.id])).join('') + '</div>'
+      : '') +
+    gruppen.map(g =>
+      '<div class="tl-gallery-monat-row">'+esc(g.label)+'</div>' +
+      '<div class="tl-gallery-grid">' + g.rows.map(r => tlGalerieKarteHtml(r, shotsVon[r.id])).join('') + '</div>'
+    ).join('');
+
   el.querySelectorAll('.tl-gallery-card').forEach(card => {
     card.addEventListener('click', () => tlGalerieOeffneTrade(+card.dataset.id));
   });
@@ -1204,11 +1231,20 @@ function renderTradeLogShots(tradeId, shots, el){
       '<button type="button" class="tl-shot-del" title="Löschen">✕</button>' +
     '</div>'
   ).join('');
+  // WICHTIG: bewusst kein <label for=input>, das wuerde jeden Klick auf die Kachel sofort
+  // in den nativen Datei-Dialog schicken - dort landet ein danach gedrueckter Strg+V/Cmd+V
+  // dann im Dialogfenster statt auf der Seite, das Einfuegen wirkt dadurch "kaputt". Datei-
+  // Auswahl gibt es deshalb nur noch ueber den kleinen 📁-Button; die Kachel selbst tut beim
+  // Klick nichts weiter, damit Strg+V/Cmd+V (Seite muss dafuer nur irgendwie fokussiert sein,
+  // ganz ohne vorherigen Klick auf die Kachel) den Screenshot direkt einfuegt.
   el.innerHTML =
     '<div class="tl-shots-grid">' + kacheln +
-      '<label class="tl-shot-upload" title="Screenshot hochladen (oder Strg+V / Cmd+V zum Einfügen)">+' +
+      '<div class="tl-shot-upload" tabindex="0">' +
+        '<span class="tl-shot-upload-plus">+</span>' +
+        '<span class="tl-shot-upload-hint">Strg+V / Cmd+V<br>zum Einfügen</span>' +
+        '<button type="button" class="tl-shot-browse" title="Datei auswählen">📁</button>' +
         '<input type="file" accept="image/*" hidden class="tl-shot-input">' +
-      '</label>' +
+      '</div>' +
     '</div>' +
     '<span class="te-msg tl-shots-msg"></span>';
 
@@ -1226,6 +1262,8 @@ function renderTradeLogShots(tradeId, shots, el){
   input.addEventListener('change', () => {
     if (input.files && input.files[0]) tlLadeScreenshotHoch(tradeId, input.files[0], el);
   });
+  const browse = el.querySelector('.tl-shot-browse');
+  if (browse) browse.addEventListener('click', ev => { ev.stopPropagation(); input.click(); });
 }
 
 function tlZeigeLightbox(src){
