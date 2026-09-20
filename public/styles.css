@@ -157,6 +157,9 @@ section.page { display:none; } section.page.active { display:block; }
   background:var(--hover-bg); font-size:10px; font-weight:600; white-space:nowrap; }
 .wl-note { display:inline-block; padding:1px 7px; border-radius:6px; font-size:11px; font-weight:700;
   border:1.5px solid; white-space:nowrap; }
+/* Haken vor "L: ... · S: ...", wenn lokale UND strukturelle Divergenz beide gesetzt sind -
+   auf einen Blick erkennbar, dass das ein staerkeres "doppeltes" Divergenz-Signal war. */
+.wl-div-check { color:var(--green); font-weight:700; }
 /* Event-Typ (Single/Double Bottom) als farbiges Badge, auf einen Blick von der grauen
    Rest-Setup-Info (MTF, Multi-Asset, Form) unterscheidbar. */
 .wl-setup-cell { white-space:nowrap; }
@@ -334,13 +337,13 @@ a { color:var(--accent); }
 .tl-table th { text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
   padding:6px 10px; white-space:nowrap; border-bottom:1px solid var(--line); }
 .tl-table td { padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
-/* "Trade" (5.) und "Strategie" (6.) Spalte koennen lange Texte enthalten (z.B. "Migitierte
+/* "Trade" (6.) und "Strategie" (7.) Spalte koennen lange Texte enthalten (z.B. "Migitierte
    Bullische Divergenz"). Mit white-space:nowrap ueberall zwingen lange Eintraege die ganze
    Tabelle breiter zu werden, als die Karte ist - der eigentliche Grund, warum die Tabelle
    (und damit auch die Screenshot-Zeile darunter) nur zu einem Teil sichtbar war und der
    Rest per Horizontal-Scroll verborgen blieb. Fuer diese zwei Spalten daher Zeilenumbruch
    statt einer festen Breite erlauben - das haelt die Tabelle innerhalb der Kartenbreite. */
-.tl-table td:nth-child(5), .tl-table td:nth-child(6) { white-space:normal; max-width:200px; }
+.tl-table td:nth-child(6), .tl-table td:nth-child(7) { white-space:normal; max-width:200px; }
 .tl-monat-row td { padding:10px 10px 6px; font-size:11.5px; font-weight:700; text-transform:uppercase;
   letter-spacing:.06em; color:var(--muted); border-bottom:none; background:var(--hover-bg); }
 .tl-row2 { cursor:pointer; }

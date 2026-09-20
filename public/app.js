@@ -806,19 +806,19 @@ function renderTradeLogTabelle(){
   });
   el.innerHTML =
     '<table class="tl-table">' +
-      '<thead><tr><th>Datum</th><th>Side</th><th>Asset</th><th>TF</th><th>Trade</th><th>Strategie</th><th>Ergebnis</th></tr></thead>' +
+      '<thead><tr><th>Datum</th><th>Ergebnis</th><th>Asset</th><th>Side</th><th>TF</th><th>Trade</th><th>Strategie</th></tr></thead>' +
       gruppen.map(g => (
         '<tbody>' +
           '<tr class="tl-monat-row"><td colspan="7">'+esc(g.label)+'</td></tr>' +
           g.rows.map(r => (
             '<tr class="tl-row2" data-id="'+r.id+'" title="Doppelklick für Details">' +
               '<td>'+tlDatKurz(r.openedAt)+'</td>' +
-              '<td>'+tlSideHtml(r.side)+'</td>' +
+              '<td>'+tlErgebnisHtml(r)+'</td>' +
               '<td>'+tlAssetIconHtml(r)+'</td>' +
+              '<td>'+tlSideHtml(r.side)+'</td>' +
               '<td>'+tlBadgesHtml(r.tf)+'</td>' +
               '<td>'+(r.name ? esc(r.name) : '<span class="muted">–</span>')+'</td>' +
               '<td>'+(r.strategy ? esc(r.strategy) : '<span class="muted">–</span>')+'</td>' +
-              '<td>'+tlErgebnisHtml(r)+'</td>' +
             '</tr>' +
             '<tr class="tl-detail-row" data-detail-id="'+r.id+'" hidden><td colspan="7"><div id="tl-detail-'+r.id+'"></div></td></tr>'
           )).join('') +
@@ -1282,8 +1282,14 @@ const WL_FORM_LABEL = { bogen:'Bogen', bogen_unsauber:'Bogen unsauber', kein_bog
 const WL_PHASE_LABEL = { uptrend:'Uptrend', downtrend:'Downtrend', ranging:'Range', '':'–' };
 const WL_PATTERN_LABEL = { valid:'valid', clean:'clean', choppy:'choppy', '':'–' };
 const WL_CANDLE_LABEL = { choppy:'Choppy Candles', decent:'Decent Candles', gap:'Gap Candles', mini:'Mini Candles (Doji/Hammer/Shooting Star)', '':'–' };
-const WL_DIV_LABEL = { rsi:'RSI Div.', none:'No Div.', hidden:'RSI Hidden Div.', '':'–' };
-const WL_DIV_KURZ = { rsi:'RSI', none:'keine', hidden:'Hidden', '':'–' };
+const WL_DIV_LABEL = { rsi:'RSI Div.', leicht:'Leichte RSI Div.', none:'No Div.', hidden:'RSI Hidden Div.', '':'–' };
+const WL_DIV_KURZ = { rsi:'RSI', leicht:'Leicht', none:'keine', hidden:'Hidden', '':'–' };
+// "Doppelte Divergenz": lokale UND strukturelle Divergenz sind beide gesetzt (irgendeine
+// Auspraegung ausser leer/none) - staerkeres Signal, deshalb in der Tabelle mit Haken markiert.
+function wlDoppelteDivergenz(s){
+  const aktiv = v => v && v !== 'none';
+  return aktiv(s.divLokal) && aktiv(s.divStruktur);
+}
 const wlStatus = s => s.status || '';
 // Setup-Qualitaet (bewertet das Signal selbst, unabhaengig vom Ausgang des Trades)
 const WL_NOTEN = ['A++', 'A+', 'A', 'B'];
@@ -1615,7 +1621,8 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '</td>' +
         '<td class="muted">'+
           ((s.divLokal || s.divStruktur)
-            ? 'L: '+WL_DIV_KURZ[s.divLokal || '']+' · S: '+WL_DIV_KURZ[s.divStruktur || '']
+            ? (wlDoppelteDivergenz(s) ? '<span class="wl-div-check" title="Doppelte Divergenz (lokal + strukturell)">✓</span> ' : '') +
+              'L: '+WL_DIV_KURZ[s.divLokal || '']+' · S: '+WL_DIV_KURZ[s.divStruktur || '']
             : '–') +
         '</td>' +
         '<td>'+(s.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span>' : '<span class="muted">–</span>')+'</td>' +
@@ -1639,8 +1646,8 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           '<label>Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
           '<label>Pattern'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
-          '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['rsi','RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
-          '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['rsi','RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
+          '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['rsi','RSI Div.'],['leicht','Leichte RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
+          '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['rsi','RSI Div.'],['leicht','Leichte RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
         '</div>' +
