@@ -107,6 +107,11 @@ CREATE TABLE IF NOT EXISTS portfolio (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS portfolio_id INTEGER REFERENCES portfolios(id) DEFAULT 1;
+-- Seit wann dieser Bestand tatsaechlich gehalten wird (optional). Ohne das nimmt die
+-- Verlaufs-Schaetzung in /portfolio/backfill sonst die JETZIGEN Bestaende und
+-- multipliziert sie mit Kursen aus Zeiten, in denen der Coin noch gar nicht gehalten
+-- wurde - das Portfolio sieht dann faelschlich schon vor dem eigentlichen Kauf werthaltig aus.
+ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS held_since DATE;
 
 -- Performance-Verlauf: ein Wert pro Portfolio pro Tag. "estimated=true" heisst
 -- rueckwirkend geschaetzt (aktuelle Bestaende x historische Kurse), "false" ist ein

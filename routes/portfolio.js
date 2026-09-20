@@ -9,7 +9,8 @@ const router = express.Router();
 function rowOut(r) {
   return {
     id: r.id, portfolioId: r.portfolio_id, asset: r.asset, ticker: r.ticker, amount: num(r.amount), buyPrice: num(r.buy_price),
-    wallet: r.wallet, chain: r.chain, notiz: r.notiz, createdAt: r.created_at, updatedAt: r.updated_at
+    wallet: r.wallet, chain: r.chain, notiz: r.notiz, heldSince: r.held_since ? r.held_since.toISOString().slice(0, 10) : null,
+    createdAt: r.created_at, updatedAt: r.updated_at
   };
 }
 function num(v) { return v === null || v === undefined ? null : Number(v); }
@@ -25,9 +26,9 @@ router.post('/', async (req, res) => {
   if (!b.asset || b.amount === undefined || b.amount === null) return res.status(400).json({ error: 'asset und amount sind Pflicht' });
   const portfolioId = +(b.portfolioId || 1);
   const { rows } = await pool.query(
-    `INSERT INTO portfolio (portfolio_id, asset, ticker, amount, buy_price, wallet, chain, notiz)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [portfolioId, b.asset, (b.ticker || b.asset).toUpperCase(), b.amount, b.buyPrice || null, b.wallet || null, b.chain || null, b.notiz || null]
+    `INSERT INTO portfolio (portfolio_id, asset, ticker, amount, buy_price, wallet, chain, notiz, held_since)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [portfolioId, b.asset, (b.ticker || b.asset).toUpperCase(), b.amount, b.buyPrice || null, b.wallet || null, b.chain || null, b.notiz || null, b.heldSince || null]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -37,7 +38,7 @@ router.patch('/:id', async (req, res) => {
   const b = req.body || {};
   const fields = []; const vals = []; let i = 1;
   for (const [key, col] of [['asset','asset'],['ticker','ticker'],['amount','amount'],['buyPrice','buy_price'],
-                             ['wallet','wallet'],['chain','chain'],['notiz','notiz']]) {
+                             ['wallet','wallet'],['chain','chain'],['notiz','notiz'],['heldSince','held_since']]) {
     if (b[key] !== undefined) { fields.push(`${col} = $${i++}`); vals.push(b[key]); }
   }
   if (!fields.length) return res.status(400).json({ error: 'nichts zu ändern' });
@@ -106,10 +107,14 @@ router.post('/snapshot', async (req, res) => {
 // Tageskursen. Ungenau fuer Zeitraeume, in denen sich die Bestaende tatsaechlich
 // geaendert haben (z.B. Coins dazugekommen) - deshalb estimated=true, und ueberschreibt
 // nie einen bereits echten Snapshot (WHERE-Klausel im ON CONFLICT).
+// held_since (optional, pro Bestand) verhindert dabei, dass ein Coin faelschlich schon
+// vor dem eigentlichen Kauf mitgerechnet wird - ohne das wuerde z.B. ein Portfolio, das
+// erst im Dezember angelegt wurde, schon Monate vorher werthaltig aussehen, weil die
+// Schaetzung sonst einfach die heutige Menge rueckwirkend mit alten Kursen multipliziert.
 router.post('/backfill', async (req, res) => {
   const portfolioId = +(req.query.portfolioId || req.body?.portfolioId || 1);
   try {
-    const { rows: holdings } = await pool.query('SELECT amount, ticker, asset FROM portfolio WHERE portfolio_id = $1', [portfolioId]);
+    const { rows: holdings } = await pool.query('SELECT amount, ticker, asset, held_since FROM portfolio WHERE portfolio_id = $1', [portfolioId]);
     if (!holdings.length) return res.json({ ok: true, tage: 0 });
     const tickerListe = [...new Set(holdings.map(h => (h.ticker || h.asset).toUpperCase()))];
     const historie = await coingecko.getHistoricalDaily(tickerListe, 365);
@@ -118,16 +123,18 @@ router.post('/backfill', async (req, res) => {
     for (const map of Object.values(historie)) if (map) for (const d of map.keys()) alleDaten.add(d);
     const heute = new Date().toISOString().slice(0, 10);
 
-    let geschrieben = 0;
+    let geschrieben = 0, uebersprungenVorKauf = 0;
     for (const datum of alleDaten) {
       if (datum === heute) continue; // heute macht /snapshot, nicht die Schaetzung
       let wert = 0, irgendeinPreis = false;
       for (const h of holdings) {
+        const seit = h.held_since ? h.held_since.toISOString().slice(0, 10) : null;
+        if (seit && datum < seit) continue; // an diesem Tag noch nicht gehalten
         const t = (h.ticker || h.asset).toUpperCase();
         const preis = historie[t] && historie[t].get(datum);
         if (preis != null) { wert += Number(h.amount) * preis; irgendeinPreis = true; }
       }
-      if (!irgendeinPreis) continue;
+      if (!irgendeinPreis) { uebersprungenVorKauf++; continue; }
       await pool.query(
         `INSERT INTO portfolio_snapshots (portfolio_id, taken_at, value_usd, estimated)
          VALUES ($1, $2, $3, true)
@@ -137,7 +144,23 @@ router.post('/backfill', async (req, res) => {
       );
       geschrieben++;
     }
-    res.json({ ok: true, tage: geschrieben });
+    // Falls fuer diesen Portfolio schon frueher (vor Einfuehrung von held_since) zu weit
+    // zurueckreichende geschaetzte Snapshots geschrieben wurden, hier gleich mit aufraeumen -
+    // aber nur estimated=true, ein echter (per /snapshot aufgenommener) Wert bleibt unangetastet.
+    const fruehesteHeldSince = holdings.reduce((min, h) => {
+      if (!h.held_since) return min; // kein Datum gesetzt -> keine Einschraenkung moeglich
+      const s = h.held_since.toISOString().slice(0, 10);
+      return min === null ? s : (s < min ? s : min);
+    }, null);
+    let bereinigt = 0;
+    if (fruehesteHeldSince && holdings.every(h => h.held_since)) {
+      const { rowCount } = await pool.query(
+        `DELETE FROM portfolio_snapshots WHERE portfolio_id = $1 AND estimated = true AND taken_at < $2`,
+        [portfolioId, fruehesteHeldSince]
+      );
+      bereinigt = rowCount;
+    }
+    res.json({ ok: true, tage: geschrieben, vorKaufUebersprungen: uebersprungenVorKauf, alteSchaetzungenBereinigt: bereinigt });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
