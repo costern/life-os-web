@@ -833,7 +833,11 @@ function renderTradeLogTabelle(){
 function tlToggleDetail(id){
   const zeile = document.querySelector('.tl-detail-row[data-detail-id="'+id+'"]');
   if (!zeile) return;
-  if (!zeile.hidden && tlOffenId === id) { zeile.hidden = true; tlOffenId = null; return; }
+  if (!zeile.hidden && tlOffenId === id) {
+    zeile.hidden = true; tlOffenId = null;
+    document.querySelectorAll('.tl-row2.tl-row-active').forEach(z => z.classList.remove('tl-row-active'));
+    return;
+  }
   document.querySelectorAll('.tl-detail-row').forEach(z => { z.hidden = true; });
   tlOeffneDetail(id);
 }
@@ -904,6 +908,12 @@ async function tlOeffneDetail(id){
   if (!zeile) return;
   zeile.hidden = false;
   tlOffenId = id;
+  // Die zugehoerige Tabellenzeile leicht markieren, solange ihr Detail aufgeklappt ist -
+  // sonst ist wegen der grauen Trennlinie zwischen den Zeilen nicht klar erkennbar, dass
+  // das Detail-Fenster darunter zu genau dieser Zeile gehoert.
+  document.querySelectorAll('.tl-row2.tl-row-active').forEach(z => z.classList.remove('tl-row-active'));
+  const zugehoerigeZeile = document.querySelector('.tl-row2[data-id="'+id+'"]');
+  if (zugehoerigeZeile) zugehoerigeZeile.classList.add('tl-row-active');
   const trade = tlTrades.find(r => r.id === id);
   const zielEl = document.getElementById('tl-detail-'+id);
   if (!trade || !zielEl) return;
@@ -979,12 +989,6 @@ function renderTradeLogDetail(trade, shots, zielEl){
     tlFeldInput('Datum', 'tle-opened', tlDatetimeInputWert(trade.openedAt), 'datetime-local'),
     tlFeldSelect('Side', 'tle-side', trade.side, ['Long','Short']),
     tlFeldInput('Asset', 'tle-asset', trade.asset, 'text'),
-    // Ticker wird nur gebraucht, wenn der Kurs-/Icon-Code vom Anzeigenamen abweicht
-    // (z.B. Asset "Canton" -> Ticker "CC", "Render" -> "RENDER", "Quant" -> "QNT").
-    // Ist er identisch mit Asset, bleibt das Feld leer (Platzhalter zeigt den Fallback),
-    // statt den gleichen Wert sichtbar doppelt anzuzeigen.
-    tlFeldInput('Ticker (nur falls abweichend)', 'tle-ticker',
-      (trade.ticker && trade.ticker !== trade.asset) ? trade.ticker : '', 'text', trade.asset || 'z.B. bei Gold, Silber, Canton …'),
     tlFeldTfMulti('tle-tf', trade.tf),
     tlFeldInput('Trade-Name', 'tle-name', trade.name || '', 'text'),
     tlFeldInput('Strategie', 'tle-strategy', trade.strategy || '', 'text'),
@@ -1004,6 +1008,10 @@ function renderTradeLogDetail(trade, shots, zielEl){
 
   zielEl.innerHTML =
     '<div class="tl-shots-wrap" id="tl-shots-'+trade.id+'"></div>' +
+    '<div class="tl-events-wrap">' +
+      '<button type="button" class="tl-events-toggle">📈 Entry/TP/SL-Verlauf</button>' +
+      '<div class="tl-events-chart" id="tl-events-'+trade.id+'" hidden></div>' +
+    '</div>' +
     '<div class="tl-details-grid">'+felder.join('')+'</div>' +
     '<div class="tl-save-row">' +
       '<button type="button" class="btn tle-save">Speichern</button>' +
@@ -1012,9 +1020,110 @@ function renderTradeLogDetail(trade, shots, zielEl){
     '</div>';
   renderTradeLogShots(trade.id, shots, document.getElementById('tl-shots-'+trade.id));
   tlTfChipsRender(zielEl.querySelector('.tle-tf'));
+  tlSetupEventsToggle(trade, zielEl);
 
   zielEl.querySelector('.tle-save').addEventListener('click', () => tlSpeichereDetail(trade.id, zielEl));
   zielEl.querySelector('.tle-delete').addEventListener('click', () => tlLoescheTrade(trade.id, zielEl));
+}
+
+// ---------- Entry/TP/SL-Verlauf: kleiner Treppenlinien-Chart, wie Colins TradingView-
+// Screenshot (weiss=Entry, gruen=Take-Profit, rot=Stop-Loss - jeweils in Stufen, weil
+// sich die Werte im Trade-Verlauf aendern koennen: SL hochgezogen, TP-Teilziele erreicht/
+// verschoben, Nachkauf als zweiter Entry). Wird erst beim Aufklappen geladen. ----------
+function tlSetupEventsToggle(trade, zielEl){
+  const btn = zielEl.querySelector('.tl-events-toggle');
+  const chartEl = document.getElementById('tl-events-'+trade.id);
+  if (!btn || !chartEl) return;
+  let geladen = false;
+  btn.addEventListener('click', async () => {
+    chartEl.hidden = !chartEl.hidden;
+    if (chartEl.hidden || geladen) return;
+    geladen = true;
+    chartEl.innerHTML = '<div class="empty">Lade…</div>';
+    try {
+      const events = await api('/trades/'+trade.id+'/events');
+      tlZeichneEvents(trade, events, chartEl);
+    } catch (e) {
+      chartEl.innerHTML = '<div class="err">Verlauf nicht ladbar: '+esc(e.message)+'</div>';
+    }
+  });
+}
+
+function tlZeichneEvents(trade, events, chartEl){
+  if (!events.length){
+    chartEl.innerHTML = '<div class="empty">Noch kein Verlauf (Entry/SL/TP wurden noch nicht geändert).</div>';
+    return;
+  }
+  const FARBEN = { entry: 'var(--ink)', sl: 'var(--red)', tp: 'var(--green)' };
+  const LABEL = { entry: 'Entry', sl: 'Stop-Loss', tp: 'Take-Profit' };
+
+  const start = new Date(trade.openedAt).getTime();
+  const ende = Math.max(
+    trade.closedAt ? new Date(trade.closedAt).getTime() : Date.now(),
+    ...events.map(e => new Date(e.changedAt).getTime())
+  );
+  const spanne = Math.max(ende - start, 1);
+
+  const B = 640, H = 200, padL = 54, padR = 16, padT = 14, padB = 24;
+  const innenB = B - padL - padR, innenH = H - padT - padB;
+  const xFuer = t => padL + Math.min(1, Math.max(0, (t - start) / spanne)) * innenB;
+
+  const werte = events.map(e => e.value);
+  let min = Math.min(...werte), max = Math.max(...werte);
+  if (min === max) { min -= min * 0.02 || 1; max += max * 0.02 || 1; }
+  const spanneY = max - min;
+  min -= spanneY * 0.1; max += spanneY * 0.1;
+  const yFuer = v => padT + innenH - (v - min) / (max - min) * innenH;
+
+  // Pro Feld eine Treppenlinie: horizontal bis zum naechsten Wechsel halten, dann
+  // senkrecht springen (step-after) - genau wie in Colins TradingView-Screenshot.
+  function stufenpfad(punkte){
+    if (!punkte.length) return '';
+    let d = 'M'+xFuer(new Date(punkte[0].changedAt).getTime()).toFixed(1)+','+yFuer(punkte[0].value).toFixed(1);
+    for (let i = 1; i < punkte.length; i++) {
+      const xVor = xFuer(new Date(punkte[i].changedAt).getTime());
+      const yVor = yFuer(punkte[i-1].value);
+      d += ' L'+xVor.toFixed(1)+','+yVor.toFixed(1);
+      d += ' L'+xVor.toFixed(1)+','+yFuer(punkte[i].value).toFixed(1);
+    }
+    const letzter = punkte[punkte.length-1];
+    d += ' L'+xFuer(ende).toFixed(1)+','+yFuer(letzter.value).toFixed(1);
+    return d;
+  }
+
+  const nachFeld = { entry: [], sl: [], tp: [] };
+  events.slice().sort((a,b) => new Date(a.changedAt)-new Date(b.changedAt)).forEach(e => {
+    if (nachFeld[e.field]) nachFeld[e.field].push(e);
+  });
+
+  const linien = Object.entries(nachFeld).filter(([,pts]) => pts.length).map(([feld, punkte]) =>
+    '<path class="tl-ev-line" d="'+stufenpfad(punkte)+'" stroke="'+FARBEN[feld]+'" fill="none"/>' +
+    punkte.map(p => {
+      const cx = xFuer(new Date(p.changedAt).getTime()).toFixed(1), cy = yFuer(p.value).toFixed(1);
+      const titel = LABEL[feld]+': '+p.value+' · '+new Date(p.changedAt).toLocaleString('de-DE')+(p.note ? ' · '+p.note : '');
+      return '<circle class="tl-ev-dot" cx="'+cx+'" cy="'+cy+'" r="3.5" fill="'+FARBEN[feld]+'"><title>'+esc(titel)+'</title></circle>';
+    }).join('')
+  ).join('');
+
+  const gitterY = [max - spanneY*0.1, (min+max)/2, min + spanneY*0.1].map(w => {
+    const y = yFuer(w).toFixed(1);
+    return '<line class="perf-grid" x1="'+padL+'" y1="'+y+'" x2="'+(B-padR)+'" y2="'+y+'"/>' +
+      '<text class="perf-grid-label" x="'+(padL-8)+'" y="'+y+'" text-anchor="end" dominant-baseline="middle">'+rundPreis(w)+'</text>';
+  }).join('');
+
+  const datLabel = t => new Date(t).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
+  const xAchse = '<text class="perf-grid-label" x="'+padL+'" y="'+(H-6)+'" text-anchor="start">'+datLabel(start)+'</text>' +
+    '<text class="perf-grid-label" x="'+(B-padR)+'" y="'+(H-6)+'" text-anchor="end">'+datLabel(ende)+'</text>';
+
+  const legende = Object.keys(LABEL).filter(f => nachFeld[f].length).map(f =>
+    '<span class="tl-ev-legend-item"><span class="tl-ev-legend-dot" style="background:'+FARBEN[f]+'"></span>'+LABEL[f]+'</span>'
+  ).join('');
+
+  chartEl.innerHTML =
+    '<div class="tl-ev-legend">'+legende+'</div>' +
+    '<svg viewBox="0 0 '+B+' '+H+'" class="perf-svg" preserveAspectRatio="none">' +
+      gitterY + linien + xAchse +
+    '</svg>';
 }
 
 async function tlSpeichereDetail(id, zielEl){
@@ -1023,7 +1132,7 @@ async function tlSpeichereDetail(id, zielEl){
   const zeit = v => v ? new Date(v).toISOString() : undefined;
   const body = {
     asset: val('tle-asset').trim(),
-    ticker: val('tle-ticker').trim() || val('tle-asset').trim(),
+    ticker: val('tle-asset').trim(),
     side: val('tle-side'),
     name: val('tle-name').trim() || null,
     strategy: val('tle-strategy').trim() || null,

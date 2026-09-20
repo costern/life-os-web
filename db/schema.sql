@@ -177,19 +177,27 @@ CREATE TABLE IF NOT EXISTS trade_events (
   trade_id INTEGER NOT NULL REFERENCES trades(id) ON DELETE CASCADE,
   field TEXT NOT NULL CHECK (field IN ('entry','sl','tp')),
   value NUMERIC NOT NULL,
-  changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  changed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Freitext-Anmerkung fuer manuell (per Claude, wenn Colin einen neuen Screenshot
+  -- schickt) eingetragene Punkte, z.B. "Teilverkauf 50% bei 1.42" oder "Position
+  -- aufgestockt". Bei automatisch vom Trigger geloggten Aenderungen bleibt sie leer.
+  note TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_trade_events_trade ON trade_events (trade_id, field, changed_at);
 
--- Automatisches Protokollieren: jede tatsaechliche Aenderung an entry1/sl/tp wird als neuer
--- Trade-Event gespeichert - egal ob sie ueber das Dashboard-Formular oder per direktem
+-- Automatisches Protokollieren: jede tatsaechliche Aenderung an entry1/entry2/sl/tp wird als
+-- neuer Trade-Event gespeichert - egal ob sie ueber das Dashboard-Formular oder per direktem
 -- SQL-Update (z.B. wenn Colin einen Screenshot schickt und die Position von Hand angepasst
 -- wird) passiert. Beim Anlegen eines Trades wird der Startwert gleich als erster Punkt
--- gespeichert, sonst haette das Log am Anfang keine Linie zum Einzeichnen.
+-- gespeichert, sonst haette das Log am Anfang keine Linie zum Einzeichnen. entry2 (zweiter
+-- Einstieg/Nachkauf) faellt mit unter 'entry', damit die Entry-Linie auch Nachkaeufe zeigt.
 CREATE OR REPLACE FUNCTION trg_trade_log_change() RETURNS trigger AS $$
 BEGIN
   IF NEW.entry1 IS NOT NULL AND NEW.entry1 IS DISTINCT FROM OLD.entry1 THEN
     INSERT INTO trade_events (trade_id, field, value) VALUES (NEW.id, 'entry', NEW.entry1);
+  END IF;
+  IF NEW.entry2 IS NOT NULL AND NEW.entry2 IS DISTINCT FROM OLD.entry2 THEN
+    INSERT INTO trade_events (trade_id, field, value) VALUES (NEW.id, 'entry', NEW.entry2);
   END IF;
   IF NEW.sl IS NOT NULL AND NEW.sl IS DISTINCT FROM OLD.sl THEN
     INSERT INTO trade_events (trade_id, field, value) VALUES (NEW.id, 'sl', NEW.sl);
@@ -206,6 +214,7 @@ CREATE TRIGGER trades_log_change AFTER UPDATE ON trades FOR EACH ROW EXECUTE FUN
 CREATE OR REPLACE FUNCTION trg_trade_log_initial() RETURNS trigger AS $$
 BEGIN
   IF NEW.entry1 IS NOT NULL THEN INSERT INTO trade_events (trade_id, field, value, changed_at) VALUES (NEW.id, 'entry', NEW.entry1, NEW.opened_at); END IF;
+  IF NEW.entry2 IS NOT NULL THEN INSERT INTO trade_events (trade_id, field, value, changed_at) VALUES (NEW.id, 'entry', NEW.entry2, NEW.opened_at); END IF;
   IF NEW.sl IS NOT NULL THEN INSERT INTO trade_events (trade_id, field, value, changed_at) VALUES (NEW.id, 'sl', NEW.sl, NEW.opened_at); END IF;
   IF NEW.tp IS NOT NULL THEN INSERT INTO trade_events (trade_id, field, value, changed_at) VALUES (NEW.id, 'tp', NEW.tp, NEW.opened_at); END IF;
   RETURN NEW;

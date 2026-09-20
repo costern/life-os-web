@@ -69,15 +69,34 @@ router.patch('/:id', async (req, res) => {
   res.json(rowOut(rows[0]));
 });
 
-// Entry/SL/TP-Verlauf fuers Trading-Log-Chart. Wird automatisch von einem DB-Trigger
-// befuellt (siehe schema.sql) - hier wird nur gelesen.
+// Entry/SL/TP-Verlauf fuers Trading-Log-Chart. Wird meist automatisch von einem DB-Trigger
+// befuellt, wenn entry1/entry2/sl/tp sich aendern (siehe schema.sql) - GET liest nur.
 router.get('/:id/events', async (req, res) => {
   const id = +req.params.id;
   const { rows } = await pool.query(
-    'SELECT field, value, changed_at FROM trade_events WHERE trade_id=$1 ORDER BY changed_at ASC, id ASC',
+    'SELECT id, field, value, changed_at, note FROM trade_events WHERE trade_id=$1 ORDER BY changed_at ASC, id ASC',
     [id]
   );
-  res.json(rows.map(r => ({ field: r.field, value: num(r.value), changedAt: r.changed_at })));
+  res.json(rows.map(r => ({ id: r.id, field: r.field, value: num(r.value), changedAt: r.changed_at, note: r.note })));
+});
+
+// Manueller Punkt im Verlauf, z.B. wenn Colin einen neuen Bitget-Screenshot schickt und
+// darin ein Teilverkauf/eine Aufstockung zu sehen ist, die sich nicht 1:1 in einer
+// entry1/entry2/sl/tp-Aenderung des Trades ausdruecken laesst - dann wird hier direkt
+// ein annotierter Punkt fuer den Chart eingetragen (field bleibt trotzdem entry/sl/tp,
+// damit er in dieselbe Linie einsortiert wird; note traegt den Freitext).
+router.post('/:id/events', async (req, res) => {
+  const id = +req.params.id;
+  const b = req.body || {};
+  if (!['entry','sl','tp'].includes(b.field)) return res.status(400).json({ error: "field muss 'entry', 'sl' oder 'tp' sein" });
+  if (b.value === undefined || b.value === null || !isFinite(Number(b.value))) return res.status(400).json({ error: 'value ist Pflicht (Zahl)' });
+  const { rows } = await pool.query(
+    `INSERT INTO trade_events (trade_id, field, value, changed_at, note)
+     VALUES ($1,$2,$3, COALESCE($4, now()), $5) RETURNING id, field, value, changed_at, note`,
+    [id, b.field, Number(b.value), b.changedAt || null, b.note || null]
+  );
+  const r = rows[0];
+  res.status(201).json({ id: r.id, field: r.field, value: num(r.value), changedAt: r.changed_at, note: r.note });
 });
 
 // Trading-Log-Screenshots: Colin zeichnet seine Analyse selbst in TradingView ein und laedt
