@@ -20,6 +20,7 @@ const portfolioRoutes = require('./routes/portfolio');
 const portfoliosRoutes = require('./routes/portfolios');
 const bitgetRoutes = require('./routes/bitget');
 const coinpricesRoutes = require('./routes/coinprices');
+const coiniconRoutes = require('./routes/coinicon');
 const ledgerRoutes = require('./routes/ledger');
 const watchlistRoutes = require('./routes/watchlist');
 
@@ -46,6 +47,7 @@ app.use('/api/portfolio', requireAuthOrClaude, portfolioRoutes);
 app.use('/api/portfolios', requireAuthOrClaude, portfoliosRoutes);
 app.use('/api/bitget', requireAuthOrClaude, bitgetRoutes);
 app.use('/api/coinprices', requireAuthOrClaude, coinpricesRoutes);
+app.use('/api/coinicon', requireAuthOrClaude, coiniconRoutes);
 app.use('/api/ledger', requireAuthOrClaude, ledgerRoutes);
 app.use('/api/watchlist', requireAuthOrClaude, watchlistRoutes);
 

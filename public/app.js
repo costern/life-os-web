@@ -15,19 +15,15 @@
 
 const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 
-// Coin-Icons: liegen als SVG unter /icons/<datei>.svg. COIN_ICON_ALIAS bildet
-// Ticker ab, deren Icon-Dateiname vom Ticker abweicht (z.B. RENDER -> render.svg
-// heisst intern noch "render", war frueher unter RNDR bekannt).
-const COIN_ICONS = new Set(['eth','link','sui','render']);
-const COIN_ICON_ALIAS = { rndr: 'render' };
+// Coin-Icons: echtes Logo vom Server (/api/coinicon/<ticker>, siehe routes/coinicon.js),
+// der es von CoinGecko holt - deckt auch kleinere/neuere Coins ab (GRAM, Kaspa, BGB,
+// ONDO, TAO, ...), nicht nur eine kuratierte Handvoll. Buchstaben-Badge als Fallback,
+// falls es fuer den Ticker kein Logo gibt.
 function coinIcon(ticker, name){
-  const key = String(ticker || name || '').toLowerCase().replace(/[^a-z0-9]/g,'');
-  const file = COIN_ICON_ALIAS[key] || key;
-  const buchstabe = esc((ticker || name || '?').trim().charAt(0).toUpperCase() || '?');
-  if (COIN_ICONS.has(file)) return '<img class="coin-icon" src="/icons/'+file+'.svg" alt="">';
-  // Lokal kein Icon hinterlegt: breite CDN-Abdeckung versuchen (viele "grosse" Coins),
-  // mit Buchstaben-Badge als letzter Fallback, falls auch die CDN den Coin nicht kennt.
-  return '<img class="coin-icon" src="https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/'+file+'.svg" alt="" ' +
+  const t = String(ticker || name || '').trim();
+  const buchstabe = esc((t || '?').charAt(0).toUpperCase() || '?');
+  if (!t) return '<span class="coin-icon coin-icon-fallback">'+buchstabe+'</span>';
+  return '<img class="coin-icon" src="/api/coinicon/'+encodeURIComponent(t.toUpperCase())+'" alt="" ' +
       'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\'">' +
     '<span class="coin-icon coin-icon-fallback" style="display:none">'+buchstabe+'</span>';
 }
@@ -813,18 +809,14 @@ function tlArtBadgeHtml(r){
 function tlAssetIconHtml(r){
   return '<span class="tl-asset-cell">' + coinIconWlHtml(r.ticker || r.asset, r.asset) + esc(r.asset) + '</span>';
 }
-// Icon fuer eine Kachel im "wl-icon"-Stil (Trading-Log-Tabelle, Watchlist): zuerst das
-// lokal kuratierte Icon-Set pruefen (fuer Coins, die die CDN unten nicht kennt, z.B. SUI,
-// RENDER), sonst die breite CDN-Abdeckung versuchen, mit Buchstaben als letzter Fallback.
+// Icon fuer eine Kachel im "wl-icon"-Stil (Trading-Log-Tabelle, Watchlist/Bottom Events):
+// gleiche Logo-Quelle wie coinIcon() oben, nur mit dem wl-icon-Markup/-Fallback.
 function coinIconWlHtml(ticker, name){
-  const key = String(ticker || name || '').toLowerCase().replace(/[^a-z0-9]/g,'');
-  const datei = COIN_ICON_ALIAS[key] || key;
-  const buchstabe = esc((ticker || name || '?').trim().slice(0,3).toUpperCase());
-  if (COIN_ICONS.has(datei)) {
-    return '<span class="wl-icon"><img src="/icons/'+datei+'.svg" alt=""></span>';
-  }
+  const t = String(ticker || name || '').trim();
+  const buchstabe = esc((t || '?').slice(0,3).toUpperCase());
+  if (!t) return '<span class="wl-icon"><span class="wl-icon-fallback">'+buchstabe+'</span></span>';
   return '<span class="wl-icon">' +
-    '<img src="https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/'+datei+'.svg" alt="" ' +
+    '<img src="/api/coinicon/'+encodeURIComponent(t.toUpperCase())+'" alt="" ' +
       'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
     '<span class="wl-icon-fallback" style="display:none">'+buchstabe+'</span>' +
   '</span>';
@@ -2476,7 +2468,7 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     const beAbstandPct = (last!=null && h.buyPrice) ? (last-h.buyPrice)/h.buyPrice*100 : null;
     return '<div class="row" data-id="'+h.id+'">' +
       '<span class="pf-dot" style="background:'+farbe+'"></span>' +
-      '<span class="t">'+esc(h.asset)+' <span class="muted">'+fmtAmount(h.amount)+' '+esc(h.ticker)+'</span></span>' +
+      '<span class="t">'+coinIcon(h.ticker, h.asset)+' '+esc(h.asset)+' <span class="muted">'+fmtAmount(h.amount)+' '+esc(h.ticker)+'</span></span>' +
       (wert!=null ? '<span>'+fmt(wert).replace('+','')+'</span>' : '<span class="muted">kein Kurs</span>') +
       (pnlPct!=null ? '<span class="'+(pnl>=0?'pnl-pos':'pnl-neg')+'">'+(pnlPct>=0?'+':'')+pnlPct.toFixed(1)+'%</span>' : '') +
       '<span class="row-actions">' +
