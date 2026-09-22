@@ -533,6 +533,9 @@ async function ladeOvTrades(){
   const elOvTodos = document.getElementById('ovTodos');
   const elOvBeob = document.getElementById('ovBeobachten');
   const THEMEN_VORSCHLAEGE = ['Trading','Beobachten','Dashboard','Sport','Arbeit','Privat','Sonstiges'];
+  // Eigene Akzentfarbe je Thema-Spalte, damit die Ueberschriften auf einen Blick
+  // auseinanderzuhalten sind (siehe Colins Feedback: Themen sollen "sofort" erkennbar sein).
+  const TODO_SPALTEN_FARBEN = ['#4f46e5','#059669','#d97706','#0891b2','#db2777','#7c3aed','#65a30d','#dc2626','#0284c7','#ea580c'];
   let rows = [];
   let ansicht = 'offen';
 
@@ -602,14 +605,16 @@ async function ladeOvTrades(){
       if (ohneThema.length || !themen.length) spalten.push({ label:'Ohne Thema', liste: ohneThema });
       themen.forEach(th => spalten.push({ label: th, liste: sortiert(gefiltert.filter(r => r.thema === th)) }));
 
-      elBoard.innerHTML = spalten.map(sp =>
-        '<div class="card todo-col" data-thema-slug="'+themaSlug(sp.label==='Ohne Thema'?'':sp.label)+'">' +
-          '<h2>'+esc(sp.label)+' <span class="sub">'+sp.liste.length+'</span></h2>' +
+      let farbIdx = 0;
+      elBoard.innerHTML = spalten.map(sp => {
+        const farbe = sp.label === 'Ohne Thema' ? 'var(--muted)' : TODO_SPALTEN_FARBEN[(farbIdx++) % TODO_SPALTEN_FARBEN.length];
+        return '<div class="card todo-col" data-thema-slug="'+themaSlug(sp.label==='Ohne Thema'?'':sp.label)+'" style="border-top:3px solid '+farbe+'">' +
+          '<h2 style="color:'+farbe+'">'+esc(sp.label)+' <span class="sub">'+sp.liste.length+'</span></h2>' +
           '<div class="todo-col-list">' + (sp.liste.length ? sp.liste.map(r => zeile(r, true)).join('') :
             '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Keine Einträge')+'</div>') +
           '</div>' +
-        '</div>'
-      ).join('') || '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Keine offenen To-Dos')+'</div>';
+        '</div>';
+      }).join('') || '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Keine offenen To-Dos')+'</div>';
     }
 
     // Übersicht-Seite: kompakte Vorschau, "Beobachten" weiterhin eigens hervorgehoben

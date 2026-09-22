@@ -75,8 +75,13 @@ section.page { display:none; } section.page.active { display:block; }
 .todo-add-toggle:hover { background:var(--badge-blue-bg); }
 .todo-add-toggle .plus { font-weight:700; margin-right:2px; }
 #todoAdd { margin-top:14px; margin-bottom:0; padding-bottom:0; border-bottom:none; }
-.todo-board { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:flex-start; gap:16px; }
-.todo-col { flex:1 1 260px; max-width:380px; }
+.todo-board { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px; }
+.todo-col { flex:1 1 220px; max-width:300px; padding:10px 12px; }
+.todo-col h2 { font-size:13px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid currentColor; }
+.todo-col h2 .sub { color:var(--muted); }
+.todo-col .row { padding:5px 0; font-size:13px; gap:6px; }
+.todo-col .empty { padding:6px 0; }
 .addrow input[type=text] { font-family:inherit; font-size:12px; padding:5px 8px; border:1px solid var(--line);
   border-radius:8px; background:var(--input-bg); color:var(--ink); flex:1; min-width:104px; width:auto; }
 
