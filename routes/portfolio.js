@@ -17,7 +17,7 @@ function num(v) { return v === null || v === undefined ? null : Number(v); }
 
 router.get('/', async (req, res) => {
   const portfolioId = +(req.query.portfolioId || 1);
-  const { rows } = await pool.query('SELECT * FROM portfolio WHERE portfolio_id = $1 ORDER BY created_at DESC', [portfolioId]);
+  const { rows } = await pool.query('SELECT * FROM portfolio WHERE portfolio_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC', [portfolioId]);
   res.json(rows.map(rowOut));
 });
 
@@ -50,8 +50,17 @@ router.patch('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  await pool.query('DELETE FROM portfolio WHERE id = $1', [+req.params.id]);
-  res.status(204).end();
+  const id = +req.params.id;
+  const { rows } = await pool.query('UPDATE portfolio SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING id', [id]);
+  if (!rows.length) return res.status(404).json({ error: 'nicht gefunden' });
+  res.json({ ok: true, id });
+});
+
+router.post('/:id/restore', async (req, res) => {
+  const id = +req.params.id;
+  const { rows } = await pool.query('UPDATE portfolio SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *', [id]);
+  if (!rows.length) return res.status(404).json({ error: 'nichts zum Wiederherstellen (evtl. Frist abgelaufen)' });
+  res.json(rowOut(rows[0]));
 });
 
 // ---------- Performance-Verlauf (Snapshots) ----------

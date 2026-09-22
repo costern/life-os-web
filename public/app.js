@@ -54,6 +54,33 @@ async function api(path, opts) {
   return data;
 }
 
+/* ---------- Undo-Toast: nach dem Löschen kurz "Rückgängig" anbieten ----------
+   Server loescht dabei nur "weich" (deleted_at) und raeumt es erst nach einer
+   Gnadenfrist endgueltig weg (siehe lib/softDelete.js) - die Funktion hier ruft
+   bei Klick einfach den passenden /restore-Endpunkt auf. */
+function zeigeUndoToast(text, wiederherstellen){
+  let host = document.getElementById('undoToastHost');
+  if (!host){
+    host = document.createElement('div');
+    host.id = 'undoToastHost';
+    document.body.appendChild(host);
+  }
+  const toast = document.createElement('div');
+  toast.className = 'undo-toast';
+  toast.innerHTML = '<span>'+esc(text)+'</span><button type="button" class="undo-toast-btn">Rückgängig</button>';
+  host.appendChild(toast);
+  const entfernen = () => { toast.classList.add('out'); setTimeout(() => toast.remove(), 200); };
+  const timer = setTimeout(entfernen, 8000);
+  toast.querySelector('.undo-toast-btn').addEventListener('click', async () => {
+    clearTimeout(timer);
+    const btn = toast.querySelector('.undo-toast-btn');
+    btn.disabled = true; btn.textContent = '…';
+    try { await wiederherstellen(); }
+    catch(e){ alert('Konnte nicht wiederhergestellt werden: ' + e.message); }
+    entfernen();
+  });
+}
+
 (function(){
   const btns = document.querySelectorAll('nav.side button[data-page]');
   function show(id){
@@ -648,7 +675,10 @@ async function ladeOvTrades(){
         return;
       }
       delete del.dataset.confirm;
-      try { await api('/todos/'+id, { method:'DELETE' }); await laden(); }
+      try {
+        await api('/todos/'+id, { method:'DELETE' }); await laden();
+        zeigeUndoToast('To-Do gelöscht', async () => { await api('/todos/'+id+'/restore', { method:'POST' }); await laden(); });
+      }
       catch(e){ alert('Konnte nicht gelöscht werden: ' + e.message); }
       return;
     }
@@ -1212,6 +1242,7 @@ async function tlLoescheTrade(id, zielEl){
     await api('/trades/'+id, { method:'DELETE' });
     tlOffenId = null;
     await ladeHistorie();
+    zeigeUndoToast('Trade gelöscht', async () => { await api('/trades/'+id+'/restore', { method:'POST' }); await ladeHistorie(); });
   } catch(e){
     zielEl.querySelector('.tle-msg').textContent = 'Fehler: '+e.message;
     zielEl.querySelector('.tle-msg').className = 'te-msg tle-msg bad';
@@ -1931,7 +1962,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           return;
         }
         const id = delBtn.closest('tr').dataset.id;
-        try { await api('/watchlist/'+id, { method: 'DELETE' }); await ladeUndZeichne(); }
+        try {
+          await api('/watchlist/'+id, { method: 'DELETE' }); await ladeUndZeichne();
+          zeigeUndoToast('Eintrag gelöscht', async () => { await api('/watchlist/'+id+'/restore', { method:'POST' }); await ladeUndZeichne(); });
+        }
         catch(e) { alert('Konnte nicht gelöscht werden: ' + e.message); }
       }
     });
@@ -2643,7 +2677,10 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
         return;
       }
       delete del.dataset.confirm;
-      try { await api('/portfolio/'+id, { method:'DELETE' }); await ladePortfolio(); }
+      try {
+        await api('/portfolio/'+id, { method:'DELETE' }); await ladePortfolio();
+        zeigeUndoToast('Position gelöscht', async () => { await api('/portfolio/'+id+'/restore', { method:'POST' }); await ladePortfolio(); });
+      }
       catch(e){ alert('Konnte nicht gelöscht werden: '+e.message); }
       return;
     }

@@ -5,6 +5,7 @@ const path = require('path');
 
 const initDb = require('./db/init');
 const { requireAuthOrClaude, requirePageLogin } = require('./lib/auth');
+const { raeumeAlteGeloeschteAuf } = require('./lib/softDelete');
 
 const authRoutes = require('./routes/auth');
 const tradesRoutes = require('./routes/trades');
@@ -61,6 +62,10 @@ const PORT = process.env.PORT || 3000;
 initDb()
   .then(() => {
     app.listen(PORT, () => console.log('Life OS Web läuft auf Port ' + PORT));
+    // Endgueltiges Aufraeumen weich geloeschter Eintraege (siehe lib/softDelete.js) -
+    // einmal beim Start, danach alle 5 Minuten.
+    raeumeAlteGeloeschteAuf();
+    setInterval(raeumeAlteGeloeschteAuf, 5 * 60 * 1000);
   })
   .catch(err => {
     console.error('DB-Init fehlgeschlagen:', err);

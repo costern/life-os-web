@@ -23,12 +23,12 @@ function tfArray(v) {
 }
 
 router.get('/', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM trades ORDER BY opened_at DESC');
+  const { rows } = await pool.query('SELECT * FROM trades WHERE deleted_at IS NULL ORDER BY opened_at DESC');
   res.json(rows.map(rowOut));
 });
 
 router.get('/open', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM trades WHERE exit_price IS NULL ORDER BY opened_at DESC');
+  const { rows } = await pool.query('SELECT * FROM trades WHERE exit_price IS NULL AND deleted_at IS NULL ORDER BY opened_at DESC');
   res.json(rows.map(rowOut));
 });
 
@@ -169,11 +169,20 @@ router.post('/:id/close', async (req, res) => {
   res.json(rowOut(rows[0]));
 });
 
+// Weiches Loeschen statt sofort endgueltig, damit der "Rueckgaengig"-Toast im Frontend
+// funktioniert - siehe lib/softDelete.js fuers spaetere endgueltige Aufraeumen.
 router.delete('/:id', async (req, res) => {
   const id = +req.params.id;
-  const { rowCount } = await pool.query('DELETE FROM trades WHERE id = $1', [id]);
-  if (!rowCount) return res.status(404).json({ error: 'Trade nicht gefunden' });
-  res.json({ ok: true });
+  const { rows } = await pool.query('UPDATE trades SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING id', [id]);
+  if (!rows.length) return res.status(404).json({ error: 'Trade nicht gefunden' });
+  res.json({ ok: true, id });
+});
+
+router.post('/:id/restore', async (req, res) => {
+  const id = +req.params.id;
+  const { rows } = await pool.query('UPDATE trades SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *', [id]);
+  if (!rows.length) return res.status(404).json({ error: 'nichts zum Wiederherstellen (evtl. Frist abgelaufen)' });
+  res.json(rowOut(rows[0]));
 });
 
 module.exports = router;

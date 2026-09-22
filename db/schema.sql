@@ -40,6 +40,9 @@ CREATE INDEX IF NOT EXISTS idx_trades_open ON trades ((exit_price IS NULL));
 -- eigentlich ein Fehlgriff (nicht die eigene Strategie, haette so nicht genommen werden
 -- sollen)? NULL = noch nicht bewertet. Rein informativ fuers Trading-Log.
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS trade_type TEXT;
+-- deleted_at: "weiches" Loeschen statt sofort endgueltig - siehe Undo-Toast im Frontend
+-- (public/app.js `zeigeUndoToast`) und die Aufraeum-Routine in lib/softDelete.js.
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS todos (
   id SERIAL PRIMARY KEY,
@@ -52,6 +55,7 @@ CREATE TABLE IF NOT EXISTS todos (
   done_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE todos ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS macro_status (
   id INTEGER PRIMARY KEY DEFAULT 1,
@@ -116,6 +120,7 @@ ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS portfolio_id INTEGER REFERENCES p
 -- multipliziert sie mit Kursen aus Zeiten, in denen der Coin noch gar nicht gehalten
 -- wurde - das Portfolio sieht dann faelschlich schon vor dem eigentlichen Kauf werthaltig aus.
 ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS held_since DATE;
+ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 -- Performance-Verlauf: ein Wert pro Portfolio pro Tag. "estimated=true" heisst
 -- rueckwirkend geschaetzt (aktuelle Bestaende x historische Kurse), "false" ist ein
@@ -173,6 +178,7 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS div_struktur TEXT;
 -- uhrzeit: Kerzen-Close des Signals. Standard 02:00 = Tageschart-Close; 12:00 = 12H-Close
 -- mitten am Tag; kuerzere Timeframes werden von Hand eingetragen. NULL = unbekannt.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS uhrzeit TIME;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).
