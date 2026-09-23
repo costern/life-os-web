@@ -120,6 +120,57 @@ router.patch('/:id', async (req, res) => {
   res.json(rowOut(rows[0]));
 });
 
+// Bottom-Events-Screenshots: gleiches Prinzip wie beim Trading-Log (routes/trades.js) -
+// Colin legt eigene TradingView-Screenshots zu einem Signal ab, Bilder liegen als bytea
+// in der DB (Render hat kein persistentes Dateisystem).
+const ERLAUBTE_BILDTYPEN = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+
+router.get('/:id/screenshots', async (req, res) => {
+  const id = +req.params.id;
+  const { rows } = await pool.query(
+    'SELECT id, content_type, uploaded_at FROM watchlist_screenshots WHERE signal_id=$1 ORDER BY uploaded_at ASC, id ASC',
+    [id]
+  );
+  res.json(rows.map(r => ({ id: r.id, contentType: r.content_type, uploadedAt: r.uploaded_at })));
+});
+
+router.post('/:id/screenshots', async (req, res) => {
+  const id = +req.params.id;
+  const { imageBase64 } = req.body || {};
+  const match = /^data:([^;]+);base64,(.+)$/.exec(String(imageBase64 || ''));
+  if (!match) return res.status(400).json({ error: 'imageBase64 fehlt oder ungueltig' });
+  const contentType = match[1];
+  if (!ERLAUBTE_BILDTYPEN.has(contentType)) return res.status(400).json({ error: 'Bildtyp nicht erlaubt: ' + contentType });
+  const buffer = Buffer.from(match[2], 'base64');
+  const { rows } = await pool.query(
+    `INSERT INTO watchlist_screenshots (signal_id, content_type, image_data) VALUES ($1,$2,$3)
+     RETURNING id, content_type, uploaded_at`,
+    [id, contentType, buffer]
+  );
+  const r = rows[0];
+  res.status(201).json({ id: r.id, contentType: r.content_type, uploadedAt: r.uploaded_at });
+});
+
+router.get('/:id/screenshots/:sid/image', async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT content_type, image_data FROM watchlist_screenshots WHERE id=$1 AND signal_id=$2',
+    [+req.params.sid, +req.params.id]
+  );
+  if (!rows.length) return res.status(404).end();
+  res.set('Content-Type', rows[0].content_type);
+  res.set('Cache-Control', 'private, max-age=31536000, immutable');
+  res.send(rows[0].image_data);
+});
+
+router.delete('/:id/screenshots/:sid', async (req, res) => {
+  const { rowCount } = await pool.query(
+    'DELETE FROM watchlist_screenshots WHERE id=$1 AND signal_id=$2',
+    [+req.params.sid, +req.params.id]
+  );
+  if (!rowCount) return res.status(404).json({ error: 'Screenshot nicht gefunden' });
+  res.json({ ok: true });
+});
+
 router.delete('/:id', async (req, res) => {
   const id = +req.params.id;
   const { rows } = await pool.query('UPDATE watchlist_signals SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING id', [id]);

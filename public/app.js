@@ -1256,7 +1256,7 @@ function renderTradeLogShots(tradeId, shots, el){
   const kacheln = shots.map(s =>
     '<div class="tl-shot-thumb" data-shot-id="'+s.id+'">' +
       '<img src="/api/trades/'+tradeId+'/screenshots/'+s.id+'/image" loading="lazy" alt="Screenshot">' +
-      '<button type="button" class="tl-shot-del" title="Löschen">✕</button>' +
+      '<button type="button" class="tl-shot-del" title="Löschen (oder Rechtsklick)">✕</button>' +
     '</div>'
   ).join('');
   // WICHTIG: bewusst kein <label for=input>, das wuerde jeden Klick auf die Kachel sofort
@@ -1283,6 +1283,13 @@ function renderTradeLogShots(tradeId, shots, el){
     btn.addEventListener('click', ev => {
       ev.stopPropagation();
       const kachel = btn.closest('.tl-shot-thumb');
+      tlLoescheScreenshot(tradeId, +kachel.dataset.shotId, el);
+    });
+  });
+  // Rechtsklick auf die Kachel loescht ebenfalls (zusaetzlich zum ✕-Button).
+  el.querySelectorAll('.tl-shot-thumb').forEach(kachel => {
+    kachel.addEventListener('contextmenu', ev => {
+      ev.preventDefault();
       tlLoescheScreenshot(tradeId, +kachel.dataset.shotId, el);
     });
   });
@@ -1341,6 +1348,94 @@ async function tlLoescheScreenshot(tradeId, shotId, el){
     delete tlShotsCache[tradeId]; // Galerie-Cache invalidieren
     const shots = await api('/trades/'+tradeId+'/screenshots').catch(() => []);
     renderTradeLogShots(tradeId, shots, el);
+  } catch(e){
+    const msg = el.querySelector('.tl-shots-msg');
+    msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg tl-shots-msg bad';
+  }
+}
+
+// Bottom-Events-Screenshots: gleiches Prinzip wie beim Trading-Log oben, nur andere Route
+// (/watchlist/:id/screenshots) - bewusst dieselben CSS-Klassen (tl-shot-*) verwendet,
+// damit es optisch identisch aussieht statt duplizierter Styles.
+let wlOffenId = null;
+const wlShotsCache = {};
+
+function wlLiesShots(id){
+  if (!wlShotsCache[id]) wlShotsCache[id] = api('/watchlist/'+id+'/screenshots').catch(() => []);
+  return wlShotsCache[id];
+}
+
+function renderWlShots(signalId, shots, el){
+  const kacheln = shots.map(s =>
+    '<div class="tl-shot-thumb" data-shot-id="'+s.id+'">' +
+      '<img src="/api/watchlist/'+signalId+'/screenshots/'+s.id+'/image" loading="lazy" alt="Screenshot">' +
+      '<button type="button" class="tl-shot-del" title="Löschen (oder Rechtsklick)">✕</button>' +
+    '</div>'
+  ).join('');
+  el.innerHTML =
+    '<div class="tl-shots-grid">' + kacheln +
+      '<div class="tl-shot-upload" tabindex="0">' +
+        '<span class="tl-shot-upload-plus">+</span>' +
+        '<span class="tl-shot-upload-hint">Strg+V / Cmd+V<br>zum Einfügen</span>' +
+        '<button type="button" class="tl-shot-browse" title="Datei auswählen">📁</button>' +
+        '<input type="file" accept="image/*" hidden class="tl-shot-input">' +
+      '</div>' +
+    '</div>' +
+    '<span class="te-msg tl-shots-msg"></span>';
+
+  el.querySelectorAll('.tl-shot-thumb img').forEach(img => {
+    img.addEventListener('click', () => tlZeigeLightbox(img.src));
+  });
+  el.querySelectorAll('.tl-shot-del').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const kachel = btn.closest('.tl-shot-thumb');
+      wlLoescheScreenshot(signalId, +kachel.dataset.shotId, el);
+    });
+  });
+  // Rechtsklick auf die Kachel loescht ebenfalls (zusaetzlich zum ✕-Button) - so wie
+  // Colin es sich urspruenglich gewuenscht hat.
+  el.querySelectorAll('.tl-shot-thumb').forEach(kachel => {
+    kachel.addEventListener('contextmenu', ev => {
+      ev.preventDefault();
+      wlLoescheScreenshot(signalId, +kachel.dataset.shotId, el);
+    });
+  });
+  const input = el.querySelector('.tl-shot-input');
+  input.addEventListener('change', () => {
+    if (input.files && input.files[0]) wlLadeScreenshotHoch(signalId, input.files[0], el);
+  });
+  const browse = el.querySelector('.tl-shot-browse');
+  if (browse) browse.addEventListener('click', ev => { ev.stopPropagation(); input.click(); });
+}
+
+async function wlLadeScreenshotHoch(signalId, file, el){
+  const msg = el.querySelector('.tl-shots-msg');
+  msg.textContent = ''; msg.className = 'te-msg tl-shots-msg';
+  if (file.size > TL_MAX_BILDGROESSE) {
+    msg.textContent = 'Bild zu groß (max. 8 MB)'; msg.className = 'te-msg tl-shots-msg bad';
+    return;
+  }
+  try {
+    const dataUrl = await tlLiesAlsDataUrl(file);
+    await api('/watchlist/'+signalId+'/screenshots', { method:'POST', body: JSON.stringify({ imageBase64: dataUrl }) });
+    delete wlShotsCache[signalId];
+    const shots = await api('/watchlist/'+signalId+'/screenshots').catch(() => []);
+    renderWlShots(signalId, shots, el);
+  } catch(e){
+    msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg tl-shots-msg bad';
+  }
+}
+
+async function wlLoescheScreenshot(signalId, shotId, el){
+  const kachel = el.querySelector('.tl-shot-thumb[data-shot-id="'+shotId+'"]');
+  const btn = kachel && kachel.querySelector('.tl-shot-del');
+  if (btn && btn.textContent !== '✓') { btn.textContent = '✓'; btn.title = 'Wirklich löschen?'; return; }
+  try {
+    await api('/watchlist/'+signalId+'/screenshots/'+shotId, { method:'DELETE' });
+    delete wlShotsCache[signalId];
+    const shots = await api('/watchlist/'+signalId+'/screenshots').catch(() => []);
+    renderWlShots(signalId, shots, el);
   } catch(e){
     const msg = el.querySelector('.tl-shots-msg');
     msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg tl-shots-msg bad';
@@ -1719,6 +1814,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       // Detailansicht: klappt per Doppelklick auf die Zeile (oder ueber ✎) auf
       '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="12"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
+        '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>' +
         '<div class="wl-detail-grid">' +
           '<label>Datum<input type="date" class="wle-date" value="'+s.date+'"></label>' +
           '<label>Uhrzeit <span class="wl-hint">Kerzen-Close, leer = 02:00 (Tageschart)</span>' +
@@ -1904,22 +2000,30 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     });
 
     // Doppelklick (bzw. Doppeltipp) auf eine Zeile klappt die Detailansicht auf/zu
+    function wlOeffneDetail(id, detailRow){
+      detailRow.hidden = !detailRow.hidden;
+      wlOffenId = detailRow.hidden ? null : id;
+      if (!detailRow.hidden) {
+        const shotsEl = document.getElementById('wl-shots-'+id);
+        if (shotsEl) wlLiesShots(id).then(shots => { if (wlOffenId === id) renderWlShots(id, shots, shotsEl); });
+      }
+    }
     tableWrap.addEventListener('dblclick', ev => {
       const tr = ev.target.closest('tr[data-id]');
       if (!tr || tr.classList.contains('wl-edit-row')) return;
       const detail = tableWrap.querySelector('tr.wl-edit-row[data-id="'+tr.dataset.id+'"]');
-      if (detail) detail.hidden = !detail.hidden;
+      if (detail) wlOeffneDetail(tr.dataset.id, detail);
     });
     tableWrap.addEventListener('click', async ev => {
       const editBtn = ev.target.closest('.wl-edit');
       if (editBtn) {
         const id = editBtn.closest('tr').dataset.id;
         const editRow = tableWrap.querySelector('tr.wl-edit-row[data-id="'+id+'"]');
-        if (editRow) editRow.hidden = !editRow.hidden;
+        if (editRow) wlOeffneDetail(id, editRow);
         return;
       }
       const cancelBtn = ev.target.closest('.wl-cancel');
-      if (cancelBtn) { cancelBtn.closest('tr').hidden = true; return; }
+      if (cancelBtn) { cancelBtn.closest('tr').hidden = true; wlOffenId = null; return; }
 
       const saveBtn = ev.target.closest('.wl-save');
       if (saveBtn) {
@@ -1960,12 +2064,27 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         }
         const id = delBtn.closest('tr').dataset.id;
         try {
-          await api('/watchlist/'+id, { method: 'DELETE' }); await ladeUndZeichne();
+          await api('/watchlist/'+id, { method: 'DELETE' });
+          if (wlOffenId === id) wlOffenId = null;
+          await ladeUndZeichne();
           zeigeUndoToast('Eintrag gelöscht', async () => { await api('/watchlist/'+id+'/restore', { method:'POST' }); await ladeUndZeichne(); });
         }
         catch(e) { alert('Konnte nicht gelöscht werden: ' + e.message); }
       }
     });
+
+    // Falls gerade eine Detailansicht offen war (z.B. nach dem Speichern neu gezeichnet),
+    // wieder aufklappen statt sie zu verlieren - inkl. Screenshots neu laden.
+    if (wlOffenId != null) {
+      const detailRow = tableWrap.querySelector('tr.wl-edit-row[data-id="'+wlOffenId+'"]');
+      if (detailRow) {
+        detailRow.hidden = false;
+        const shotsEl = document.getElementById('wl-shots-'+wlOffenId);
+        if (shotsEl) wlLiesShots(wlOffenId).then(shots => { if (wlOffenId != null) renderWlShots(wlOffenId, shots, shotsEl); });
+      } else {
+        wlOffenId = null;
+      }
+    }
   }
 
   async function ladeUndZeichne(){
@@ -2742,15 +2861,20 @@ function seiteAuffrischen(id){
 // muessen: solange im Trading-Log ein Trade aufgeklappt ist, geht ein eingefuegtes Bild
 // direkt an dessen Screenshot-Bereich - ganz ohne vorherigen Klick auf die "+"-Kachel noetig.
 document.addEventListener('paste', ev => {
-  if (tlOffenId == null) return;
+  if (tlOffenId == null && wlOffenId == null) return;
   const items = (ev.clipboardData && ev.clipboardData.items) || [];
   const bildItem = [...items].find(it => it.type && it.type.startsWith('image/'));
   if (!bildItem) return;
   const datei = bildItem.getAsFile();
   if (!datei) return;
   ev.preventDefault();
-  const el = document.getElementById('tl-shots-'+tlOffenId);
-  if (el) tlLadeScreenshotHoch(tlOffenId, datei, el);
+  if (tlOffenId != null) {
+    const el = document.getElementById('tl-shots-'+tlOffenId);
+    if (el) tlLadeScreenshotHoch(tlOffenId, datei, el);
+  } else if (wlOffenId != null) {
+    const el = document.getElementById('wl-shots-'+wlOffenId);
+    if (el) wlLadeScreenshotHoch(wlOffenId, datei, el);
+  }
 });
 
 document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });

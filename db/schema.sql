@@ -244,3 +244,15 @@ CREATE TABLE IF NOT EXISTS trade_screenshots (
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_trade_screenshots_trade ON trade_screenshots (trade_id, uploaded_at);
+
+-- Bottom-Events-Screenshots: analog zu trade_screenshots, damit man bei einem Watchlist-
+-- Signal ebenfalls eigene TradingView-Screenshots ablegen kann (zu viele/falsche lassen
+-- sich ueber die dazugehoerige DELETE-Route wieder entfernen).
+CREATE TABLE IF NOT EXISTS watchlist_screenshots (
+  id SERIAL PRIMARY KEY,
+  signal_id INTEGER NOT NULL REFERENCES watchlist_signals(id) ON DELETE CASCADE,
+  content_type TEXT NOT NULL,
+  image_data BYTEA NOT NULL,
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_watchlist_screenshots_signal ON watchlist_screenshots (signal_id, uploaded_at);
