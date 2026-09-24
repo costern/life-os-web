@@ -355,22 +355,27 @@ a { color:var(--accent); }
   letter-spacing:.06em; color:var(--muted); border-bottom:none; background:var(--hover-bg); }
 .tl-row2 { cursor:pointer; }
 .tl-row2:hover td { background:var(--hover-bg); }
-/* Solange das Detail dieser Zeile aufgeklappt ist: leicht einfaerben UND die graue
-   Trennlinie zur Detail-Zeile darunter entfernen, damit klar ist, dass beides zusammengehoert
-   (statt wie vorher durch die Linie getrennt auszusehen). */
-.tl-row2.tl-row-active td { background:var(--badge-amber-bg); border-bottom-color:transparent;
-  border-top:3px solid var(--amber); padding-top:9px; padding-bottom:9px; }
-.tl-row2.tl-row-active td:first-child { border-left:3px solid var(--amber); border-top-left-radius:8px; }
-.tl-row2.tl-row-active td:last-child { border-right:3px solid var(--amber); border-top-right-radius:8px; }
+/* Solange das Detail dieser Zeile aufgeklappt ist: die Tabellenzeile verschwindet ganz aus
+   der Tabelle - ihre Werte erscheinen stattdessen als eigene "Recap-Zeile" innerhalb des
+   Detailbereichs (siehe .tl-recap-row), zwischen Bildern und Beschreibung. */
+.tl-row2.tl-row-active { display:none; }
 .tl-detail-row td { padding:0; border-bottom:1px solid var(--line); white-space:normal; width:0; }
 .tl-detail-row > td > div { padding:14px 10px 18px; }
-/* Solange das Detail offen ist: die Detail-Zeile bekommt denselben gelben Rahmen +
-   Hintergrund wie die aktive Tabellenzeile darueber (border-radius nur unten), damit beide
-   Zeilen zusammen wie ein einziger, klar abgegrenzter Kasten fuer genau diesen Trade wirken. */
-.tl-detail-row:not([hidden]) td { background:var(--badge-amber-bg); border-bottom:3px solid var(--amber);
-  border-left:3px solid var(--amber); border-right:3px solid var(--amber);
-  border-bottom-left-radius:8px; border-bottom-right-radius:8px; }
+/* Solange das Detail offen ist: die Detail-Zeile bekommt ringsum einen gelben Rahmen +
+   Hintergrund, damit klar erkennbar ist, dass alles darin (inkl. der Recap-Zeile) zu
+   genau diesem einen Trade gehoert. */
+.tl-detail-row:not([hidden]) td { background:var(--badge-amber-bg); border:3px solid var(--amber);
+  border-radius:8px; }
 .tl-detail-row:not([hidden]) > td > div { padding:18px 14px 22px; }
+/* Recap-Zeile: Wiederholung der Tabellenspalten (Datum/Ergebnis/Asset/Side/TF/Art/Trade/
+   Strategie) direkt im Detailbereich, im selben Zeilen-Look wie oben in der Tabelle -
+   per CSS-Grid nachgebaut, weil hier kein echtes <tr> stehen kann. */
+.tl-recap-row { display:grid; grid-template-columns:60px 90px minmax(90px,1.2fr) 64px minmax(80px,1fr) 78px minmax(100px,1.4fr) minmax(100px,1.4fr);
+  font-size:13px; border:1px solid var(--line); border-radius:9px; background:var(--card); overflow:auto;
+  margin-bottom:14px; cursor:pointer; }
+.tl-recap-cell { padding:8px 10px; border-right:1px solid var(--line); display:flex; align-items:center; white-space:nowrap; }
+.tl-recap-cell:last-child { border-right:none; }
+.tl-recap-row:hover { border-color:var(--accent); }
 .tl-side { font-size:11px; font-weight:700; padding:2px 9px; border-radius:99px; }
 .tl-side-long { background:var(--badge-blue-bg); color:var(--accent); }
 .tl-side-short { background:var(--badge-amber-bg); color:var(--amber); }

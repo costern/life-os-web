@@ -827,6 +827,23 @@ function coinIconWlHtml(ticker, name){
   '</span>';
 }
 
+// Kompakte Wiederholung der Tabellenzeile (Datum/Ergebnis/Asset/Side/TF/Art/Trade/Strategie)
+// innerhalb der aufgeklappten Detailansicht - Colin will diese Infos direkt zwischen den
+// Bildern und der Beschreibung sehen statt nur ganz oben in der Tabelle, aber weiterhin im
+// Tabellenzeilen-Look (per CSS-Grid nachgebaut, da ein <tr> hier kein gueltiger Ort waere).
+function tlUebersichtZeileHtml(r){
+  return '<div class="tl-recap-row">' +
+    '<div class="tl-recap-cell">'+tlDatKurz(r.openedAt)+'</div>' +
+    '<div class="tl-recap-cell">'+tlErgebnisHtml(r)+'</div>' +
+    '<div class="tl-recap-cell">'+tlAssetIconHtml(r)+'</div>' +
+    '<div class="tl-recap-cell">'+tlSideHtml(r.side)+'</div>' +
+    '<div class="tl-recap-cell">'+tlBadgesHtml(r.tf)+'</div>' +
+    '<div class="tl-recap-cell">'+tlArtBadgeHtml(r)+'</div>' +
+    '<div class="tl-recap-cell">'+(r.name ? esc(r.name) : '<span class="muted">–</span>')+'</div>' +
+    '<div class="tl-recap-cell">'+(r.strategy ? esc(r.strategy) : '<span class="muted">–</span>')+'</div>' +
+  '</div>';
+}
+
 function renderTradeLogTabelle(){
   const el = document.getElementById('tradeLogTabelle');
   if (!el) return;
@@ -1081,6 +1098,7 @@ function renderTradeLogDetail(trade, shots, zielEl){
 
   zielEl.innerHTML =
     '<div class="tl-shots-wrap" id="tl-shots-'+trade.id+'"></div>' +
+    tlUebersichtZeileHtml(trade) +
     '<div class="tl-feld-notiz-split">' +
       '<div class="tl-feld tl-notiz-col">' +
         '<div class="tl-feld-l">Setup &amp; Fehler</div>' +
@@ -1102,6 +1120,11 @@ function renderTradeLogDetail(trade, shots, zielEl){
       '<span class="te-msg tle-msg"></span>' +
     '</div>';
   renderTradeLogShots(trade.id, shots, document.getElementById('tl-shots-'+trade.id));
+  const recapZeile = zielEl.querySelector('.tl-recap-row');
+  if (recapZeile) {
+    recapZeile.title = 'Doppelklick zum Einklappen';
+    recapZeile.addEventListener('dblclick', () => tlToggleDetail(trade.id));
+  }
   tlTfChipsRender(zielEl.querySelector('.tle-tf'));
   tlSetupEventsToggle(trade, zielEl);
   zielEl.querySelectorAll('.tl-notiz-auto').forEach(feld => {
