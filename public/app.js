@@ -1081,6 +1081,10 @@ function renderTradeLogDetail(trade, shots, zielEl){
 
   zielEl.innerHTML =
     '<div class="tl-shots-wrap" id="tl-shots-'+trade.id+'"></div>' +
+    '<div class="tl-feld tl-feld-notiz">' +
+      '<div class="tl-feld-l">Beschreibung</div>' +
+      '<textarea class="tle-notiz tl-notiz-auto" rows="1" placeholder="Was ist zu sehen, was war der Gedanke, was ist passiert…">'+esc(trade.notiz||'')+'</textarea>' +
+    '</div>' +
     '<div class="tl-events-wrap">' +
       '<button type="button" class="tl-events-toggle">📈 Entry/TP/SL-Verlauf</button>' +
       '<div class="tl-events-chart" id="tl-events-'+trade.id+'" hidden></div>' +
@@ -1094,9 +1098,19 @@ function renderTradeLogDetail(trade, shots, zielEl){
   renderTradeLogShots(trade.id, shots, document.getElementById('tl-shots-'+trade.id));
   tlTfChipsRender(zielEl.querySelector('.tle-tf'));
   tlSetupEventsToggle(trade, zielEl);
+  const notizFeld = zielEl.querySelector('.tle-notiz');
+  tlAutoResize(notizFeld);
+  notizFeld.addEventListener('input', () => tlAutoResize(notizFeld));
 
   zielEl.querySelector('.tle-save').addEventListener('click', () => tlSpeichereDetail(trade.id, zielEl));
   zielEl.querySelector('.tle-delete').addEventListener('click', () => tlLoescheTrade(trade.id, zielEl));
+}
+
+// Textfeld waechst mit dem Inhalt mit statt einer festen Groesse mit Scrollbalken -
+// duenn wenn wenig drinsteht, mehr Platz sobald mehr Text da ist.
+function tlAutoResize(textarea){
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
 }
 
 // ---------- Entry/TP/SL-Verlauf: kleiner Treppenlinien-Chart, wie Colins TradingView-
@@ -1210,6 +1224,7 @@ async function tlSpeichereDetail(id, zielEl){
     tradeType: val('tle-tradetype') || null,
     name: val('tle-name').trim() || null,
     strategy: val('tle-strategy').trim() || null,
+    notiz: val('tle-notiz').trim() || null,
     tf: tlTfWerte(zielEl),
     entry1: num(val('tle-entry1')), entry2: num(val('tle-entry2')),
     size1: num(val('tle-size1')), size2: num(val('tle-size2')),

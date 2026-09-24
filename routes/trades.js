@@ -8,7 +8,8 @@ function rowOut(r) {
     entry1: num(r.entry1), entry2: num(r.entry2), size1: num(r.size1), size2: num(r.size2),
     sl: num(r.sl), tp: num(r.tp), exit: num(r.exit_price), pnl: num(r.pnl),
     fundingFees: num(r.funding_fees), realizedPnl: num(r.realized_pnl), strategy: r.strategy, riskUsd: num(r.risk_usd),
-    tf: r.tf, tradeType: r.trade_type, openedAt: r.opened_at, closedAt: r.closed_at, source: r.source
+    tf: r.tf, tradeType: r.trade_type, openedAt: r.opened_at, closedAt: r.closed_at, source: r.source,
+    notiz: r.notiz
   };
 }
 function num(v) { return v === null || v === undefined ? null : Number(v); }
@@ -57,7 +58,7 @@ router.patch('/:id', async (req, res) => {
                              ['realizedPnl','realized_pnl'],['strategy','strategy'],
                              ['name','trade_name'],['riskUsd','risk_usd'],
                              ['asset','asset'],['ticker','ticker'],['side','side'],['openedAt','opened_at'],
-                             ['tradeType','trade_type']]) {
+                             ['tradeType','trade_type'],['notiz','notiz']]) {
     if (b[key] !== undefined) { fields.push(`${col} = $${i++}`); vals.push(b[key]); }
   }
   // tf ist ein TEXT[] (mehrere Timeframes moeglich) - separat normalisieren statt roh durchreichen.

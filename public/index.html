@@ -12,7 +12,10 @@
 <body>
 <div class="shell">
   <nav class="side">
-    <div class="brand">Life OS</div>
+    <div class="brand-row">
+      <div class="brand">Life OS</div>
+      <button id="themeToggle" class="theme-toggle" type="button" title="Dark Mode umschalten">🌙</button>
+    </div>
     <button data-page="uebersicht" class="active"><span class="ico">🏠</span>Übersicht</button>
     <button data-page="disziplin"><span class="ico">📖</span>Täglich lesen</button>
     <button data-page="todos"><span class="ico">✅</span>To-Dos</button>
@@ -31,7 +34,6 @@
       <h1 id="greeting">Life OS<span>.</span></h1>
       <div style="display:flex;align-items:center;gap:12px">
         <div class="date" id="dateline"></div>
-        <button id="themeToggle" class="theme-toggle" type="button" title="Dark Mode umschalten">🌙</button>
       </div>
     </header>
 

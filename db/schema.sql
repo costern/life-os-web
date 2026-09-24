@@ -43,6 +43,9 @@ ALTER TABLE trades ADD COLUMN IF NOT EXISTS trade_type TEXT;
 -- deleted_at: "weiches" Loeschen statt sofort endgueltig - siehe Undo-Toast im Frontend
 -- (public/app.js `zeigeUndoToast`) und die Aufraeum-Routine in lib/softDelete.js.
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+-- notiz: freie Beschreibung des Trades (Kontext, was zu sehen war, was gelernt wurde) -
+-- fuers Zusammenspiel mit den Trading-Log-Screenshots und Obsidian gedacht.
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS notiz TEXT;
 
 CREATE TABLE IF NOT EXISTS todos (
   id SERIAL PRIMARY KEY,

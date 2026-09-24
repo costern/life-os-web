@@ -17,7 +17,8 @@
 body { font-family:-apple-system,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--ink); }
 .shell { display:flex; align-items:flex-start; gap:18px; padding:18px; }
 nav.side { width:186px; flex:0 0 186px; position:sticky; top:18px; }
-nav.side .brand { font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); padding:0 12px 10px; }
+nav.side .brand-row { display:flex; align-items:center; justify-content:space-between; padding:0 12px 10px; gap:8px; }
+nav.side .brand { font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); padding:0; }
 nav.side button { display:flex; align-items:center; gap:9px; width:100%; text-align:left; font-family:inherit; font-size:14px;
   background:none; border:none; color:var(--ink); padding:9px 12px; border-radius:10px; cursor:pointer; margin-bottom:2px; }
 nav.side button:hover { background:var(--hover-bg); }
@@ -228,6 +229,7 @@ a { color:var(--accent); }
   .shell { flex-direction:column; }
   nav.side { width:100%; flex:none; position:static; display:flex; gap:6px; overflow-x:auto; }
   nav.side .brand { display:none; }
+  nav.side .brand-row { flex:none; padding:0; }
   nav.side button { width:auto; white-space:nowrap; margin:0; }
 }
 /* Journal Day + Jahres-/Monatsfortschritt ganz oben auf der Uebersicht */
@@ -373,6 +375,11 @@ a { color:var(--accent); }
 .tl-feld-input:focus { outline:none; border-color:var(--accent); }
 .tl-save-row { display:flex; align-items:center; gap:10px; margin-top:16px; }
 .tl-feld-tf-multi { grid-column: span 2; }
+.tl-feld-notiz { margin-top:12px; }
+.tl-notiz-auto { width:100%; font-family:inherit; font-size:13.5px; line-height:1.5; padding:9px 11px; margin-top:4px;
+  border:1px solid var(--line); border-radius:9px; background:var(--input-bg); color:var(--ink);
+  resize:none; overflow:hidden; min-height:38px; display:block; }
+.tl-notiz-auto:focus { outline:none; border-color:var(--accent); }
 /* Nur die ausgewaehlten Timeframes werden als Chip gezeigt (statt immer alle 8 Optionen);
    neue kommen ueber das kleine "+"-Dropdown dazu, das nur noch die uebrigen Optionen listet. */
 .tl-tf-chips { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:4px; }
