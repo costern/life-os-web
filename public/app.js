@@ -555,7 +555,6 @@ async function ladeOvTrades(){
     const prioOpts = '<option value="">Priorität…</option>' + ['Hoch','Mittel','Niedrig'].map(p =>
       '<option'+(r.prio===p?' selected':'')+'>'+p+'</option>').join('');
     return '<div class="todo-panel" data-id="'+r.id+'">' +
-      '<div class="tp-line"><input type="text" class="te-text" maxlength="200" value="'+esc(r.text)+'" placeholder="Aufgabe"></div>' +
       '<div class="tp-line">' +
         '<input type="date" class="te-due" value="'+(r.due ? String(r.due).slice(0,10) : '')+'">' +
         '<input type="text" class="te-thema" list="themaSuggest" maxlength="40" value="'+esc(r.thema||'')+'" placeholder="Thema…">' +
@@ -569,10 +568,14 @@ async function ladeOvTrades(){
     '</div>';
   }
 
+  // Statt einem separaten, schmalen Eingabefeld im Panel darunter wird beim Bearbeiten
+  // direkt die normale Textanzeige durch ein gleich breites, mitwachsendes Textfeld ersetzt -
+  // so sieht man beim Tippen immer den ganzen Text statt nur einen kurzen Ausschnitt.
   function zeile(r, hideThema){
     return '<div class="row" data-id="'+r.id+'">' +
       '<span class="tcb'+(r.done?' done':'')+'" role="button">'+(r.done?'✓':'○')+'</span>' +
-      '<span class="t">'+esc(r.text)+'</span>' +
+      '<span class="t todo-text-anzeige">'+esc(r.text)+'</span>' +
+      '<textarea class="t te-text todo-text-edit" maxlength="200" rows="1" hidden>'+esc(r.text)+'</textarea>' +
       (r.prio ? '<span class="badge'+(r.prio==='Hoch'?' red':r.prio==='Mittel'?' amber':'')+'">'+esc(r.prio)+'</span>' : '') +
       (r.thema && !hideThema ? '<span class="badge">'+esc(r.thema)+'</span>' : '') +
       (r.due ? '<span class="muted">'+new Date(r.due).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</span>' : '') +
@@ -646,6 +649,10 @@ async function ladeOvTrades(){
     });
   });
 
+  document.addEventListener('input', ev => {
+    if (ev.target.classList.contains('todo-text-edit')) tlAutoResize(ev.target);
+  });
+
   document.addEventListener('click', async ev => {
     if (!ev.target.closest('#todoBoard, #ovTodos, #ovBeobachten')) return;
 
@@ -664,6 +671,14 @@ async function ladeOvTrades(){
       const row = editTgl.closest('.row');
       const p = row && row.nextElementSibling;
       if (p && p.classList.contains('todo-panel')) p.classList.toggle('on');
+      const anEingeschaltet = p && p.classList.contains('on');
+      const anzeige = row.querySelector('.todo-text-anzeige');
+      const edit = row.querySelector('.todo-text-edit');
+      if (anzeige && edit){
+        anzeige.hidden = anEingeschaltet;
+        edit.hidden = !anEingeschaltet;
+        if (anEingeschaltet){ tlAutoResize(edit); edit.focus(); }
+      }
       return;
     }
 
@@ -685,13 +700,22 @@ async function ladeOvTrades(){
     }
 
     const cancel = ev.target.closest('.te-cancel');
-    if (cancel){ cancel.closest('.todo-panel').classList.remove('on'); return; }
+    if (cancel){
+      const p = cancel.closest('.todo-panel');
+      p.classList.remove('on');
+      const row = p.previousElementSibling;
+      const anzeige = row && row.querySelector('.todo-text-anzeige');
+      const edit = row && row.querySelector('.todo-text-edit');
+      if (anzeige && edit){ anzeige.hidden = false; edit.hidden = true; edit.value = anzeige.textContent; }
+      return;
+    }
 
     const save = ev.target.closest('.te-save');
     if (save){
       const p = save.closest('.todo-panel');
       const id = p.dataset.id;
-      const text = p.querySelector('.te-text').value.trim();
+      const row = p.previousElementSibling;
+      const text = row.querySelector('.te-text').value.trim();
       const due = p.querySelector('.te-due').value;
       const thema = p.querySelector('.te-thema').value.trim();
       const prio = p.querySelector('.te-prio').value;
