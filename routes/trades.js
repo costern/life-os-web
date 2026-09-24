@@ -108,7 +108,7 @@ const ERLAUBTE_BILDTYPEN = new Set(['image/png', 'image/jpeg', 'image/webp', 'im
 router.get('/:id/screenshots', async (req, res) => {
   const id = +req.params.id;
   const { rows } = await pool.query(
-    'SELECT id, content_type, uploaded_at FROM trade_screenshots WHERE trade_id=$1 ORDER BY uploaded_at ASC, id ASC',
+    'SELECT id, content_type, uploaded_at FROM trade_screenshots WHERE trade_id=$1 AND deleted_at IS NULL ORDER BY uploaded_at ASC, id ASC',
     [id]
   );
   res.json(rows.map(r => ({ id: r.id, contentType: r.content_type, uploadedAt: r.uploaded_at })));
@@ -133,7 +133,7 @@ router.post('/:id/screenshots', async (req, res) => {
 
 router.get('/:id/screenshots/:sid/image', async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT content_type, image_data FROM trade_screenshots WHERE id=$1 AND trade_id=$2',
+    'SELECT content_type, image_data FROM trade_screenshots WHERE id=$1 AND trade_id=$2 AND deleted_at IS NULL',
     [+req.params.sid, +req.params.id]
   );
   if (!rows.length) return res.status(404).end();
@@ -142,13 +142,25 @@ router.get('/:id/screenshots/:sid/image', async (req, res) => {
   res.send(rows[0].image_data);
 });
 
+// Weiches Loeschen statt sofort endgueltig, damit der "Rueckgaengig"-Toast im Frontend
+// funktioniert - siehe lib/softDelete.js fuers spaetere endgueltige Aufraeumen.
 router.delete('/:id/screenshots/:sid', async (req, res) => {
   const { rowCount } = await pool.query(
-    'DELETE FROM trade_screenshots WHERE id=$1 AND trade_id=$2',
+    'UPDATE trade_screenshots SET deleted_at = now() WHERE id=$1 AND trade_id=$2 AND deleted_at IS NULL',
     [+req.params.sid, +req.params.id]
   );
   if (!rowCount) return res.status(404).json({ error: 'Screenshot nicht gefunden' });
   res.json({ ok: true });
+});
+
+router.post('/:id/screenshots/:sid/restore', async (req, res) => {
+  const { rows } = await pool.query(
+    'UPDATE trade_screenshots SET deleted_at = NULL WHERE id=$1 AND trade_id=$2 AND deleted_at IS NOT NULL RETURNING id, content_type, uploaded_at',
+    [+req.params.sid, +req.params.id]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'nichts zum Wiederherstellen (evtl. Frist abgelaufen)' });
+  const r = rows[0];
+  res.json({ id: r.id, contentType: r.content_type, uploadedAt: r.uploaded_at });
 });
 
 router.post('/:id/close', async (req, res) => {

@@ -1348,6 +1348,12 @@ async function tlLoescheScreenshot(tradeId, shotId, el){
     delete tlShotsCache[tradeId]; // Galerie-Cache invalidieren
     const shots = await api('/trades/'+tradeId+'/screenshots').catch(() => []);
     renderTradeLogShots(tradeId, shots, el);
+    zeigeUndoToast('Screenshot gelöscht', async () => {
+      await api('/trades/'+tradeId+'/screenshots/'+shotId+'/restore', { method:'POST' });
+      delete tlShotsCache[tradeId];
+      const nachher = await api('/trades/'+tradeId+'/screenshots').catch(() => []);
+      renderTradeLogShots(tradeId, nachher, el);
+    });
   } catch(e){
     const msg = el.querySelector('.tl-shots-msg');
     msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg tl-shots-msg bad';
@@ -1436,6 +1442,12 @@ async function wlLoescheScreenshot(signalId, shotId, el){
     delete wlShotsCache[signalId];
     const shots = await api('/watchlist/'+signalId+'/screenshots').catch(() => []);
     renderWlShots(signalId, shots, el);
+    zeigeUndoToast('Screenshot gelöscht', async () => {
+      await api('/watchlist/'+signalId+'/screenshots/'+shotId+'/restore', { method:'POST' });
+      delete wlShotsCache[signalId];
+      const nachher = await api('/watchlist/'+signalId+'/screenshots').catch(() => []);
+      renderWlShots(signalId, nachher, el);
+    });
   } catch(e){
     const msg = el.querySelector('.tl-shots-msg');
     msg.textContent = 'Fehler: '+e.message; msg.className = 'te-msg tl-shots-msg bad';
