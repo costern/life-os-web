@@ -9,7 +9,7 @@ function rowOut(r) {
     sl: num(r.sl), tp: num(r.tp), exit: num(r.exit_price), pnl: num(r.pnl),
     fundingFees: num(r.funding_fees), realizedPnl: num(r.realized_pnl), strategy: r.strategy, riskUsd: num(r.risk_usd),
     tf: r.tf, tradeType: r.trade_type, openedAt: r.opened_at, closedAt: r.closed_at, source: r.source,
-    notiz: r.notiz
+    notizSetup: r.notiz_setup, notizLektion: r.notiz_lektion
   };
 }
 function num(v) { return v === null || v === undefined ? null : Number(v); }
@@ -58,7 +58,8 @@ router.patch('/:id', async (req, res) => {
                              ['realizedPnl','realized_pnl'],['strategy','strategy'],
                              ['name','trade_name'],['riskUsd','risk_usd'],
                              ['asset','asset'],['ticker','ticker'],['side','side'],['openedAt','opened_at'],
-                             ['tradeType','trade_type'],['notiz','notiz']]) {
+                             ['tradeType','trade_type'],
+                             ['notizSetup','notiz_setup'],['notizLektion','notiz_lektion']]) {
     if (b[key] !== undefined) { fields.push(`${col} = $${i++}`); vals.push(b[key]); }
   }
   // tf ist ein TEXT[] (mehrere Timeframes moeglich) - separat normalisieren statt roh durchreichen.

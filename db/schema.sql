@@ -43,9 +43,24 @@ ALTER TABLE trades ADD COLUMN IF NOT EXISTS trade_type TEXT;
 -- deleted_at: "weiches" Loeschen statt sofort endgueltig - siehe Undo-Toast im Frontend
 -- (public/app.js `zeigeUndoToast`) und die Aufraeum-Routine in lib/softDelete.js.
 ALTER TABLE trades ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
--- notiz: freie Beschreibung des Trades (Kontext, was zu sehen war, was gelernt wurde) -
--- fuers Zusammenspiel mit den Trading-Log-Screenshots und Obsidian gedacht.
-ALTER TABLE trades ADD COLUMN IF NOT EXISTS notiz TEXT;
+-- notiz_setup / notiz_lektion: zweigeteilte Trade-Beschreibung - "Setup & Fehler" links,
+-- "Richtig erkannt & Lektion" rechts (ersetzt das anfangs einspaltige "notiz"-Feld, damit
+-- das Textfeld nicht riesig hoch wird, wenn beide Themen reingeschrieben werden).
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS notiz_setup TEXT;
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS notiz_lektion TEXT;
+-- Einmalige Migration: falls die alte "notiz"-Spalte noch existiert, ihren Inhalt ins linke
+-- Feld (Setup & Fehler) uebernehmen und die Spalte danach entfernen. Der IF-EXISTS-Check
+-- macht das sicher wiederholbar - beim naechsten Start (Spalte dann schon weg) passiert nichts mehr.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'trades' AND column_name = 'notiz'
+  ) THEN
+    UPDATE trades SET notiz_setup = notiz WHERE notiz IS NOT NULL AND notiz_setup IS NULL;
+    ALTER TABLE trades DROP COLUMN notiz;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS todos (
   id SERIAL PRIMARY KEY,

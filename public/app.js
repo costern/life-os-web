@@ -1081,9 +1081,15 @@ function renderTradeLogDetail(trade, shots, zielEl){
 
   zielEl.innerHTML =
     '<div class="tl-shots-wrap" id="tl-shots-'+trade.id+'"></div>' +
-    '<div class="tl-feld tl-feld-notiz">' +
-      '<div class="tl-feld-l">Beschreibung</div>' +
-      '<textarea class="tle-notiz tl-notiz-auto" rows="1" placeholder="Was ist zu sehen, was war der Gedanke, was ist passiert…">'+esc(trade.notiz||'')+'</textarea>' +
+    '<div class="tl-feld-notiz-split">' +
+      '<div class="tl-feld tl-notiz-col">' +
+        '<div class="tl-feld-l">Setup &amp; Fehler</div>' +
+        '<textarea class="tle-notiz-setup tl-notiz-auto" rows="1" placeholder="Setup, was ist zu sehen, was lief schief…">'+esc(trade.notizSetup||'')+'</textarea>' +
+      '</div>' +
+      '<div class="tl-feld tl-notiz-col">' +
+        '<div class="tl-feld-l">Richtig erkannt &amp; Lektion</div>' +
+        '<textarea class="tle-notiz-lektion tl-notiz-auto" rows="1" placeholder="Was wurde richtig erkannt, was ist die Lektion…">'+esc(trade.notizLektion||'')+'</textarea>' +
+      '</div>' +
     '</div>' +
     '<div class="tl-events-wrap">' +
       '<button type="button" class="tl-events-toggle">📈 Entry/TP/SL-Verlauf</button>' +
@@ -1098,9 +1104,10 @@ function renderTradeLogDetail(trade, shots, zielEl){
   renderTradeLogShots(trade.id, shots, document.getElementById('tl-shots-'+trade.id));
   tlTfChipsRender(zielEl.querySelector('.tle-tf'));
   tlSetupEventsToggle(trade, zielEl);
-  const notizFeld = zielEl.querySelector('.tle-notiz');
-  tlAutoResize(notizFeld);
-  notizFeld.addEventListener('input', () => tlAutoResize(notizFeld));
+  zielEl.querySelectorAll('.tl-notiz-auto').forEach(feld => {
+    tlAutoResize(feld);
+    feld.addEventListener('input', () => tlAutoResize(feld));
+  });
 
   zielEl.querySelector('.tle-save').addEventListener('click', () => tlSpeichereDetail(trade.id, zielEl));
   zielEl.querySelector('.tle-delete').addEventListener('click', () => tlLoescheTrade(trade.id, zielEl));
@@ -1224,7 +1231,8 @@ async function tlSpeichereDetail(id, zielEl){
     tradeType: val('tle-tradetype') || null,
     name: val('tle-name').trim() || null,
     strategy: val('tle-strategy').trim() || null,
-    notiz: val('tle-notiz').trim() || null,
+    notizSetup: val('tle-notiz-setup').trim() || null,
+    notizLektion: val('tle-notiz-lektion').trim() || null,
     tf: tlTfWerte(zielEl),
     entry1: num(val('tle-entry1')), entry2: num(val('tle-entry2')),
     size1: num(val('tle-size1')), size2: num(val('tle-size2')),
