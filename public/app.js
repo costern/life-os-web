@@ -782,6 +782,8 @@ async function ladeHistorie(){
     )).join('') || '<div class="empty">Noch keine Trades</div>';
     tlTrades = rows;
     renderTradeLogTabelle();
+    if (tlAnsicht === 'galerie') renderTradeLogGalerie();
+    if (tlAnsicht === 'kalender') renderTlAnalyse();
   } catch(e){ el.innerHTML = '<div class="err">Historie nicht ladbar: '+esc(e.message)+'</div>'; }
 }
 
@@ -995,6 +997,173 @@ function tlGalerieOeffneTrade(id){
   }, 30);
 }
 
+/* ---------- Trading-Log: "P&L & Kalender"-Ansicht (dritter Tab neben Tabelle/Galerie) ----------
+   Dreiteilig wie von Colin gewünscht: oben links P&L pro Monat (Balkendiagramm), oben rechts
+   ein Zeitstrahl mit einem Balken pro Trade (Start bis Ende bzw. bis jetzt bei offenen Trades),
+   unten ein Kalender mit den einzelnen Trades an ihrem Tag. Alles rein clientseitig aus
+   tlTrades berechnet, keine eigenen API-Calls noetig. */
+function tlMonatKurzLabel(iso){
+  const s = new Date(iso).toLocaleDateString('de-DE', { month:'short', year:'2-digit' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Geschlossene Trades zaehlen mit ihrem vollen pnl im Monat ihres Exits (closedAt); bei noch
+// offenen Trades gibt es kein Enddatum fuer den Teilgewinn (realizedPnl), der wird deshalb
+// vereinfachend dem aktuellen Monat zugerechnet - dieselbe Naeherung wie beim Gesamt-Σ-PnL,
+// das realizedPnl unabhaengig vom Zeitpunkt einfach mit aufsummiert.
+function tlPnlProMonat(trades){
+  const byMonth = {};
+  const nimm = (iso, betrag) => {
+    const key = tlMonatSchluessel(iso);
+    if (!byMonth[key]) byMonth[key] = { key, label: tlMonatKurzLabel(iso), sum: 0 };
+    byMonth[key].sum += betrag;
+  };
+  trades.forEach(r => { if (r.exit != null && r.pnl != null) nimm(r.closedAt || r.openedAt, Number(r.pnl)); });
+  const offenerTeilgewinn = trades.filter(r => r.exit == null).reduce((a,r) => a + (r.realizedPnl ? Number(r.realizedPnl) : 0), 0);
+  if (offenerTeilgewinn) nimm(new Date().toISOString(), offenerTeilgewinn);
+  return Object.keys(byMonth).sort().map(k => byMonth[k]);
+}
+
+function renderTlPnlMonat(){
+  const el = document.getElementById('tlPnlMonat');
+  if (!el) return;
+  const monate = tlPnlProMonat(tlTrades);
+  if (!monate.length){ el.innerHTML = '<div class="empty">Noch keine abgeschlossenen Trades</div>'; return; }
+  // Divergierendes Balkendiagramm um eine Nulllinie (Gewinn nach oben, Verlust nach unten) statt
+  // Balken ab der Grundlinie, weil PnL positiv wie negativ sein kann (Polaritaet).
+  const scale = Math.max(1, ...monate.map(m => Math.abs(m.sum)));
+  el.innerHTML = '<div class="tl-pnl-bars">' + monate.map(m => {
+    const pos = m.sum >= 0;
+    const pct = Math.round(Math.abs(m.sum) / scale * 100);
+    return '<div class="tl-pnl-bar-col" title="'+esc(m.label)+': '+fmt(m.sum)+'">' +
+      '<div class="tl-pnl-bar-val '+(pos?'pnl-pos':'pnl-neg')+'">'+fmt(m.sum)+'</div>' +
+      '<div class="tl-pnl-bar-track">' +
+        '<div class="tl-pnl-bar-fill pos" style="height:'+(pos?pct:0)+'%"></div>' +
+        '<div class="tl-pnl-bar-zero"></div>' +
+        '<div class="tl-pnl-bar-fill neg" style="height:'+(pos?0:pct)+'%"></div>' +
+      '</div>' +
+      '<div class="tl-pnl-bar-label muted">'+esc(m.label)+'</div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+// Gemeinsamer Zeitstrahl-Baustein: ein Balken pro Trade von openedAt bis closedAt (bzw. bis
+// jetzt, wenn noch offen). Wird sowohl fuer den "alle Trades"-Zeitstrahl im Trading-Log als
+// auch - mit nur den offenen Trades und eigener Skala - im Live-Positionen-Fenster genutzt.
+function tlZeitstrahlHtml(trades, opts){
+  opts = opts || {};
+  if (!trades.length) return '<div class="empty">'+(opts.leerText || 'Keine Trades')+'</div>';
+  const jetzt = Date.now();
+  const sortiert = trades.slice().sort((a,b) => new Date(b.openedAt) - new Date(a.openedAt));
+  const starts = sortiert.map(r => new Date(r.openedAt).getTime());
+  const enden = sortiert.map(r => r.closedAt ? new Date(r.closedAt).getTime() : jetzt);
+  const von = Math.min(...starts);
+  const bis = Math.max(jetzt, ...enden);
+  const spanne = Math.max(1, bis - von);
+  const kurzDatum = t => new Date(t).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
+  const zeilen = sortiert.map(r => {
+    const start = new Date(r.openedAt).getTime();
+    const ende = r.closedAt ? new Date(r.closedAt).getTime() : jetzt;
+    const links = (start - von) / spanne * 100;
+    const breite = Math.max(1.2, (ende - start) / spanne * 100);
+    const status = r.exit == null ? 'live' : (Number(r.pnl) >= 0 ? 'win' : 'loss');
+    const dauerH = Math.round((ende - start) / 36e5);
+    const dauerText = dauerH < 24 ? dauerH+'h' : Math.round(dauerH/24)+'d';
+    const titel = esc(r.asset)+' · '+kurzDatum(start)+'–'+(r.closedAt ? kurzDatum(ende) : 'jetzt')+' · '+dauerText +
+      (r.exit != null && r.pnl != null ? ' · '+fmt(r.pnl) : r.exit == null ? ' · LIVE' : '');
+    return '<div class="tl-timeline-row">' +
+      '<div class="tl-timeline-label" title="'+esc(r.name || r.asset)+'">'+tlAssetIconHtml(r)+'</div>' +
+      '<div class="tl-timeline-track" title="'+titel+'">' +
+        '<div class="tl-timeline-bar '+status+'" style="left:'+links.toFixed(2)+'%;width:'+breite.toFixed(2)+'%"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  return '<div class="tl-timeline">' + zeilen + '</div>' +
+    '<div class="tl-timeline-range"><span>'+kurzDatum(von)+'</span><span>jetzt</span></div>';
+}
+
+function renderTlZeitstrahl(){
+  const el = document.getElementById('tlZeitstrahl');
+  if (!el) return;
+  el.innerHTML = tlZeitstrahlHtml(tlTrades, { leerText:'Noch keine Trades' });
+}
+
+// Zeitstrahl der aktuell offenen Live-Trades, direkt im Live-Positionen-Fenster unter der
+// Tabelle (dort, wo sonst noch Platz ist) - eigene Skala, nur die offenen Positionen.
+function renderLpZeitstrahl(){
+  const el = document.getElementById('lpZeitstrahl');
+  if (!el) return;
+  if (!openTrades.length){ el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="muted" style="margin:12px 0 6px">Zeitstrahl offene Positionen</div>' +
+    tlZeitstrahlHtml(openTrades, { leerText:'Keine offenen Positionen' });
+}
+
+/* ---------- Trading-Log: Kalender (Monatsansicht, wie der To-Do-Kalender aufgebaut, aber
+   mit Trades statt Terminen) - Tag der Trades ist bei geschlossenen der Exit-Tag (closedAt,
+   das Ergebnis passiert da), bei noch offenen der Start-Tag (openedAt). */
+let tlCalMonat = new Date(); tlCalMonat.setDate(1); tlCalMonat.setHours(0,0,0,0);
+
+function tlCalMontag(d){
+  const t = new Date(d);
+  const tag = (t.getDay() + 6) % 7; // 0 = Montag
+  t.setDate(t.getDate() - tag);
+  t.setHours(0,0,0,0);
+  return t;
+}
+function tlCalTagVon(r){
+  const iso = r.closedAt || r.openedAt;
+  const d = new Date(iso);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function renderTlKalender(){
+  const grid = document.getElementById('tlCalGrid');
+  const label = document.getElementById('tlCalMonthLabel');
+  if (!grid || !label) return;
+  label.textContent = tlCalMonat.toLocaleDateString('de-DE', { month:'long', year:'numeric' });
+  const monatsStart = new Date(tlCalMonat.getFullYear(), tlCalMonat.getMonth(), 1);
+  const monatsEnde = new Date(tlCalMonat.getFullYear(), tlCalMonat.getMonth()+1, 0);
+  const gridStart = tlCalMontag(monatsStart);
+  const gridEnde = new Date(tlCalMontag(monatsEnde)); gridEnde.setDate(gridEnde.getDate()+6);
+  const heute = new Date(); heute.setHours(0,0,0,0);
+  const tage = [];
+  for (let d = new Date(gridStart); d <= gridEnde; d.setDate(d.getDate()+1)) tage.push(new Date(d));
+
+  grid.innerHTML = tage.map(tag => {
+    const inMonat = tag.getMonth() === tlCalMonat.getMonth();
+    const istHeute = tag.toDateString() === heute.toDateString();
+    const istWochenende = tag.getDay() === 0 || tag.getDay() === 6;
+    const tagTrades = tlTrades.filter(r => tlCalTagVon(r).toDateString() === tag.toDateString());
+    const tagSumme = tagTrades.reduce((a,r) => a + (r.exit != null && r.pnl != null ? Number(r.pnl) : (r.realizedPnl ? Number(r.realizedPnl) : 0)), 0);
+    const evHtml = tagTrades.slice(0,3).map(r => {
+      const status = r.exit == null ? 'live' : (Number(r.pnl) >= 0 ? 'win' : 'loss');
+      return '<div class="tl-cal-ev '+status+'" data-id="'+r.id+'" title="'+esc(r.asset)+' '+esc(r.side)+(r.pnl!=null?' · '+fmt(r.pnl):'')+'">'+esc(r.asset)+'</div>';
+    }).join('') + (tagTrades.length > 3 ? '<div class="muted">+'+(tagTrades.length-3)+' mehr</div>' : '');
+    const sumHtml = tagSumme ? '<div class="tl-cal-sum '+(tagSumme>=0?'pnl-pos':'pnl-neg')+'">'+fmt(tagSumme)+'</div>' : '';
+    return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+(istWochenende?' weekend':'')+'">' +
+      '<div class="dnum">'+tag.getDate()+'</div>' + sumHtml + evHtml +
+    '</div>';
+  }).join('');
+
+  grid.querySelectorAll('.tl-cal-ev').forEach(ev => {
+    ev.addEventListener('click', () => tlGalerieOeffneTrade(+ev.dataset.id));
+  });
+}
+
+function renderTlAnalyse(){
+  renderTlPnlMonat();
+  renderTlZeitstrahl();
+  renderTlKalender();
+}
+
+(function(){
+  const prev = document.getElementById('tlCalPrev');
+  const next = document.getElementById('tlCalNext');
+  if (prev) prev.addEventListener('click', () => { tlCalMonat.setMonth(tlCalMonat.getMonth()-1); renderTlKalender(); });
+  if (next) next.addEventListener('click', () => { tlCalMonat.setMonth(tlCalMonat.getMonth()+1); renderTlKalender(); });
+})();
+
 function tlSetupViewTabs(){
   document.querySelectorAll('.tl-view-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1003,7 +1172,9 @@ function tlSetupViewTabs(){
       document.querySelectorAll('.tl-view-tab').forEach(b => b.classList.toggle('active', b === btn));
       document.getElementById('tradeLogTabelle').hidden = tlAnsicht !== 'tabelle';
       document.getElementById('tradeLogGalerie').hidden = tlAnsicht !== 'galerie';
+      document.getElementById('tradeLogAnalyse').hidden = tlAnsicht !== 'kalender';
       if (tlAnsicht === 'galerie') renderTradeLogGalerie();
+      if (tlAnsicht === 'kalender') renderTlAnalyse();
     });
   });
 }
@@ -2214,7 +2385,7 @@ async function renderLivePos(){
   try {
     openTrades = await api('/trades/open');
     letzterPreisCheck = new Date(); zeigePreisStamp();
-    if (!openTrades.length){ el.innerHTML = '<div class="empty">Keine offenen Positionen</div>'; ov.unreal = 0; renderOverview(); return; }
+    if (!openTrades.length){ el.innerHTML = '<div class="empty">Keine offenen Positionen</div>'; ov.unreal = 0; renderOverview(); renderLpZeitstrahl(); return; }
 
     let total = 0, allPriced = true;
     const parts = [];
@@ -2280,6 +2451,7 @@ async function renderLivePos(){
         parts.join('') +
       '</div></div>' +
       '<div class="muted" style="margin-top:6px">Live von Crypto.com · ohne Fees/Funding</div>';
+    renderLpZeitstrahl();
   } catch(e){ el.innerHTML = '<div class="err">Live-Daten nicht ladbar: '+esc(e.message)+'</div>'; }
 }
 

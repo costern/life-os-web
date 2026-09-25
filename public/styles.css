@@ -488,6 +488,58 @@ a { color:var(--accent); }
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tl-gallery-sub { font-size:12px; color:var(--muted); margin-top:3px; }
 
+/* ---------- Trading-Log: dritter Tab "P&L & Kalender" - dreiteiliges Grid (oben links
+   P&L pro Monat, oben rechts Zeitstrahl, unten voller Breite der Kalender). Fuer guaranteed
+   50/50-Spalten bei genug Platz grid-template-columns:1fr 1fr in einer eigenen Media-Query
+   statt auto-fit (siehe Life-Os-Gotcha: auto-fit gibt bei breiten Screens ungleiche Spalten). */
+.tl-analyse-grid { display:grid; grid-template-columns:1fr; gap:16px; }
+@media (min-width:900px) {
+  .tl-analyse-grid { grid-template-columns:1fr 1fr; }
+  .tl-analyse-full { grid-column:1/-1; }
+}
+.tl-analyse-panel { background:var(--bg); border-radius:12px; padding:14px 16px; min-width:0; }
+.tl-analyse-panel h3 { font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+  margin-bottom:12px; font-weight:600; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.tl-cal-nav-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.tl-cal-nav-row h3 { margin-bottom:0; }
+
+/* P&L pro Monat: divergierendes Balkendiagramm um eine Nulllinie (Gewinn nach oben in Gruen,
+   Verlust nach unten in Rot) statt Balken ab der Grundlinie, weil PnL beide Vorzeichen hat. */
+.tl-pnl-bars { display:flex; align-items:stretch; gap:14px; height:190px; overflow-x:auto; padding-bottom:4px; }
+.tl-pnl-bar-col { display:flex; flex-direction:column; align-items:center; flex:0 0 auto; min-width:48px; height:100%; }
+.tl-pnl-bar-val { font-size:10.5px; font-weight:700; white-space:nowrap; margin-bottom:4px; }
+.tl-pnl-bar-track { position:relative; width:28px; flex:1; }
+.tl-pnl-bar-fill { position:absolute; left:0; right:0; border-radius:4px; }
+.tl-pnl-bar-fill.pos { bottom:50%; background:var(--green); border-radius:4px 4px 0 0; }
+.tl-pnl-bar-fill.neg { top:50%; background:var(--red); border-radius:0 0 4px 4px; }
+.tl-pnl-bar-zero { position:absolute; left:-4px; right:-4px; top:50%; height:1px; background:var(--line); }
+.tl-pnl-bar-label { font-size:10.5px; color:var(--muted); margin-top:6px; white-space:nowrap; }
+
+/* Zeitstrahl: ein Balken pro Trade von Start bis Ende (bzw. bis jetzt bei offenen Trades) -
+   wird sowohl im Trading-Log-Tab (alle Trades) als auch kompakt im Live-Positionen-Fenster
+   (nur offene Trades, eigene Skala) ueber dieselbe tlZeitstrahlHtml()-Funktion gerendert. */
+.tl-timeline { display:flex; flex-direction:column; gap:7px; max-height:220px; overflow-y:auto; padding-right:2px; }
+.tl-timeline-row { display:grid; grid-template-columns:74px 1fr; align-items:center; gap:8px; }
+.tl-timeline-label { display:flex; align-items:center; gap:5px; font-size:12px; overflow:hidden;
+  white-space:nowrap; text-overflow:ellipsis; }
+.tl-timeline-track { position:relative; height:16px; background:var(--card); border-radius:5px; }
+.tl-timeline-bar { position:absolute; top:2px; bottom:2px; border-radius:4px; min-width:5px; }
+.tl-timeline-bar.win { background:var(--green); }
+.tl-timeline-bar.loss { background:var(--red); }
+.tl-timeline-bar.live { background:var(--amber); }
+.tl-timeline-range { display:flex; justify-content:space-between; font-size:10.5px; color:var(--muted); margin-top:8px; }
+#lpZeitstrahl:not(:empty) { margin-top:6px; padding-top:10px; border-top:1px solid var(--line); }
+#lpZeitstrahl .tl-timeline { max-height:150px; }
+
+/* Kalender-Tages-Marker fuer Trades (analog .cal-ev, eigene Klasse wegen eigener Statusfarben
+   win/loss/live statt der einheitlichen Akzentfarbe bei normalen Terminen). */
+.tl-cal-ev { font-size:10px; font-weight:600; border-radius:5px; padding:1px 5px; margin-top:2px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+.tl-cal-ev.win { background:var(--badge-green-bg); color:var(--green); }
+.tl-cal-ev.loss { background:var(--badge-red-bg); color:var(--red); }
+.tl-cal-ev.live { background:var(--badge-amber-bg); color:var(--amber); }
+.tl-cal-sum { font-size:10.5px; font-weight:700; margin-bottom:2px; }
+
 /* ---------- Undo-Toast: nach dem Löschen kurz "Rückgängig" anbieten ---------- */
 #undoToastHost { position:fixed; left:50%; bottom:22px; transform:translateX(-50%);
   z-index:200; display:flex; flex-direction:column-reverse; gap:8px; align-items:center;

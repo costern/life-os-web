@@ -201,6 +201,7 @@
               <h2>🔴 Live-Positionen <button id="refreshPrices" class="btn">Kurse aktualisieren</button></h2>
               <div class="muted" id="preisStamp" style="margin-bottom:8px"></div>
               <div id="livepos"><div class="empty">Lade…</div></div>
+              <div id="lpZeitstrahl"></div>
             </div>
             <div class="card">
               <h2>📈 Trade-Historie</h2>
@@ -213,9 +214,38 @@
             <div class="tl-view-tabs">
               <button type="button" class="tl-view-tab active" data-tlview="tabelle">Tabelle</button>
               <button type="button" class="tl-view-tab" data-tlview="galerie">Galerie</button>
+              <button type="button" class="tl-view-tab" data-tlview="kalender">P&L &amp; Kalender</button>
             </div>
             <div id="tradeLogTabelle" class="tl-table-wrap"><div class="empty">Lade…</div></div>
             <div id="tradeLogGalerie" class="tl-gallery-wrap" hidden><div class="empty">Lade…</div></div>
+            <div id="tradeLogAnalyse" class="tl-analyse-wrap" hidden>
+              <div class="tl-analyse-grid">
+                <div class="tl-analyse-panel">
+                  <h3>P&amp;L pro Monat</h3>
+                  <div id="tlPnlMonat"><div class="empty">Lade…</div></div>
+                </div>
+                <div class="tl-analyse-panel">
+                  <h3>Zeitstrahl <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">Dauer je Trade</span></h3>
+                  <div id="tlZeitstrahl"><div class="empty">Lade…</div></div>
+                </div>
+                <div class="tl-analyse-panel tl-analyse-full">
+                  <div class="tl-cal-nav-row">
+                    <h3>Kalender</h3>
+                    <span class="cal-nav">
+                      <button type="button" id="tlCalPrev">‹</button>
+                      <span id="tlCalMonthLabel"></span>
+                      <button type="button" id="tlCalNext">›</button>
+                    </span>
+                  </div>
+                  <div class="cal-weekdays">
+                    <div class="cal-weekday">Mo</div><div class="cal-weekday">Di</div><div class="cal-weekday">Mi</div>
+                    <div class="cal-weekday">Do</div><div class="cal-weekday">Fr</div><div class="cal-weekday">Sa</div>
+                    <div class="cal-weekday">So</div>
+                  </div>
+                  <div class="cal-grid" id="tlCalGrid"><div class="empty">Lade…</div></div>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="card wide">
             <h2>➕ Trade eintragen</h2>
