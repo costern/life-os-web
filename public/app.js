@@ -1029,8 +1029,8 @@ function renderTlPnlMonat(){
   if (!el) return;
   const monate = tlPnlProMonat(tlTrades);
   if (!monate.length){ el.innerHTML = '<div class="empty">Noch keine abgeschlossenen Trades</div>'; return; }
-  // Divergierendes Balkendiagramm um eine Nulllinie (Gewinn nach oben, Verlust nach unten) statt
-  // Balken ab der Grundlinie, weil PnL positiv wie negativ sein kann (Polaritaet).
+  // Alle Balken wachsen von der Grundlinie nach oben (Farbe zeigt Gewinn/Verlust statt Richtung) -
+  // einfacher zu lesen als ein divergierendes Diagramm um eine Nulllinie.
   const scale = Math.max(1, ...monate.map(m => Math.abs(m.sum)));
   el.innerHTML = '<div class="tl-pnl-bars">' + monate.map(m => {
     const pos = m.sum >= 0;
@@ -1038,13 +1038,35 @@ function renderTlPnlMonat(){
     return '<div class="tl-pnl-bar-col" title="'+esc(m.label)+': '+fmt(m.sum)+'">' +
       '<div class="tl-pnl-bar-val '+(pos?'pnl-pos':'pnl-neg')+'">'+fmt(m.sum)+'</div>' +
       '<div class="tl-pnl-bar-track">' +
-        '<div class="tl-pnl-bar-fill pos" style="height:'+(pos?pct:0)+'%"></div>' +
-        '<div class="tl-pnl-bar-zero"></div>' +
-        '<div class="tl-pnl-bar-fill neg" style="height:'+(pos?0:pct)+'%"></div>' +
+        '<div class="tl-pnl-bar-fill '+(pos?'pos':'neg')+'" style="height:'+pct+'%"></div>' +
       '</div>' +
       '<div class="tl-pnl-bar-label muted">'+esc(m.label)+'</div>' +
     '</div>';
   }).join('') + '</div>';
+}
+
+// Wochen- (kurzer Zeitraum) bzw. Monats-Anhaltspunkte (laengerer Zeitraum) fuer das Lineal
+// ueber dem Zeitstrahl, damit man beim Wandern von links nach rechts grob erkennt, in welchem
+// Zeitraum ein Balken liegt, statt nur "von...jetzt" an den Raendern zu haben.
+function tlZeitstrahlTicks(von, bis){
+  const spanTage = (bis - von) / 864e5;
+  const ticks = [];
+  if (spanTage <= 45) {
+    let d = new Date(von); d.setHours(0,0,0,0);
+    while (((d.getDay()+6)%7) !== 0) d.setDate(d.getDate()+1); // naechster Montag ab "von"
+    while (d.getTime() <= bis) {
+      ticks.push({ t: d.getTime(), label: d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) });
+      d = new Date(d.getTime()); d.setDate(d.getDate()+7);
+    }
+  } else {
+    let d = new Date(von); d.setDate(1); d.setHours(0,0,0,0);
+    if (d.getTime() < von) d.setMonth(d.getMonth()+1);
+    while (d.getTime() <= bis) {
+      ticks.push({ t: d.getTime(), label: tlMonatKurzLabel(d.toISOString()) });
+      d = new Date(d.getTime()); d.setMonth(d.getMonth()+1);
+    }
+  }
+  return ticks;
 }
 
 // Gemeinsamer Zeitstrahl-Baustein: ein Balken pro Trade von openedAt bis closedAt (bzw. bis
@@ -1058,8 +1080,10 @@ function tlZeitstrahlHtml(trades, opts){
   const starts = sortiert.map(r => new Date(r.openedAt).getTime());
   const enden = sortiert.map(r => r.closedAt ? new Date(r.closedAt).getTime() : jetzt);
   const von = Math.min(...starts);
-  const bis = Math.max(jetzt, ...enden);
-  const spanne = Math.max(1, bis - von);
+  const bis = jetzt; // kein Trade kann in der Zukunft enden, "jetzt" ist immer der rechte Rand
+  // 14% Platz am rechten Rand freihalten, damit bei offenen Trades die "seit X Tagen offen"-
+  // Anzeige neben dem bis ganz nach rechts laufenden Balken noch Platz hat.
+  const spanne = Math.max(1, (bis - von) / 0.86);
   const kurzDatum = t => new Date(t).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
   const zeilen = sortiert.map(r => {
     const start = new Date(r.openedAt).getTime();
@@ -1067,6 +1091,7 @@ function tlZeitstrahlHtml(trades, opts){
     const links = (start - von) / spanne * 100;
     const breite = Math.max(1.2, (ende - start) / spanne * 100);
     const status = r.exit == null ? 'live' : (Number(r.pnl) >= 0 ? 'win' : 'loss');
+    const offenTage = Math.floor((ende - start) / 864e5);
     const dauerH = Math.round((ende - start) / 36e5);
     const dauerText = dauerH < 24 ? dauerH+'h' : Math.round(dauerH/24)+'d';
     const titel = esc(r.asset)+' · '+kurzDatum(start)+'–'+(r.closedAt ? kurzDatum(ende) : 'jetzt')+' · '+dauerText +
@@ -1075,11 +1100,18 @@ function tlZeitstrahlHtml(trades, opts){
       '<div class="tl-timeline-label" title="'+esc(r.name || r.asset)+'">'+tlAssetIconHtml(r)+'</div>' +
       '<div class="tl-timeline-track" title="'+titel+'">' +
         '<div class="tl-timeline-bar '+status+'" style="left:'+links.toFixed(2)+'%;width:'+breite.toFixed(2)+'%"></div>' +
+        (status === 'live' ? '<span class="tl-timeline-live-tage">'+(offenTage < 1 ? '<1d' : offenTage+'d')+' offen</span>' : '') +
       '</div>' +
     '</div>';
   }).join('');
-  return '<div class="tl-timeline">' + zeilen + '</div>' +
-    '<div class="tl-timeline-range"><span>'+kurzDatum(von)+'</span><span>jetzt</span></div>';
+  const ticks = tlZeitstrahlTicks(von, bis);
+  const ruler = '<div class="tl-timeline-ruler">' +
+    '<div class="tl-timeline-ruler-spacer"></div>' +
+    '<div class="tl-timeline-ruler-track">' +
+      ticks.map(tk => '<div class="tl-timeline-tick" style="left:'+((tk.t-von)/spanne*100).toFixed(2)+'%">'+esc(tk.label)+'</div>').join('') +
+    '</div>' +
+  '</div>';
+  return ruler + '<div class="tl-timeline">' + zeilen + '</div>';
 }
 
 function renderTlZeitstrahl(){
