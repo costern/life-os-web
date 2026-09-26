@@ -21,44 +21,92 @@ const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;',
    auch fuer normale Datumsfelder (neues Signal, Signal bearbeiten - dort wird ein
    vollstaendiges Datum verlangt) verwendet. ---------- */
 
-// Parst Text zu {jahr, monat, tag} (monat/tag koennen null sein, wenn nicht angegeben)
-// oder gibt null zurueck, wenn nichts Sinnvolles erkannt wurde. Erkannte Formate:
-// JJJJ-MM-TT (ISO), TT.MM.JJ(JJ) / TT/MM/JJ(JJ) / TT-MM-JJ(JJ) (deutsch, Tag zuerst),
-// TT.MM (Punkt, ohne Jahr -> aktuelles Jahr), MM/JJ(JJ) (Slash, Monat/Jahr - z.B. "09/25"),
-// JJJJ (nur Jahr).
+// Deutsche Monatsnamen (voll + gaengige Abkuerzungen, auch ohne Umlaut getippt/erkannt) ->
+// Monatszahl. monatAusWort() normalisiert (Kleinschreibung, Umlaute -> ae/oe/ue, Punkt am
+// Ende weg) bevor nachgeschlagen wird, damit "März", "Marz", "MÄRZ" und "Mär." alle treffen.
+const MONAT_NAMEN = {
+  jan:1, januar:1,
+  feb:2, februar:2,
+  maer:3, maerz:3, marz:3, mrz:3,
+  apr:4, april:4,
+  mai:5,
+  jun:6, juni:6,
+  jul:7, juli:7,
+  aug:8, august:8,
+  sep:9, sept:9, september:9,
+  okt:10, oktober:10,
+  nov:11, november:11,
+  dez:12, dezember:12
+};
+const MONAT_ANZEIGE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+function monatAusWort(wort){
+  const norm = String(wort).toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/\.$/, '');
+  return MONAT_NAMEN[norm] || null;
+}
+
+// Parst Text zu {jahr, monat, tag} (monat/tag koennen null sein, wenn nicht angegeben) oder
+// gibt null zurueck, wenn nichts Sinnvolles erkannt wurde - gedacht fuer diktierten/frei
+// getippten Text, nicht nur sauber getipptes Format. Erkannte Formen (Trenner beliebig aus
+// Punkt/Slash/Bindestrich/Leerzeichen, je nach Form): JJJJ-MM-TT (ISO); TT MM JJ(JJ) bzw.
+// TT <Monatsname> JJ(JJ) - z.B. "26.03.25", "26 03 25", "26 März 25"; <Monatsname> JJ(JJ)
+// bzw. MM JJ(JJ) - z.B. "August 24", "08 24", "09/25" (nur Monat+Jahr, kein Tag); TT.MM
+// (nur Punkt, ohne Jahr -> aktuelles Jahr); JJJJ oder ein blosser Monatsname (aktuelles Jahr).
 function parseSchlauesDatum(text){
   const t = String(text || '').trim();
   if (!t) return null;
   const jahrVoll = roh => {
     const j = +roh;
-    return roh.length <= 2 ? j + (j < 70 ? 2000 : 1900) : j;
+    return String(roh).length <= 2 ? j + (j < 70 ? 2000 : 1900) : j;
   };
   const pruefen = (jahr, monat, tag) => {
     if (!(monat >= 1 && monat <= 12)) return null;
     if (tag != null && !(tag >= 1 && tag <= 31)) return null;
     return { jahr, monat, tag: tag ?? null };
   };
+  const WORT = '[a-zäöüß]{3,}';
   let m;
+
   m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (m) return pruefen(+m[1], +m[2], +m[3]);
-  m = t.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/);
+
+  // TT MM JJ(JJ) - beliebiger Trenner inkl. Leerzeichen (z.B. diktiert "26 03 25")
+  m = t.match(/^(\d{1,2})[\s./-]+(\d{1,2})[\s./-]+(\d{2,4})$/);
   if (m) return pruefen(jahrVoll(m[3]), +m[2], +m[1]);
+
+  // TT <Monatsname> JJ(JJ) - z.B. "26 März 25", "26. März 2025"
+  m = t.match(new RegExp('^(\\d{1,2})\\.?[\\s./-]+(' + WORT + ')\\.?[\\s./-]+(\\d{2,4})$', 'i'));
+  if (m) { const monat = monatAusWort(m[2]); if (monat) return pruefen(jahrVoll(m[3]), monat, +m[1]); }
+
+  // <Monatsname> JJ(JJ) - z.B. "August 24", "März 23", "Aug 2024" (kein Tag)
+  m = t.match(new RegExp('^(' + WORT + ')\\.?[\\s./-]+(\\d{2,4})$', 'i'));
+  if (m) { const monat = monatAusWort(m[1]); if (monat) return pruefen(jahrVoll(m[2]), monat, null); }
+
+  // TT.MM (nur Punkt, ohne Jahr) - aktuelles Jahr angenommen
   m = t.match(/^(\d{1,2})\.(\d{1,2})\.?$/);
   if (m) return pruefen(new Date().getFullYear(), +m[2], +m[1]);
-  m = t.match(/^(\d{1,2})\/(\d{2,4})$/);
+
+  // MM JJ(JJ) - Leerzeichen/Slash/Bindestrich, kein Tag - z.B. "08 24", "09/25", "06-25"
+  m = t.match(/^(\d{1,2})[\s\/-]+(\d{2,4})$/);
   if (m) return pruefen(jahrVoll(m[2]), +m[1], null);
+
   m = t.match(/^(\d{4})$/);
   if (m) return { jahr: +m[1], monat: null, tag: null };
+
+  // Blosser Monatsname (ohne Jahr) - aktuelles Jahr angenommen
+  m = t.match(new RegExp('^(' + WORT + ')\\.?$', 'i'));
+  if (m) { const monat = monatAusWort(m[1]); if (monat) return { jahr: new Date().getFullYear(), monat, tag: null }; }
+
   return null;
 }
 // Formatiert ein geparstes Datum wieder als Text, zur Bestaetigung im Feld ("schreibt es
-// rein") - vollstaendig als TT.MM.JJJJ, Monat/Jahr als MM.JJJJ, nur Jahr als JJJJ.
+// rein") - vollstaendig als TT.MM.JJJJ, Monat/Jahr mit ausgeschriebenem Monatsnamen (z.B.
+// "August 2024" - passt besser zu diktiertem Text als "08.2024"), nur Jahr als JJJJ.
 function formatSchlauesDatum(d){
   if (!d) return '';
-  const mm = d.monat != null ? String(d.monat).padStart(2, '0') : null;
   const tt = d.tag != null ? String(d.tag).padStart(2, '0') : null;
-  if (tt && mm) return tt + '.' + mm + '.' + d.jahr;
-  if (mm) return mm + '.' + d.jahr;
+  if (tt && d.monat != null) return tt + '.' + String(d.monat).padStart(2, '0') + '.' + d.jahr;
+  if (d.monat != null) return MONAT_ANZEIGE[d.monat - 1] + ' ' + d.jahr;
   return String(d.jahr);
 }
 // Wandelt ein VOLLSTAENDIG geparstes Datum (Tag vorhanden) in ISO (YYYY-MM-DD), sonst null.
