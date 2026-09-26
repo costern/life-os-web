@@ -15,6 +15,29 @@
 
 const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 
+// Springt innerhalb einer Tabelle zur Zeile mit dem angegebenen Datum (data-date, Format
+// YYYY-MM-DD) - existiert an dem Tag kein Eintrag, wird die zeitlich naechstgelegene Zeile
+// genommen (Liste der vorhandenen Daten in verfuegbareDaten). Scrollt die Zeile mittig in
+// den sichtbaren Bereich und hebt sie kurz farblich hervor, damit man sie sofort findet.
+// Wird sowohl von der Trading-Log-Tabelle als auch von Bottom Events genutzt.
+function springeZuDatum(container, ziel, verfuegbareDaten){
+  if (!container || !ziel) return;
+  let row = container.querySelector('tr[data-date="'+ziel+'"]');
+  if (!row && verfuegbareDaten && verfuegbareDaten.length) {
+    const zielT = new Date(ziel+'T00:00:00').getTime();
+    let bestDiff = Infinity, bestDatum = null;
+    verfuegbareDaten.forEach(d => {
+      const diff = Math.abs(new Date(d+'T00:00:00').getTime() - zielT);
+      if (diff < bestDiff) { bestDiff = diff; bestDatum = d; }
+    });
+    if (bestDatum != null) row = container.querySelector('tr[data-date="'+bestDatum+'"]');
+  }
+  if (!row) return;
+  row.scrollIntoView({ behavior:'smooth', block:'center' });
+  row.classList.add('datum-sprung-highlight');
+  setTimeout(() => row.classList.remove('datum-sprung-highlight'), 2000);
+}
+
 // Coin-Icons: echtes Logo vom Server (/api/coinicon/<ticker>, siehe routes/coinicon.js),
 // der es von CoinGecko holt - deckt auch kleinere/neuere Coins ab (GRAM, Kaspa, BGB,
 // ONDO, TAO, ...), nicht nur eine kuratierte Handvoll. Buchstaben-Badge als Fallback,
@@ -797,6 +820,12 @@ let tlOffenId = null;
 function tlDatKurz(iso){
   return new Date(iso).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
 }
+// Lokales Datum (Jahr-Monat-Tag) als String, passend zum Wert eines <input type="date">
+// - fuer den Datums-Sprung in der Trading-Log-Tabelle.
+function tlDatumIso(iso){
+  const d = new Date(iso);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function tlZeit(iso){
   return new Date(iso).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
@@ -885,13 +914,17 @@ function renderTradeLogTabelle(){
     gruppen[gruppen.length-1].rows.push(r);
   });
   el.innerHTML =
+    '<div class="tl-jump">' +
+      '<label for="tlJumpDate">Zu Datum springen</label>' +
+      '<input type="date" id="tlJumpDate">' +
+    '</div>' +
     '<table class="tl-table">' +
       '<thead><tr><th>Datum</th><th>Ergebnis</th><th>Asset</th><th>Side</th><th>TF</th><th>Art</th><th>Trade</th><th>Strategie</th></tr></thead>' +
       gruppen.map(g => (
         '<tbody>' +
           '<tr class="tl-monat-row"><td colspan="8">'+esc(g.label)+'</td></tr>' +
           g.rows.map(r => (
-            '<tr class="tl-row2" data-id="'+r.id+'" title="Klick für Details">' +
+            '<tr class="tl-row2" data-id="'+r.id+'" data-date="'+tlDatumIso(r.openedAt)+'" title="Klick für Details">' +
               '<td>'+tlDatKurz(r.openedAt)+'</td>' +
               '<td>'+tlErgebnisHtml(r)+'</td>' +
               '<td>'+tlAssetIconHtml(r)+'</td>' +
@@ -909,6 +942,10 @@ function renderTradeLogTabelle(){
   el.querySelectorAll('.tl-row2').forEach(tr => tr.addEventListener('click', () => tlToggleDetail(+tr.dataset.id)));
   // Falls gerade ein Detail offen war, nach dem Neuaufbau der Tabelle wieder aufklappen.
   if (tlOffenId != null && tlTrades.some(r => r.id === tlOffenId)) tlOeffneDetail(tlOffenId);
+  const jumpInput = document.getElementById('tlJumpDate');
+  if (jumpInput) jumpInput.addEventListener('change', () => {
+    springeZuDatum(el, jumpInput.value, tlTrades.map(r => tlDatumIso(r.openedAt)));
+  });
 }
 
 function tlToggleDetail(id){
@@ -2100,7 +2137,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       const st = wlStatus(s);
       const setupRest = wlSetupRestText(s);
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
-      return jahrZeile + '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'"'+tradeAttr+' title="Klick für Details">' +
+      return jahrZeile + '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'" data-date="'+s.date+'"'+tradeAttr+' title="Klick für Details">' +
         '<td class="muted">'+esc(wlDatumLabel(s)) +
           (s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') + tagBadge + '</td>' +
         '<td class="wl-trade-cell">' +
@@ -2203,6 +2240,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '</div>' +
         '<div class="te-msg muted" id="wlAddMsg">Details (Event, Multi-TF, Multi-Asset, Form) danach per Klick auf die Zeile ergänzen.</div>' +
       '</form>' +
+      '<div class="tl-jump">' +
+        '<label for="wlJumpDate">Zu Datum springen</label>' +
+        '<input type="date" id="wlJumpDate">' +
+      '</div>' +
       '<div class="wl-table-wrap">' +
         '<table class="wl-table">' +
           '<thead><tr>' +
@@ -2305,6 +2346,11 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
 
     // Bearbeiten / Löschen in der Tabelle
     const tableWrap = el.querySelector('.wl-table-wrap');
+
+    const wlJumpInput = document.getElementById('wlJumpDate');
+    if (wlJumpInput) wlJumpInput.addEventListener('change', () => {
+      springeZuDatum(tableWrap, wlJumpInput.value, signale.map(s => s.date));
+    });
 
     // Maus ueber einer Zeile mit Trade-ID hebt alle Zeilen desselben Trades hervor
     tableWrap.addEventListener('mouseover', ev => {

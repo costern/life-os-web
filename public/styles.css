@@ -157,13 +157,20 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-table tr.wl-grp-a td:first-child { border-left-color:#0d9488; }
 .wl-table tr.wl-grp-b td:first-child { border-left-color:#5eead4; }
 .wl-table tr.wl-grp-start td { border-top:2px solid var(--line); }
-/* Jahreswechsel beim Scrollen durch die (nach Datum sortierte) Tabelle: deutlich sichtbarer
-   Balken, staerker als die Haeufungs-Trennlinie, damit man beim schnellen Scrollen sofort
-   sieht, dass man in ein neues Jahr wechselt. */
+/* Jahreswechsel beim Scrollen durch die (nach Datum sortierte) Tabelle: komplett schwarzer
+   Balken mit weisser Schrift, bewusst unabhaengig vom Theme (hell/dunkel) immer gleich -
+   damit er beim schnellen Scrollen sofort als Jahresmarke auffaellt. */
 .wl-year-row td { padding:9px 10px; font-size:12.5px; font-weight:800; letter-spacing:.08em;
-  color:var(--accent); background:var(--hover-bg); border-top:3px solid var(--accent);
-  border-bottom:1px solid var(--line); }
+  color:#fff; background:#000; }
 .wl-tradeid-info { display:block; margin-top:4px; font-size:11.5px; }
+/* Datums-Sprung (Trading-Log & Bottom Events): kleine Eingabe oberhalb der Tabelle, die per
+   springeZuDatum() zur passenden (oder zeitlich naechstgelegenen) Zeile scrollt. */
+.tl-jump { display:flex; align-items:center; gap:8px; margin:0 0 10px; font-size:12.5px; color:var(--muted); }
+.tl-jump input[type="date"] { padding:5px 8px; border-radius:6px; border:1px solid var(--line);
+  background:var(--card); color:inherit; font-size:12.5px; }
+/* Kurzes Aufblitzen der Zielzeile nach einem Datums-Sprung, damit man sie sofort findet. */
+@keyframes datumSprungBlitz { 0%, 100% { background:transparent; } 30% { background:var(--badge-amber-bg); } }
+tr.datum-sprung-highlight td { animation: datumSprungBlitz 2s ease-out; }
 .wl-sameday { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:99px;
   background:#0d9488; color:#fff; font-size:10px; font-weight:700; white-space:nowrap; }
 /* Trade-Verknuepfung: gleiche Trade-ID = ein Trade ueber mehrere Signale */
