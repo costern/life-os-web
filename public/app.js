@@ -788,7 +788,7 @@ async function ladeHistorie(){
 }
 
 /* ---------- Trading-Log: Uebersichtstabelle (nach Monat gruppiert, wie Colins Notion-
-   Tabelle) mit Doppelklick-Detailansicht pro Trade. Die Detailansicht zeigt die genauen
+   Tabelle) mit Klick-Detailansicht pro Trade. Die Detailansicht zeigt die genauen
    Zahlen (Entry, Size, SL, TP, Uhrzeiten) sowie Colins eigene TradingView-Screenshots
    (mit seinen Einzeichnungen) statt eines im Dashboard nachgebauten Charts. */
 let tlTrades = [];
@@ -891,7 +891,7 @@ function renderTradeLogTabelle(){
         '<tbody>' +
           '<tr class="tl-monat-row"><td colspan="8">'+esc(g.label)+'</td></tr>' +
           g.rows.map(r => (
-            '<tr class="tl-row2" data-id="'+r.id+'" title="Doppelklick für Details">' +
+            '<tr class="tl-row2" data-id="'+r.id+'" title="Klick für Details">' +
               '<td>'+tlDatKurz(r.openedAt)+'</td>' +
               '<td>'+tlErgebnisHtml(r)+'</td>' +
               '<td>'+tlAssetIconHtml(r)+'</td>' +
@@ -906,7 +906,7 @@ function renderTradeLogTabelle(){
         '</tbody>'
       )).join('') +
     '</table>';
-  el.querySelectorAll('.tl-row2').forEach(tr => tr.addEventListener('dblclick', () => tlToggleDetail(+tr.dataset.id)));
+  el.querySelectorAll('.tl-row2').forEach(tr => tr.addEventListener('click', () => tlToggleDetail(+tr.dataset.id)));
   // Falls gerade ein Detail offen war, nach dem Neuaufbau der Tabelle wieder aufklappen.
   if (tlOffenId != null && tlTrades.some(r => r.id === tlOffenId)) tlOeffneDetail(tlOffenId);
 }
@@ -1349,8 +1349,8 @@ function renderTradeLogDetail(trade, shots, zielEl){
   renderTradeLogShots(trade.id, shots, document.getElementById('tl-shots-'+trade.id));
   const recapZeile = zielEl.querySelector('.tl-recap-row');
   if (recapZeile) {
-    recapZeile.title = 'Doppelklick zum Einklappen';
-    recapZeile.addEventListener('dblclick', () => tlToggleDetail(trade.id));
+    recapZeile.title = 'Klick zum Einklappen';
+    recapZeile.addEventListener('click', () => tlToggleDetail(trade.id));
   }
   tlTfChipsRender(zielEl.querySelector('.tle-tf'));
   tlSetupEventsToggle(trade, zielEl);
@@ -2068,7 +2068,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       const st = wlStatus(s);
       const setupRest = wlSetupRestText(s);
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
-      return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'"'+tradeAttr+' title="Doppelklick für Details">' +
+      return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'"'+tradeAttr+' title="Klick für Details">' +
         '<td class="muted">'+esc(wlDatumLabel(s)) +
           (s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') + tagBadge + '</td>' +
         '<td class="wl-trade-cell">' +
@@ -2096,7 +2096,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
       '</tr>' +
-      // Detailansicht: klappt per Doppelklick auf die Zeile (oder ueber ✎) auf
+      // Detailansicht: klappt per Klick auf die Zeile (oder ueber ✎) auf
       '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="12"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
         '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>' +
@@ -2167,7 +2167,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           '<input type="text" id="wlNewNotiz" placeholder="Notiz (optional)" maxlength="200" style="flex:1;min-width:140px">' +
           '<button type="submit">+ Hinzufügen</button>' +
         '</div>' +
-        '<div class="te-msg muted" id="wlAddMsg">Details (Event, Multi-TF, Multi-Asset, Form) danach per Doppelklick auf die Zeile ergänzen.</div>' +
+        '<div class="te-msg muted" id="wlAddMsg">Details (Event, Multi-TF, Multi-Asset, Form) danach per Klick auf die Zeile ergänzen.</div>' +
       '</form>' +
       '<div class="wl-table-wrap">' +
         '<table class="wl-table">' +
@@ -2284,7 +2284,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       tableWrap.querySelectorAll('tr.wl-trade-hover').forEach(r => r.classList.remove('wl-trade-hover'));
     });
 
-    // Doppelklick (bzw. Doppeltipp) auf eine Zeile klappt die Detailansicht auf/zu
+    // Klick auf eine Zeile klappt die Detailansicht auf/zu
     function wlOeffneDetail(id, detailRow){
       detailRow.hidden = !detailRow.hidden;
       wlOffenId = detailRow.hidden ? null : id;
@@ -2293,12 +2293,6 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         if (shotsEl) wlLiesShots(id).then(shots => { if (wlOffenId === id) renderWlShots(id, shots, shotsEl); });
       }
     }
-    tableWrap.addEventListener('dblclick', ev => {
-      const tr = ev.target.closest('tr[data-id]');
-      if (!tr || tr.classList.contains('wl-edit-row')) return;
-      const detail = tableWrap.querySelector('tr.wl-edit-row[data-id="'+tr.dataset.id+'"]');
-      if (detail) wlOeffneDetail(tr.dataset.id, detail);
-    });
     tableWrap.addEventListener('click', async ev => {
       const editBtn = ev.target.closest('.wl-edit');
       if (editBtn) {
@@ -2355,7 +2349,14 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           zeigeUndoToast('Eintrag gelöscht', async () => { await api('/watchlist/'+id+'/restore', { method:'POST' }); await ladeUndZeichne(); });
         }
         catch(e) { alert('Konnte nicht gelöscht werden: ' + e.message); }
+        return;
       }
+
+      // Klick auf eine normale Zeile (nicht auf Button/Detailbereich) klappt die Detailansicht auf/zu
+      const tr = ev.target.closest('tr[data-id]');
+      if (!tr || tr.classList.contains('wl-edit-row')) return;
+      const detail = tableWrap.querySelector('tr.wl-edit-row[data-id="'+tr.dataset.id+'"]');
+      if (detail) wlOeffneDetail(tr.dataset.id, detail);
     });
 
     // Falls gerade eine Detailansicht offen war (z.B. nach dem Speichern neu gezeichnet),
