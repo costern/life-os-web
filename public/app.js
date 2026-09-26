@@ -15,27 +15,120 @@
 
 const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 
-// Springt innerhalb einer Tabelle zur Zeile mit dem angegebenen Datum (data-date, Format
-// YYYY-MM-DD) - existiert an dem Tag kein Eintrag, wird die zeitlich naechstgelegene Zeile
-// genommen (Liste der vorhandenen Daten in verfuegbareDaten). Scrollt die Zeile mittig in
-// den sichtbaren Bereich und hebt sie kurz farblich hervor, damit man sie sofort findet.
-// Wird sowohl von der Trading-Log-Tabelle als auch von Bottom Events genutzt.
+/* ---------- Schlaues Datum: erkennt ein Datum aus moeglichst vielen frei getippten
+   Schreibweisen, statt eines umstaendlichen Datepickers. Wird sowohl fuer "Zu Datum
+   springen" (Trading-Log & Bottom Events, dort auch Monat/Jahr oder nur Jahr erlaubt) als
+   auch fuer normale Datumsfelder (neues Signal, Signal bearbeiten - dort wird ein
+   vollstaendiges Datum verlangt) verwendet. ---------- */
+
+// Parst Text zu {jahr, monat, tag} (monat/tag koennen null sein, wenn nicht angegeben)
+// oder gibt null zurueck, wenn nichts Sinnvolles erkannt wurde. Erkannte Formate:
+// JJJJ-MM-TT (ISO), TT.MM.JJ(JJ) / TT/MM/JJ(JJ) / TT-MM-JJ(JJ) (deutsch, Tag zuerst),
+// TT.MM (Punkt, ohne Jahr -> aktuelles Jahr), MM/JJ(JJ) (Slash, Monat/Jahr - z.B. "09/25"),
+// JJJJ (nur Jahr).
+function parseSchlauesDatum(text){
+  const t = String(text || '').trim();
+  if (!t) return null;
+  const jahrVoll = roh => {
+    const j = +roh;
+    return roh.length <= 2 ? j + (j < 70 ? 2000 : 1900) : j;
+  };
+  const pruefen = (jahr, monat, tag) => {
+    if (!(monat >= 1 && monat <= 12)) return null;
+    if (tag != null && !(tag >= 1 && tag <= 31)) return null;
+    return { jahr, monat, tag: tag ?? null };
+  };
+  let m;
+  m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return pruefen(+m[1], +m[2], +m[3]);
+  m = t.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/);
+  if (m) return pruefen(jahrVoll(m[3]), +m[2], +m[1]);
+  m = t.match(/^(\d{1,2})\.(\d{1,2})\.?$/);
+  if (m) return pruefen(new Date().getFullYear(), +m[2], +m[1]);
+  m = t.match(/^(\d{1,2})\/(\d{2,4})$/);
+  if (m) return pruefen(jahrVoll(m[2]), +m[1], null);
+  m = t.match(/^(\d{4})$/);
+  if (m) return { jahr: +m[1], monat: null, tag: null };
+  return null;
+}
+// Formatiert ein geparstes Datum wieder als Text, zur Bestaetigung im Feld ("schreibt es
+// rein") - vollstaendig als TT.MM.JJJJ, Monat/Jahr als MM.JJJJ, nur Jahr als JJJJ.
+function formatSchlauesDatum(d){
+  if (!d) return '';
+  const mm = d.monat != null ? String(d.monat).padStart(2, '0') : null;
+  const tt = d.tag != null ? String(d.tag).padStart(2, '0') : null;
+  if (tt && mm) return tt + '.' + mm + '.' + d.jahr;
+  if (mm) return mm + '.' + d.jahr;
+  return String(d.jahr);
+}
+// Wandelt ein VOLLSTAENDIG geparstes Datum (Tag vorhanden) in ISO (YYYY-MM-DD), sonst null.
+function schlauesDatumZuIso(d){
+  if (!d || d.tag == null) return null;
+  return d.jahr + '-' + String(d.monat).padStart(2, '0') + '-' + String(d.tag).padStart(2, '0');
+}
+// Macht ein normales Datumsfeld (neues Signal anlegen, Signal bearbeiten) "schlau": beim
+// Verlassen des Feldes wird der getippte Text erkannt und als TT.MM.JJJJ zurueckgeschrieben;
+// ist er nicht (vollstaendig) erkennbar, bleibt der Text stehen und das Feld wird rot
+// markiert, statt einfach stillschweigend nichts zu tun.
+function schlausDatumsfeld(input){
+  if (!input) return;
+  const pruefen = () => {
+    const wert = input.value.trim();
+    if (!wert) { input.classList.remove('datum-feld-ungueltig'); return; }
+    const d = parseSchlauesDatum(wert);
+    const iso = schlauesDatumZuIso(d);
+    if (iso) { input.value = formatSchlauesDatum(d); input.classList.remove('datum-feld-ungueltig'); }
+    else input.classList.add('datum-feld-ungueltig');
+  };
+  input.addEventListener('blur', pruefen);
+  input.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); pruefen(); } });
+}
+
+// Springt innerhalb einer Tabelle zur Zeile mit dem angegebenen (auch unvollstaendigen)
+// Datum - z.B. nur Monat/Jahr oder nur Jahr matcht jede Zeile in diesem Zeitraum, sonst wird
+// die zeitlich naechstgelegene Zeile genommen (Liste der vorhandenen Daten in
+// verfuegbareDaten, Format YYYY-MM-DD). Scrollt die Zeile mittig in den sichtbaren Bereich
+// und hebt sie kurz farblich hervor. Wird von der Trading-Log-Tabelle und Bottom Events genutzt.
 function springeZuDatum(container, ziel, verfuegbareDaten){
-  if (!container || !ziel) return;
-  let row = container.querySelector('tr[data-date="'+ziel+'"]');
-  if (!row && verfuegbareDaten && verfuegbareDaten.length) {
-    const zielT = new Date(ziel+'T00:00:00').getTime();
-    let bestDiff = Infinity, bestDatum = null;
+  if (!container || !ziel || !verfuegbareDaten || !verfuegbareDaten.length) return;
+  let praefix = null;
+  if (ziel.tag != null) praefix = schlauesDatumZuIso(ziel);
+  else if (ziel.monat != null) praefix = ziel.jahr + '-' + String(ziel.monat).padStart(2, '0');
+  else praefix = String(ziel.jahr);
+  let treffer = verfuegbareDaten.filter(d => d === praefix || d.startsWith(praefix));
+  let zielDatum = treffer.length ? treffer[0] : null;
+  if (!zielDatum) {
+    const pseudo = new Date(ziel.jahr, (ziel.monat || 6) - 1, ziel.tag || 15).getTime();
+    let bestDiff = Infinity;
     verfuegbareDaten.forEach(d => {
-      const diff = Math.abs(new Date(d+'T00:00:00').getTime() - zielT);
-      if (diff < bestDiff) { bestDiff = diff; bestDatum = d; }
+      const diff = Math.abs(new Date(d + 'T00:00:00').getTime() - pseudo);
+      if (diff < bestDiff) { bestDiff = diff; zielDatum = d; }
     });
-    if (bestDatum != null) row = container.querySelector('tr[data-date="'+bestDatum+'"]');
   }
+  if (!zielDatum) return;
+  const row = container.querySelector('tr[data-date="' + zielDatum + '"]');
   if (!row) return;
-  row.scrollIntoView({ behavior:'smooth', block:'center' });
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
   row.classList.add('datum-sprung-highlight');
   setTimeout(() => row.classList.remove('datum-sprung-highlight'), 2000);
+}
+// Macht ein "Zu Datum springen"-Feld schlau: erkennt Text beim Verlassen des Feldes/Enter,
+// springt zur passenden (oder naechstgelegenen) Zeile und schreibt das erkannte Datum
+// zurueck ins Feld. container/verfuegbareDaten werden bei jedem Aufruf frisch geholt (per
+// Funktion), da sich die Tabelle nach jedem Rerender neu aufbaut.
+function schlausSprungfeld(input, holeContainer, holeVerfuegbareDaten){
+  if (!input) return;
+  const aktion = () => {
+    const wert = input.value.trim();
+    if (!wert) return;
+    const d = parseSchlauesDatum(wert);
+    if (!d) { input.classList.add('datum-feld-ungueltig'); return; }
+    input.classList.remove('datum-feld-ungueltig');
+    input.value = formatSchlauesDatum(d);
+    springeZuDatum(holeContainer(), d, holeVerfuegbareDaten());
+  };
+  input.addEventListener('change', aktion);
+  input.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); aktion(); } });
 }
 
 // Coin-Icons: echtes Logo vom Server (/api/coinicon/<ticker>, siehe routes/coinicon.js),
@@ -916,7 +1009,7 @@ function renderTradeLogTabelle(){
   el.innerHTML =
     '<div class="tl-jump">' +
       '<label for="tlJumpDate">Zu Datum springen</label>' +
-      '<input type="date" id="tlJumpDate">' +
+      '<input type="text" id="tlJumpDate" placeholder="z.B. 26.03.25, 09/25, 2025 …" autocomplete="off">' +
     '</div>' +
     '<table class="tl-table">' +
       '<thead><tr><th>Datum</th><th>Ergebnis</th><th>Asset</th><th>Side</th><th>TF</th><th>Art</th><th>Trade</th><th>Strategie</th></tr></thead>' +
@@ -942,10 +1035,7 @@ function renderTradeLogTabelle(){
   el.querySelectorAll('.tl-row2').forEach(tr => tr.addEventListener('click', () => tlToggleDetail(+tr.dataset.id)));
   // Falls gerade ein Detail offen war, nach dem Neuaufbau der Tabelle wieder aufklappen.
   if (tlOffenId != null && tlTrades.some(r => r.id === tlOffenId)) tlOeffneDetail(tlOffenId);
-  const jumpInput = document.getElementById('tlJumpDate');
-  if (jumpInput) jumpInput.addEventListener('change', () => {
-    springeZuDatum(el, jumpInput.value, tlTrades.map(r => tlDatumIso(r.openedAt)));
-  });
+  schlausSprungfeld(document.getElementById('tlJumpDate'), () => el, () => tlTrades.map(r => tlDatumIso(r.openedAt)));
 }
 
 function tlToggleDetail(id){
@@ -2170,7 +2260,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
         '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>' +
         '<div class="wl-detail-grid">' +
-          '<label>Datum<input type="date" class="wle-date" value="'+s.date+'"></label>' +
+          '<label>Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
           '<label>Uhrzeit <span class="wl-hint">Kerzen-Close, leer = 02:00 (Tageschart)</span>' +
             '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
           '<label>Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
@@ -2230,7 +2320,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       '</div>' +
       '<form class="addbar" id="wlAddForm" autocomplete="off" style="margin-top:16px">' +
         '<div class="addrow">' +
-          '<input type="date" id="wlNewDate" required>' +
+          '<input type="text" id="wlNewDate" placeholder="TT.MM.JJJJ" required style="max-width:120px">' +
           '<input type="time" id="wlNewZeit" value="02:00" title="Kerzen-Close – 02:00 ist der Tageschart-Close">' +
           '<input type="text" id="wlNewAsset" placeholder="Asset (z.B. BTC)" maxlength="20" required style="max-width:110px">' +
           '<input type="text" id="wlNewTf" placeholder="TF (z.B. 1D)" maxlength="20" style="max-width:90px">' +
@@ -2242,7 +2332,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       '</form>' +
       '<div class="tl-jump">' +
         '<label for="wlJumpDate">Zu Datum springen</label>' +
-        '<input type="date" id="wlJumpDate">' +
+        '<input type="text" id="wlJumpDate" placeholder="z.B. 26.03.25, 09/25, 2025 …" autocomplete="off">' +
       '</div>' +
       '<div class="wl-table-wrap">' +
         '<table class="wl-table">' +
@@ -2315,11 +2405,14 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     // Neues Signal hinzufügen
     const addForm = document.getElementById('wlAddForm');
     const addMsg = document.getElementById('wlAddMsg');
+    const wlNewDateInput = document.getElementById('wlNewDate');
+    schlausDatumsfeld(wlNewDateInput);
     addForm.addEventListener('submit', async ev => {
       ev.preventDefault();
-      const date = document.getElementById('wlNewDate').value;
+      const date = schlauesDatumZuIso(parseSchlauesDatum(wlNewDateInput.value));
       const asset = document.getElementById('wlNewAsset').value.trim();
-      if (!date || !asset) return;
+      if (!date) { addMsg.textContent = 'Bitte ein vollständiges Datum eingeben, z.B. 26.03.2025.'; return; }
+      if (!asset) return;
       const body = {
         date, asset,
         uhrzeit: document.getElementById('wlNewZeit').value || null,
@@ -2347,10 +2440,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     // Bearbeiten / Löschen in der Tabelle
     const tableWrap = el.querySelector('.wl-table-wrap');
 
-    const wlJumpInput = document.getElementById('wlJumpDate');
-    if (wlJumpInput) wlJumpInput.addEventListener('change', () => {
-      springeZuDatum(tableWrap, wlJumpInput.value, signale.map(s => s.date));
-    });
+    schlausSprungfeld(document.getElementById('wlJumpDate'), () => tableWrap, () => signale.map(s => s.date));
 
     // Maus ueber einer Zeile mit Trade-ID hebt alle Zeilen desselben Trades hervor
     tableWrap.addEventListener('mouseover', ev => {
@@ -2363,6 +2453,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     tableWrap.addEventListener('mouseleave', () => {
       tableWrap.querySelectorAll('tr.wl-trade-hover').forEach(r => r.classList.remove('wl-trade-hover'));
     });
+
+    // Schlaues Datum im Bearbeiten-Panel: erkennt beliebig getippte Schreibweisen beim
+    // Verlassen des Feldes / Enter und schreibt das erkannte Datum als TT.MM.JJJJ zurueck.
+    tableWrap.querySelectorAll('.wle-date').forEach(schlausDatumsfeld);
 
     // Trade-ID Live-Info: zeigt beim Tippen sofort an, fuer welche(s) Asset(s) eine Nummer
     // schon in Benutzung ist (inkl. Anzahl Signale) - keine automatische Warnung/Blockierung,
@@ -2408,8 +2502,11 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       if (saveBtn) {
         const row = saveBtn.closest('tr');
         const id = row.dataset.id;
+        const dateFeld = row.querySelector('.wle-date');
+        const date = schlauesDatumZuIso(parseSchlauesDatum(dateFeld.value));
+        if (!date) { dateFeld.classList.add('datum-feld-ungueltig'); alert('Bitte ein vollständiges Datum eingeben, z.B. 26.03.2025.'); return; }
         const body = {
-          date: row.querySelector('.wle-date').value,
+          date,
           asset: row.querySelector('.wle-asset').value.trim(),
           tf: row.querySelector('.wle-tf').value.trim() || null,
           status: row.querySelector('.wle-status').value,
