@@ -1772,6 +1772,29 @@ function wlTradeFarbe(tid){
 // Signal fuer sich - Schluessel dann eindeutig ueber die Zeilen-ID.
 const wlTradeKey = s => (s.tradeId && String(s.tradeId).trim()) ? 't:' + String(s.tradeId).trim() : 'e:' + s.id;
 
+// Ueberblick ueber bereits vergebene Trade-IDs: welche Nummer ist fuer welches(e) Asset(s)
+// schon in Benutzung (Mehrfachnutzung = mehrere Signale desselben Trades, das ist gewollt),
+// die aktuell hoechste vergebene Nummer, und die naechste noch komplett freie Nummer -
+// damit Colin beim Vergeben neuer IDs nicht aus Versehen eine schon verwendete Nummer fuer
+// einen ANDEREN, neuen Trade wiederverwendet. Es wird bewusst nichts automatisch blockiert
+// oder gewarnt - nur transparent angezeigt, Colin entscheidet selbst.
+function wlTradeIdUebersicht(signale){
+  const nutzung = new Map(); // tradeId (String) -> Map(asset -> Anzahl Signale)
+  let hoechste = 0;
+  signale.forEach(s => {
+    const tid = s.tradeId != null ? String(s.tradeId).trim() : '';
+    if (!tid) return;
+    if (!nutzung.has(tid)) nutzung.set(tid, new Map());
+    const m = nutzung.get(tid);
+    m.set(s.asset, (m.get(s.asset) || 0) + 1);
+    const n = Number(tid);
+    if (Number.isFinite(n) && n > hoechste) hoechste = n;
+  });
+  let naechsteFrei = hoechste + 1;
+  while (nutzung.has(String(naechsteFrei))) naechsteFrei++;
+  return { nutzung, hoechste, naechsteFrei };
+}
+
 // Kurzfassung des Setups fuer die Tabellenspalte, z.B. "Double · MTF 2 · Multi-Asset · Bogen"
 function wlSetupText(s){
   const teile = [];
@@ -2046,6 +2069,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const anzLose = tradeStati.filter(x => x === 'lose').length;
     const anzNoEntry = tradeStati.filter(x => x === 'no_entry').length;
     const assetsAnzahl = new Set(signale.map(s => s.asset)).size;
+    const tradeIdInfo = wlTradeIdUebersicht(signale);
 
     const tabelleSortiert = signale.slice().sort((a,b) => {
       let cmp;
@@ -2063,12 +2087,20 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         klassen.push('wl-row-cluster', grp % 2 === 0 ? 'wl-grp-a' : 'wl-grp-b');
         if (grp !== grpVorher) klassen.push('wl-grp-start');
       }
+      // Beim Scrollen durch nach Datum sortierte Signale soll ein Jahreswechsel klar als
+      // eigener Balken erkennbar sein (bei Sortierung nach Asset ergibt eine Jahreszeile
+      // keinen Sinn, da die Reihenfolge dann nicht mehr chronologisch ist).
+      const jahr = s.date.slice(0, 4);
+      const jahrVorher = idx > 0 ? tabelleSortiert[idx-1].date.slice(0, 4) : null;
+      const jahrZeile = (sortSpalte === 'date' && jahr !== jahrVorher)
+        ? '<tr class="wl-year-row"><td colspan="12">'+jahr+'</td></tr>'
+        : '';
       const tagAnzahl = gleicherTag(s);
       const tagBadge = tagAnzahl ? ' <span class="wl-sameday">'+tagAnzahl+'× selber Tag</span>' : '';
       const st = wlStatus(s);
       const setupRest = wlSetupRestText(s);
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
-      return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'"'+tradeAttr+' title="Klick für Details">' +
+      return jahrZeile + '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'"'+tradeAttr+' title="Klick für Details">' +
         '<td class="muted">'+esc(wlDatumLabel(s)) +
           (s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') + tagBadge + '</td>' +
         '<td class="wl-trade-cell">' +
@@ -2118,8 +2150,9 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
         '</div>' +
-        '<label class="wl-detail-voll">Trade-ID <span class="wl-hint">gleiche Nummer bei mehreren Signalen = ein Trade</span>' +
-          '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="z.B. 7"></label>' +
+        '<label class="wl-detail-voll">Trade-ID <span class="wl-hint">gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'</span>' +
+          '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="z.B. '+tradeIdInfo.naechsteFrei+'">' +
+          '<span class="wl-tradeid-info muted" id="wl-tid-info-'+s.id+'"></span></label>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
         '<label class="wl-detail-voll">Details<textarea class="wle-details" rows="5" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>' +
         '<div class="wl-detail-aktionen">' +
@@ -2139,8 +2172,9 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '<div class="stat"><div class="v pnl-orange">'+anzBeLoss+'</div><div class="l">BE Loss</div></div>' +
         '<div class="stat"><div class="v pnl-neg">'+anzLose+'</div><div class="l">Lose</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+anzNoEntry+'</div><div class="l">No Entry</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--accent)">'+tradeIdInfo.naechsteFrei+'</div><div class="l">Nächste Trade-ID</div></div>' +
       '</div>' +
-      '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer.</div>' +
+      '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer. Aktuell höchste vergebene Trade-ID: '+tradeIdInfo.hoechste+'.</div>' +
       '<div class="wl-toolbar">' +
         '<span class="muted">🔍 Ziehen zum Hineinzoomen · Doppelklick zum Zurücksetzen</span>' +
         (zoomAktiv ? '<button type="button" class="btn ghost" id="wlZoomReset">Zoom zurücksetzen</button>' : '') +
@@ -2282,6 +2316,26 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     });
     tableWrap.addEventListener('mouseleave', () => {
       tableWrap.querySelectorAll('tr.wl-trade-hover').forEach(r => r.classList.remove('wl-trade-hover'));
+    });
+
+    // Trade-ID Live-Info: zeigt beim Tippen sofort an, fuer welche(s) Asset(s) eine Nummer
+    // schon in Benutzung ist (inkl. Anzahl Signale) - keine automatische Warnung/Blockierung,
+    // Colin sieht nur transparent den Stand und entscheidet selbst, ob es eine Ergaenzung
+    // zu einem bestehenden Trade oder ein neuer Trade sein soll.
+    tableWrap.querySelectorAll('.wle-tradeid').forEach(inp => {
+      const row = inp.closest('tr.wl-edit-row');
+      const infoEl = row ? row.querySelector('.wl-tradeid-info') : null;
+      if (!infoEl) return;
+      const aktualisieren = () => {
+        const tid = inp.value.trim();
+        if (!tid) { infoEl.textContent = ''; return; }
+        const nutzung = tradeIdInfo.nutzung.get(tid);
+        if (!nutzung) { infoEl.textContent = 'Nummer '+tid+' ist noch frei.'; return; }
+        const teile = [...nutzung.entries()].map(([asset, n]) => asset+' ('+n+'×)');
+        infoEl.textContent = 'Nummer '+tid+' bereits vergeben – '+teile.join(', ')+'.';
+      };
+      inp.addEventListener('input', aktualisieren);
+      aktualisieren();
     });
 
     // Klick auf eine Zeile klappt die Detailansicht auf/zu
