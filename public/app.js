@@ -732,6 +732,19 @@ async function ladeOvTrades(){
     '</div>';
   }
 
+  // Alters-Balken: reiner Balken (keine Beschriftung), zeigt wie lange ein To-Do schon
+  // offen ist auf einer 0-30-Tage-Skala - bei 30+ Tagen komplett voll und tiefrot. Die
+  // Farbe wandert stufenlos von gruen (frisch) über gelb nach rot (alt), damit man beim
+  // Ueberfliegen der Liste sofort sieht, was schon ewig herumliegt.
+  function todoAlterBarHtml(r){
+    if (!r.createdAt) return '';
+    const tageAlt = (Date.now() - new Date(r.createdAt).getTime()) / 86400000;
+    if (!(tageAlt >= 0)) return '';
+    const anteil = Math.max(0, Math.min(1, tageAlt / 30));
+    const farbton = 130 - anteil * 130; // 130=gruen -> 0=rot
+    return '<div class="todo-age"><div class="todo-age-fill" style="width:'+(anteil*100)+'%;background:hsl('+farbton+',65%,45%)"></div></div>';
+  }
+
   // Statt einem separaten, schmalen Eingabefeld im Panel darunter wird beim Bearbeiten
   // direkt die normale Textanzeige durch ein gleich breites, mitwachsendes Textfeld ersetzt -
   // so sieht man beim Tippen immer den ganzen Text statt nur einen kurzen Ausschnitt.
@@ -747,6 +760,7 @@ async function ladeOvTrades(){
         '<span class="icon-btn todo-edit-toggle" role="button" title="Bearbeiten">✎</span>' +
         '<span class="icon-btn del todo-del" role="button" title="Löschen">🗑</span>' +
       '</span>' +
+      (r.done ? '' : todoAlterBarHtml(r)) +
     '</div>' + panel(r);
   }
 
