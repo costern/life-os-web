@@ -159,9 +159,15 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-table tr.wl-grp-start td { border-top:2px solid var(--line); }
 /* Jahreswechsel beim Scrollen durch die (nach Datum sortierte) Tabelle: komplett schwarzer
    Balken mit weisser Schrift, bewusst unabhaengig vom Theme (hell/dunkel) immer gleich -
-   damit er beim schnellen Scrollen sofort als Jahresmarke auffaellt. */
+   damit er beim schnellen Scrollen sofort als Jahresmarke auffaellt.
+   Bleibt zusaetzlich beim Scrollen oben kleben (position:sticky), direkt unter der
+   Kopfzeile - "--wl-thead-h" wird per JS auf die tatsaechliche Kopfzeilen-Hoehe gesetzt.
+   Steht ein neuer Jahresbalken weiter unten im Dokument an derselben Klebe-Position an,
+   loest er den vorherigen automatisch ab (normales Stapelverhalten von position:sticky) -
+   so klebt immer nur der Balken des Jahres, in dem man sich gerade befindet. */
 .wl-year-row td { padding:9px 10px; font-size:12.5px; font-weight:800; letter-spacing:.08em;
-  color:#fff; background:#000; }
+  color:#fff; background:#000;
+  position:sticky; top:var(--wl-thead-h, 30px); z-index:2; }
 .wl-tradeid-info { display:block; margin-top:4px; font-size:11.5px; }
 /* Datums-Sprung (Trading-Log & Bottom Events): kleine Eingabe oberhalb der Tabelle, die per
    springeZuDatum() zur passenden (oder zeitlich naechstgelegenen) Zeile scrollt. */

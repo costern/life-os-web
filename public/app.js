@@ -2488,6 +2488,12 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     // Bearbeiten / Löschen in der Tabelle
     const tableWrap = el.querySelector('.wl-table-wrap');
 
+    // Jahresbalken kleben direkt unter der Kopfzeile (siehe .wl-year-row in styles.css) -
+    // dafuer muss die Kopfzeilen-Hoehe als CSS-Variable bekannt sein, statt sie fest zu
+    // verdrahten (sie haengt von Schriftgroesse/Zoom/Theme ab).
+    const wlThead = tableWrap.querySelector('thead');
+    if (wlThead) tableWrap.style.setProperty('--wl-thead-h', wlThead.offsetHeight + 'px');
+
     schlausSprungfeld(document.getElementById('wlJumpDate'), () => tableWrap, () => signale.map(s => s.date));
 
     // Maus ueber einer Zeile mit Trade-ID hebt alle Zeilen desselben Trades hervor
