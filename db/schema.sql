@@ -213,6 +213,9 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS zielmethode TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS entry_simulation TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS kursverlauf TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS kein_trade_grund TEXT;
+-- analysiert: Colin hat dieses Signal komplett zu Ende analysiert (gruener Haken ganz
+-- links in der Tabelle) - unabhaengig vom Trade-Ergebnis, reiner Bearbeitungsstatus.
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS analysiert BOOLEAN NOT NULL DEFAULT false;
 -- uhrzeit: Kerzen-Close des Signals. Standard 02:00 = Tageschart-Close; 12:00 = 12H-Close
 -- mitten am Tag; kuerzere Timeframes werden von Hand eingetragen. NULL = unbekannt.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS uhrzeit TIME;

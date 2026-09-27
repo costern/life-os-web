@@ -2323,7 +2323,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       const jahr = s.date.slice(0, 4);
       const jahrVorher = idx > 0 ? tabelleSortiert[idx-1].date.slice(0, 4) : null;
       const jahrZeile = (sortSpalte === 'date' && jahr !== jahrVorher)
-        ? '<tr class="wl-year-row"><td colspan="12">'+jahr+'</td></tr>'
+        ? '<tr class="wl-year-row"><td colspan="13">'+jahr+'</td></tr>'
         : '';
       const tagAnzahl = gleicherTag(s);
       // Kurzform "4×" statt "4× selber Tag" - spart Platz in der (ohnehin schon engen)
@@ -2334,6 +2334,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       const mtfWarnBadge = wlMtfWarnBadgeHtml(s);
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
       return jahrZeile + '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'" data-date="'+s.date+'"'+tradeAttr+' title="Klick für Details">' +
+        '<td class="wl-analysiert-cell"><button type="button" class="wl-analysiert-btn'+(s.analysiert?' ist-analysiert':'')+'" title="'+(s.analysiert?'Komplett analysiert – Klick zum Zurücksetzen':'Als komplett analysiert markieren')+'">✓</button></td>' +
         '<td class="muted">'+esc(wlDatumLabel(s)) +
           (s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') + tagBadge + '</td>' +
         '<td class="wl-trade-cell">' +
@@ -2362,7 +2363,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
       '</tr>' +
       // Detailansicht: klappt per Klick auf die Zeile (oder ueber ✎) auf
-      '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="12"><div class="wl-detail">' +
+      '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="13"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
         '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>' +
         '<div class="wl-detail-grid">' +
@@ -2472,6 +2473,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       '<div class="wl-table-wrap">' +
         '<table class="wl-table">' +
           '<thead><tr>' +
+            '<th title="Komplett analysiert"></th>' +
             '<th class="wl-sortable" data-sort="date">Datum'+(sortSpalte==='date'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
             '<th>Trade</th>' +
             '<th class="wl-sortable" data-sort="asset">Asset'+(sortSpalte==='asset'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
@@ -2659,6 +2661,24 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       }
     }
     tableWrap.addEventListener('click', async ev => {
+      const analysiertBtn = ev.target.closest('.wl-analysiert-btn');
+      if (analysiertBtn) {
+        const id = analysiertBtn.closest('tr').dataset.id;
+        const neuerWert = !analysiertBtn.classList.contains('ist-analysiert');
+        // Sofort optisch umschalten, statt auf die komplette Neuzeichnung zu warten -
+        // fuehlt sich beim schnellen Durchklicken mehrerer Zeilen direkter an.
+        analysiertBtn.classList.toggle('ist-analysiert', neuerWert);
+        analysiertBtn.title = neuerWert ? 'Komplett analysiert – Klick zum Zurücksetzen' : 'Als komplett analysiert markieren';
+        try { await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify({ analysiert: neuerWert }) }); }
+        catch(e) {
+          analysiertBtn.classList.toggle('ist-analysiert', !neuerWert);
+          alert('Konnte nicht gespeichert werden: ' + e.message);
+          return;
+        }
+        const sigRef = alleSignale.find(s => String(s.id) === String(id));
+        if (sigRef) sigRef.analysiert = neuerWert;
+        return;
+      }
       const editBtn = ev.target.closest('.wl-edit');
       if (editBtn) {
         const id = editBtn.closest('tr').dataset.id;

@@ -174,14 +174,16 @@ section.page { display:none; } section.page.active { display:block; }
    white-space:nowrap - sonst brechen die Badges in dieser schmalen Spalte auf 2-3 Zeilen um
    und blaehen die Zeilenhoehe unnoetig auf. */
 .wl-table td { padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:middle; border-left:3px solid transparent; }
-.wl-table td:first-child { white-space:nowrap; }
+/* Datum-Spalte ist jetzt die 2. Spalte (1. ist der Analysiert-Haken) - nowrap und die
+   Cluster-Randfarbe bleiben deshalb an nth-child(2) statt am first-child haengen. */
+.wl-table td:nth-child(2) { white-space:nowrap; }
 /* Zwei Haeufungen, die in der Tabelle direkt untereinanderstehen, wechseln sich in der
    Helligkeit ab und werden oben durch eine Trennlinie getrennt - so sieht man sofort,
    wo eine Gruppe aufhoert und die naechste anfaengt. */
 .wl-table tr.wl-grp-a td { background:rgba(13,148,136,.11); }
 .wl-table tr.wl-grp-b td { background:rgba(13,148,136,.045); }
-.wl-table tr.wl-grp-a td:first-child { border-left-color:#0d9488; }
-.wl-table tr.wl-grp-b td:first-child { border-left-color:#5eead4; }
+.wl-table tr.wl-grp-a td:nth-child(2) { border-left-color:#0d9488; }
+.wl-table tr.wl-grp-b td:nth-child(2) { border-left-color:#5eead4; }
 .wl-table tr.wl-grp-start td { border-top:2px solid var(--line); }
 /* Jahreswechsel beim Scrollen durch die (nach Datum sortierte) Tabelle: komplett schwarzer
    Balken mit weisser Schrift, bewusst unabhaengig vom Theme (hell/dunkel) immer gleich -
@@ -235,6 +237,14 @@ tr.datum-sprung-highlight td { animation: datumSprungBlitz 2s ease-out; }
 .wl-row-actions { white-space:nowrap; text-align:right; }
 .wl-edit, .wl-del { background:none; border:none; cursor:pointer; font-size:14px; padding:2px 5px; border-radius:6px; }
 .wl-edit:hover, .wl-del:hover { background:var(--badge-blue-bg); }
+/* Gruener Haken ganz links: markiert ein Signal als komplett zu Ende analysiert
+   (reiner Bearbeitungsstatus, unabhaengig vom Trade-Ergebnis). */
+.wl-analysiert-cell { width:22px; padding-left:6px; padding-right:2px; text-align:center; }
+.wl-analysiert-btn { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line);
+  background:none; color:transparent; cursor:pointer; font-size:12px; line-height:1; padding:0;
+  display:inline-flex; align-items:center; justify-content:center; }
+.wl-analysiert-btn:hover { border-color:var(--green); }
+.wl-analysiert-btn.ist-analysiert { background:var(--green); border-color:var(--green); color:#fff; }
 .wl-edit-row td { background:var(--bg); padding:0; }
 /* Detailansicht kompakter gemacht (Colins Feedback: "viel zu viel Platz") - kleineres
    Polster, schmalere Spalten (mehr Felder pro Zeile), Label und Feld dichter beieinander. */

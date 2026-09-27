@@ -74,6 +74,7 @@ function rowOut(r) {
     entrySimulation: r.entry_simulation,
     kursverlauf: r.kursverlauf,
     keinTradeGrund: r.kein_trade_grund,
+    analysiert: !!r.analysiert,
     uhrzeit: r.uhrzeit ? String(r.uhrzeit).slice(0, 5) : null
   };
 }
@@ -125,6 +126,7 @@ router.patch('/:id', async (req, res) => {
                             ['ergebnisDetail','ergebnis_detail'],['zielmethode','zielmethode'],
                             ['entrySimulation','entry_simulation'],['kursverlauf','kursverlauf'],
                             ['keinTradeGrund','kein_trade_grund'],
+                            ['analysiert','analysiert'],
                             ['uhrzeit','uhrzeit']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
@@ -144,7 +146,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);
-    else if (key === 'multiAsset') wert = !!wert;
+    else if (key === 'multiAsset' || key === 'analysiert') wert = !!wert;
     else wert = orNull(wert);
     fields.push(`${col} = $${i++}`); vals.push(wert);
   }
