@@ -2382,6 +2382,29 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['rsi','RSI Div.'],['leicht','Leichte RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
           '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level']], s.pivotLevel)+'</label>' +
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
+          '<label>Ergebnis (Detail)'+auswahlHtml('wle-ergebnisdetail', [['','–'],
+            ['noch_nicht_bewertet','Noch nicht bewertet'],['target_erreicht','Target erreicht'],
+            ['be_2r','Break-even nach 2R'],['stop_loss','Stop-Loss erreicht'],
+            ['kein_entry','Kein Entry – Limit nicht gefüllt'],['kein_trade_rr','Kein Trade – R:R zu schlecht'],
+            ['setup_invalidiert','Setup invalidiert'],['verlauf_unklar','Verlauf unklar']], s.ergebnisDetail)+'</label>' +
+          '<label>Zielmethode'+auswahlHtml('wle-zielmethode', [['','–'],
+            ['measured_move','Measured Move / Bodenhöhe'],['ema50','Daily 50 EMA'],
+            ['doji_level','Doji-/Kerzenlevel'],['horizontaler_widerstand','Horizontaler Widerstand'],
+            ['manuelles_ziel','Manuelles Ziel'],['kein_ziel','Kein sinnvolles Ziel']], s.zielmethode)+'</label>' +
+          '<label>Entry-Simulation'+auswahlHtml('wle-entrysim', [['','–'],
+            ['direkter_entry','Direkter Entry möglich'],['limit_theoretisch_gefuellt','Limit theoretisch gefüllt'],
+            ['limit_nicht_gefuellt','Limit nicht gefüllt'],['entry_schlechtes_rr','Entry möglich, aber R:R zu schlecht'],
+            ['kein_regelkonformer_entry','Kein regelkonformer Entry'],['nicht_eindeutig','Nicht eindeutig']], s.entrySimulation)+'</label>' +
+          '<label>Kursverlauf'+auswahlHtml('wle-kursverlauf', [['','–'],
+            ['direkt_target','Direkt zum Target'],['unter_entry_dann_target','Unter Entry, Stop gehalten, danach Target'],
+            ['2r_dann_zurueck','2R erreicht, danach zurück zum Entry'],['direkt_stop','Direkt zum Stop-Loss'],
+            ['laenger_seitwaerts','Länger seitwärts'],['entry_nie_erreicht','Entry nie erreicht, direkt gestiegen'],
+            ['stop_target_gleiche_kerze','Stop und Target in derselben Kerze'],['sonstiger_verlauf','Sonstiger Verlauf']], s.kursverlauf)+'</label>' +
+          '<label>Grund für "Kein Trade"'+auswahlHtml('wle-keintradegrund', [['','–'],
+            ['rr_schlecht','Risk-Reward zu schlecht'],['langer_docht','Historischer langer Docht'],
+            ['sl_zu_weit','Stop-Loss zu weit entfernt'],['ziel_zu_nah','Ziel zu nah'],
+            ['keine_htf_bestaetigung','Keine höhere Timeframe-Bestätigung'],['pattern_nicht_sauber','Pattern nicht sauber'],
+            ['divergenz_fehlte','Divergenz/Bestätigung fehlte'],['sonstiger_grund','Sonstiger Grund']], s.keinTradeGrund)+'</label>' +
           '<label class="wl-detail-kurz" style="width:88px" title="gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'">Trade-ID' +
             '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="'+tradeIdInfo.naechsteFrei+'">' +
             '<span class="wl-tradeid-info muted" id="wl-tid-info-'+s.id+'"></span></label>' +
@@ -2672,6 +2695,11 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           divLokal: row.querySelector('.wle-divlokal').value,
           divStruktur: row.querySelector('.wle-divstruktur').value,
           pivotLevel: row.querySelector('.wle-pivot').value,
+          ergebnisDetail: row.querySelector('.wle-ergebnisdetail').value,
+          zielmethode: row.querySelector('.wle-zielmethode').value,
+          entrySimulation: row.querySelector('.wle-entrysim').value,
+          kursverlauf: row.querySelector('.wle-kursverlauf').value,
+          keinTradeGrund: row.querySelector('.wle-keintradegrund').value,
           uhrzeit: row.querySelector('.wle-uhrzeit').value
         };
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';

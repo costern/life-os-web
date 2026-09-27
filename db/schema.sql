@@ -196,6 +196,23 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS div_struktur TEXT;
 -- pivot_level  perfekt | nicht_perfekt   (trifft das Signal ein bereits bestehendes
 --              Pivot-Level exakt, oder liegt es minimal hoeher/tiefer?)
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS pivot_level TEXT;
+-- Backtest-Auswertung des theoretischen Trades (separat vom Live-Ergebnis "status"):
+-- ergebnis_detail    noch_nicht_bewertet | target_erreicht | be_2r | stop_loss |
+--                    kein_entry | kein_trade_rr | setup_invalidiert | verlauf_unklar
+-- zielmethode        measured_move | ema50 | doji_level | horizontaler_widerstand |
+--                    manuelles_ziel | kein_ziel
+-- entry_simulation   direkter_entry | limit_theoretisch_gefuellt | limit_nicht_gefuellt |
+--                    entry_schlechtes_rr | kein_regelkonformer_entry | nicht_eindeutig
+-- kursverlauf        direkt_target | unter_entry_dann_target | 2r_dann_zurueck |
+--                    direkt_stop | laenger_seitwaerts | entry_nie_erreicht |
+--                    stop_target_gleiche_kerze | sonstiger_verlauf
+-- kein_trade_grund   rr_schlecht | langer_docht | sl_zu_weit | ziel_zu_nah |
+--                    keine_htf_bestaetigung | pattern_nicht_sauber | divergenz_fehlte | sonstiger_grund
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS ergebnis_detail TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS zielmethode TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS entry_simulation TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS kursverlauf TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS kein_trade_grund TEXT;
 -- uhrzeit: Kerzen-Close des Signals. Standard 02:00 = Tageschart-Close; 12:00 = 12H-Close
 -- mitten am Tag; kuerzere Timeframes werden von Hand eingetragen. NULL = unbekannt.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS uhrzeit TIME;

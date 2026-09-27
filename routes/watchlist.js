@@ -21,6 +21,17 @@ const DIVERGENZEN = new Set(['rsi', 'none', 'hidden']);
 // pivot_level = trifft das Signal ein bereits bestehendes Pivot-Level exakt (perfekt),
 // oder liegt es minimal hoeher/tiefer (nicht_perfekt)?
 const PIVOT_LEVEL = new Set(['perfekt', 'nicht_perfekt']);
+// Backtest-Auswertung des theoretischen Trades - separat vom Live-Ergebnis "status".
+const ERGEBNIS_DETAIL = new Set(['noch_nicht_bewertet', 'target_erreicht', 'be_2r', 'stop_loss',
+  'kein_entry', 'kein_trade_rr', 'setup_invalidiert', 'verlauf_unklar']);
+const ZIELMETHODE = new Set(['measured_move', 'ema50', 'doji_level', 'horizontaler_widerstand',
+  'manuelles_ziel', 'kein_ziel']);
+const ENTRY_SIMULATION = new Set(['direkter_entry', 'limit_theoretisch_gefuellt', 'limit_nicht_gefuellt',
+  'entry_schlechtes_rr', 'kein_regelkonformer_entry', 'nicht_eindeutig']);
+const KURSVERLAUF = new Set(['direkt_target', 'unter_entry_dann_target', '2r_dann_zurueck',
+  'direkt_stop', 'laenger_seitwaerts', 'entry_nie_erreicht', 'stop_target_gleiche_kerze', 'sonstiger_verlauf']);
+const KEIN_TRADE_GRUND = new Set(['rr_schlecht', 'langer_docht', 'sl_zu_weit', 'ziel_zu_nah',
+  'keine_htf_bestaetigung', 'pattern_nicht_sauber', 'divergenz_fehlte', 'sonstiger_grund']);
 
 // Uhrzeit: "HH:MM" bzw. "HH:MM:SS" aus dem Formular, sonst nicht gesetzt
 function zeitOrNull(v) {
@@ -58,6 +69,11 @@ function rowOut(r) {
     divLokal: r.div_lokal,
     divStruktur: r.div_struktur,
     pivotLevel: r.pivot_level,
+    ergebnisDetail: r.ergebnis_detail,
+    zielmethode: r.zielmethode,
+    entrySimulation: r.entry_simulation,
+    kursverlauf: r.kursverlauf,
+    keinTradeGrund: r.kein_trade_grund,
     uhrzeit: r.uhrzeit ? String(r.uhrzeit).slice(0, 5) : null
   };
 }
@@ -73,8 +89,8 @@ router.post('/', async (req, res) => {
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const status = STATI.has(b.status) ? b.status : null;
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, uhrzeit)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
@@ -85,6 +101,11 @@ router.post('/', async (req, res) => {
      DIVERGENZEN.has(b.divLokal) ? b.divLokal : null,
      DIVERGENZEN.has(b.divStruktur) ? b.divStruktur : null,
      PIVOT_LEVEL.has(b.pivotLevel) ? b.pivotLevel : null,
+     ERGEBNIS_DETAIL.has(b.ergebnisDetail) ? b.ergebnisDetail : null,
+     ZIELMETHODE.has(b.zielmethode) ? b.zielmethode : null,
+     ENTRY_SIMULATION.has(b.entrySimulation) ? b.entrySimulation : null,
+     KURSVERLAUF.has(b.kursverlauf) ? b.kursverlauf : null,
+     KEIN_TRADE_GRUND.has(b.keinTradeGrund) ? b.keinTradeGrund : null,
      zeitOrNull(b.uhrzeit)]
   );
   res.status(201).json(rowOut(rows[0]));
@@ -101,6 +122,9 @@ router.patch('/:id', async (req, res) => {
                             ['pattern','pattern'],['candles','candles'],
                             ['divLokal','div_lokal'],['divStruktur','div_struktur'],
                             ['pivotLevel','pivot_level'],
+                            ['ergebnisDetail','ergebnis_detail'],['zielmethode','zielmethode'],
+                            ['entrySimulation','entry_simulation'],['kursverlauf','kursverlauf'],
+                            ['keinTradeGrund','kein_trade_grund'],
                             ['uhrzeit','uhrzeit']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
@@ -111,6 +135,11 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'candles') wert = CANDLES.has(wert) ? wert : null;
     else if (key === 'divLokal' || key === 'divStruktur') wert = DIVERGENZEN.has(wert) ? wert : null;
     else if (key === 'pivotLevel') wert = PIVOT_LEVEL.has(wert) ? wert : null;
+    else if (key === 'ergebnisDetail') wert = ERGEBNIS_DETAIL.has(wert) ? wert : null;
+    else if (key === 'zielmethode') wert = ZIELMETHODE.has(wert) ? wert : null;
+    else if (key === 'entrySimulation') wert = ENTRY_SIMULATION.has(wert) ? wert : null;
+    else if (key === 'kursverlauf') wert = KURSVERLAUF.has(wert) ? wert : null;
+    else if (key === 'keinTradeGrund') wert = KEIN_TRADE_GRUND.has(wert) ? wert : null;
     else if (key === 'uhrzeit') wert = zeitOrNull(wert);
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
