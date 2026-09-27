@@ -1939,6 +1939,10 @@ const WL_PATTERN_LABEL = { valid:'valid', clean:'clean', choppy:'choppy', '':'�
 const WL_CANDLE_LABEL = { choppy:'Choppy Candles', decent:'Decent Candles', gap:'Gap Candles', mini:'Mini Candles (Doji/Hammer/Shooting Star)', '':'–' };
 const WL_DIV_LABEL = { rsi:'RSI Div.', leicht:'Leichte RSI Div.', none:'No Div.', hidden:'RSI Hidden Div.', '':'–' };
 const WL_DIV_KURZ = { rsi:'RSI', leicht:'Leicht', none:'keine', hidden:'Hidden', '':'–' };
+// Pivot-Level: trifft das Signal ein bereits bestehendes Level exakt, oder liegt es
+// nur minimal hoeher/tiefer (kein perfektes Match)?
+const WL_PIVOT_LABEL = { perfekt:'Perfektes Level', nicht_perfekt:'Leicht abweichendes Level', '':'–' };
+const WL_PIVOT_KURZ = { perfekt:'Perfekt', nicht_perfekt:'Abweichend', '':'–' };
 // "Doppelte Divergenz": lokale UND strukturelle Divergenz sind beide gesetzt (irgendeine
 // Auspraegung ausser leer/none) - staerkeres Signal, deshalb in der Tabelle mit Haken markiert.
 function wlDoppelteDivergenz(s){
@@ -1948,7 +1952,9 @@ function wlDoppelteDivergenz(s){
 const wlStatus = s => s.status || '';
 // Setup-Qualitaet (bewertet das Signal selbst, unabhaengig vom Ausgang des Trades)
 const WL_NOTEN = ['A++', 'A+', 'A', 'B'];
-const WL_NOTE_FARBEN = { 'A++':'var(--green)', 'A+':'var(--green)', 'A':'var(--amber)', 'B':'var(--muted)' };
+// Setup-Note-Ampel: B = auf keinen Fall traden (rot), A = gerade so tradebar (leicht gruen),
+// A+ = gutes Setup (gruen), A++ = bestes Setup (sehr/kraeftig gruen) - siehe Colins Einstufung.
+const WL_NOTE_FARBEN = { 'A++':'var(--green-strong)', 'A+':'var(--green)', 'A':'var(--green-light)', 'B':'var(--red)' };
 // Feste Farbpalette fuer Trades. Die Farbe haengt nur an der Trade-ID, bleibt also
 // beim Umsortieren gleich; die Nummer steht immer daneben, Farbe allein traegt nichts.
 const WL_TRADE_FARBEN = ['#8b5cf6','#0ea5e9','#c026d3','#65a30d','#06b6d4','#7c3aed','#2563eb','#db2777'];
@@ -2337,7 +2343,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '<td class="wl-setup-cell">'+wlEventBadgeHtml(s)+(mtfWarnBadge ? ' '+mtfWarnBadge : '')+(setupRest ? ' <span class="muted">'+esc(setupRest)+'</span>' : ((s.eventTyp||mtfWarnBadge) ? '' : '<span class="muted">–</span>'))+'</td>' +
         '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+'</td>' +
         '<td class="muted">'+
-          ([s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '']
+          ([s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '', s.pivotLevel ? WL_PIVOT_KURZ[s.pivotLevel] : '']
             .filter(Boolean).join(' · ') || '–') +
         '</td>' +
         '<td class="muted">'+
@@ -2356,28 +2362,29 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
         '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>' +
         '<div class="wl-detail-grid">' +
-          '<label>Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
-          '<label>Uhrzeit <span class="wl-hint">Kerzen-Close, leer = 02:00 (Tageschart)</span>' +
+          '<label class="wl-detail-kurz" style="width:82px">Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
+          '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = 02:00 (Tageschart)">Uhrzeit' +
             '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
           '<label>Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
-          '<label>Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
-          '<label>Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
-          '<label>Setup-Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
-          '<label>Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
-          '<label>Multi-Timeframe'+auswahlHtml('wle-mtf', [['','–'],['1','Only One Time Frame'],['2','2 Timeframes'],['3','3 Timeframes']], s.mtf ? String(s.mtf) : '')+'</label>' +
-          '<label>Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
-          '<label>Pattern'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
+          '<label class="wl-detail-kurz" style="width:100px">Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
+          '<label class="wl-detail-kurz" style="width:56px">Setup-Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:140px">Multi-Timeframe'+auswahlHtml('wle-mtf', [['','–'],['1','Only One Time Frame'],['2','2 Timeframes'],['3','3 Timeframes']], s.mtf ? String(s.mtf) : '')+'</label>' +
+          '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:74px">Pattern'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
           '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['rsi','RSI Div.'],['leicht','Leichte RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
           '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['rsi','RSI Div.'],['leicht','Leichte RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
+          '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level']], s.pivotLevel)+'</label>' +
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:88px" title="gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'">Trade-ID' +
+            '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="'+tradeIdInfo.naechsteFrei+'">' +
+            '<span class="wl-tradeid-info muted" id="wl-tid-info-'+s.id+'"></span></label>' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
         '</div>' +
-        '<label class="wl-detail-voll">Trade-ID <span class="wl-hint">gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'</span>' +
-          '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="z.B. '+tradeIdInfo.naechsteFrei+'">' +
-          '<span class="wl-tradeid-info muted" id="wl-tid-info-'+s.id+'"></span></label>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
-        '<label class="wl-detail-voll">Details<textarea class="wle-details" rows="5" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>' +
+        '<label class="wl-detail-voll">Details<textarea class="wle-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>' +
         '<div class="wl-detail-aktionen">' +
           '<button type="button" class="wl-save">Speichern</button>' +
           '<button type="button" class="wl-cancel ghost">Schließen</button>' +
@@ -2582,6 +2589,14 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     // Verlassen des Feldes / Enter und schreibt das erkannte Datum als TT.MM.JJJJ zurueck.
     tableWrap.querySelectorAll('.wle-date').forEach(schlausDatumsfeld);
 
+    // Details-Textarea: startet einzeilig und waechst automatisch mit dem Text mit,
+    // statt immer eine grosse feste Flaeche zu belegen (gleiches Prinzip wie .tl-notiz-auto
+    // im Trading-Log).
+    tableWrap.querySelectorAll('.wle-details').forEach(feld => {
+      tlAutoResize(feld);
+      feld.addEventListener('input', () => tlAutoResize(feld));
+    });
+
     // Trade-ID Live-Info: zeigt beim Tippen sofort an, fuer welche(s) Asset(s) eine Nummer
     // schon in Benutzung ist (inkl. Anzahl Signale) - keine automatische Warnung/Blockierung,
     // Colin sieht nur transparent den Stand und entscheidet selbst, ob es eine Ergaenzung
@@ -2609,6 +2624,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       if (!detailRow.hidden) {
         const shotsEl = document.getElementById('wl-shots-'+id);
         if (shotsEl) wlLiesShots(id).then(shots => { if (wlOffenId === id) renderWlShots(id, shots, shotsEl); });
+        // Details-Textarea war unsichtbar (scrollHeight=0) - jetzt, da die Zeile sichtbar
+        // ist, die Hoehe passend zum tatsaechlichen Inhalt setzen.
+        const detailsFeld = detailRow.querySelector('.wle-details');
+        if (detailsFeld) tlAutoResize(detailsFeld);
       }
     }
     tableWrap.addEventListener('click', async ev => {
@@ -2647,6 +2666,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           candles: row.querySelector('.wle-candles').value,
           divLokal: row.querySelector('.wle-divlokal').value,
           divStruktur: row.querySelector('.wle-divstruktur').value,
+          pivotLevel: row.querySelector('.wle-pivot').value,
           uhrzeit: row.querySelector('.wle-uhrzeit').value
         };
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
@@ -2695,6 +2715,8 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         detailRow.hidden = false;
         const shotsEl = document.getElementById('wl-shots-'+wlOffenId);
         if (shotsEl) wlLiesShots(wlOffenId).then(shots => { if (wlOffenId != null) renderWlShots(wlOffenId, shots, shotsEl); });
+        const detailsFeld = detailRow.querySelector('.wle-details');
+        if (detailsFeld) tlAutoResize(detailsFeld);
       } else {
         wlOffenId = null;
       }

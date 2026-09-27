@@ -1,6 +1,7 @@
 :root { color-scheme: light;
   --bg:#f6f7f9; --card:#ffffff; --ink:#1a1d23; --muted:#6b7280; --line:#e5e7eb;
   --accent:#4f46e5; --green:#059669; --red:#dc2626; --amber:#d97706; --orange:#ea580c;
+  --green-light:#22c55e; --green-strong:#065f46;
   --input-bg:#fbfbfc; --hover-bg:#eceef2; --ghost-bg:#e7e9ee; --ghost-text:#4b5563;
   --badge-blue-bg:#eef2ff; --badge-red-bg:#fef2f2; --badge-green-bg:#ecfdf5; --badge-amber-bg:#fffbeb;
   --disabled-bg:#c7c9d1; --dot-niedrig:#cbd0d8; --dashed:#c7d2fe; --text2:#374151;
@@ -8,6 +9,7 @@
 [data-theme="dark"] { color-scheme: dark;
   --bg:#14161a; --card:#1c1f26; --ink:#e8eaed; --muted:#9aa0ab; --line:#2c3038;
   --accent:#6366f1; --green:#34d399; --red:#f87171; --amber:#fbbf24; --orange:#fb923c;
+  --green-light:#86efac; --green-strong:#22c55e;
   --input-bg:#23262e; --hover-bg:#262a33; --ghost-bg:#2a2e37; --ghost-text:#c7cbd3;
   --badge-blue-bg:rgba(99,102,241,.18); --badge-red-bg:rgba(248,113,113,.15);
   --badge-green-bg:rgba(52,211,153,.15); --badge-amber-bg:rgba(251,191,36,.15);
@@ -237,7 +239,12 @@ tr.datum-sprung-highlight td { animation: datumSprungBlitz 2s ease-out; }
 .wl-detail { padding:10px 14px; display:flex; flex-direction:column; gap:7px; }
 .wl-detail-kopf { display:flex; align-items:center; gap:6px; font-size:13px; }
 .wl-detail-kopf .wl-icon { width:18px; height:18px; border-radius:50%; flex:none; }
-.wl-detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:6px 10px; }
+/* Flex statt Grid: jedes Feld bekommt nur so viel Breite, wie sein Inhalt braucht,
+   statt dass alle Spalten gleich breit gestreckt werden (Datum/Setup-Note/Timeframe/
+   Multi-Timeframe/Trade-ID sind kurz, Asset/Form/Pivot-Level etc. duerfen wachsen). */
+.wl-detail-grid { display:flex; flex-wrap:wrap; gap:6px 10px; }
+.wl-detail-grid label { flex:1 1 128px; min-width:0; }
+.wl-detail-grid label.wl-detail-kurz { flex:0 0 auto; }
 .wl-detail label, .wl-detail-voll { display:flex; flex-direction:column; gap:2px;
   font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
 .wl-detail input[type=text], .wl-detail input[type=date], .wl-detail input[type=time], .wl-detail select, .wl-detail textarea {

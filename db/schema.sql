@@ -193,6 +193,9 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS pattern TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS candles TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS div_lokal TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS div_struktur TEXT;
+-- pivot_level  perfekt | nicht_perfekt   (trifft das Signal ein bereits bestehendes
+--              Pivot-Level exakt, oder liegt es minimal hoeher/tiefer?)
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS pivot_level TEXT;
 -- uhrzeit: Kerzen-Close des Signals. Standard 02:00 = Tageschart-Close; 12:00 = 12H-Close
 -- mitten am Tag; kuerzere Timeframes werden von Hand eingetragen. NULL = unbekannt.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS uhrzeit TIME;

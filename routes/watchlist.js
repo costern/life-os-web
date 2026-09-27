@@ -18,6 +18,9 @@ const MARKTPHASEN = new Set(['uptrend', 'downtrend', 'ranging']);
 const PATTERN = new Set(['valid', 'clean', 'choppy']);
 const CANDLES = new Set(['choppy', 'decent', 'gap', 'mini']);
 const DIVERGENZEN = new Set(['rsi', 'none', 'hidden']);
+// pivot_level = trifft das Signal ein bereits bestehendes Pivot-Level exakt (perfekt),
+// oder liegt es minimal hoeher/tiefer (nicht_perfekt)?
+const PIVOT_LEVEL = new Set(['perfekt', 'nicht_perfekt']);
 
 // Uhrzeit: "HH:MM" bzw. "HH:MM:SS" aus dem Formular, sonst nicht gesetzt
 function zeitOrNull(v) {
@@ -54,6 +57,7 @@ function rowOut(r) {
     candles: r.candles,
     divLokal: r.div_lokal,
     divStruktur: r.div_struktur,
+    pivotLevel: r.pivot_level,
     uhrzeit: r.uhrzeit ? String(r.uhrzeit).slice(0, 5) : null
   };
 }
@@ -69,8 +73,8 @@ router.post('/', async (req, res) => {
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const status = STATI.has(b.status) ? b.status : null;
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, uhrzeit)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, uhrzeit)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
@@ -80,6 +84,7 @@ router.post('/', async (req, res) => {
      CANDLES.has(b.candles) ? b.candles : null,
      DIVERGENZEN.has(b.divLokal) ? b.divLokal : null,
      DIVERGENZEN.has(b.divStruktur) ? b.divStruktur : null,
+     PIVOT_LEVEL.has(b.pivotLevel) ? b.pivotLevel : null,
      zeitOrNull(b.uhrzeit)]
   );
   res.status(201).json(rowOut(rows[0]));
@@ -95,6 +100,7 @@ router.patch('/:id', async (req, res) => {
                             ['tradeId','trade_id'],['note','note'],['marktphase','marktphase'],
                             ['pattern','pattern'],['candles','candles'],
                             ['divLokal','div_lokal'],['divStruktur','div_struktur'],
+                            ['pivotLevel','pivot_level'],
                             ['uhrzeit','uhrzeit']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
@@ -104,6 +110,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'pattern') wert = PATTERN.has(wert) ? wert : null;
     else if (key === 'candles') wert = CANDLES.has(wert) ? wert : null;
     else if (key === 'divLokal' || key === 'divStruktur') wert = DIVERGENZEN.has(wert) ? wert : null;
+    else if (key === 'pivotLevel') wert = PIVOT_LEVEL.has(wert) ? wert : null;
     else if (key === 'uhrzeit') wert = zeitOrNull(wert);
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
