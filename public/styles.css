@@ -496,6 +496,11 @@ a { color:var(--accent); }
 .tl-shot-thumb { position:relative; border-radius:8px; overflow:hidden;
   border:1px solid var(--line); cursor:zoom-in; background:var(--hover-bg); line-height:0;
   flex:1 1 380px; min-width:290px; max-width:100%; }
+/* Bottom Events: ist genau ein Screenshot vorhanden (Kachel + Upload-Feld = 2 Kinder,
+   die Kachel ist das erste), soll er die komplette Zeilenbreite bekommen statt sich die
+   Breite mit dem "+"-Upload-Feld zu teilen - das Upload-Feld rutscht dann einfach in die
+   naechste Zeile. Ab zwei Screenshots bleibt das normale Nebeneinander unveraendert. */
+.wl-shots-grid .tl-shot-thumb:first-child:nth-last-child(2) { flex:1 1 100%; }
 .tl-shot-thumb img { display:block; width:100%; height:auto; }
 .tl-shot-del { position:absolute; top:5px; right:5px; font-size:12px; line-height:1; padding:4px 7px;
   border-radius:5px; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; }

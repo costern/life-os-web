@@ -1841,7 +1841,7 @@ function renderWlShots(signalId, shots, el){
     '</div>'
   ).join('');
   el.innerHTML =
-    '<div class="tl-shots-grid">' + kacheln +
+    '<div class="tl-shots-grid wl-shots-grid">' + kacheln +
       '<div class="tl-shot-upload" tabindex="0">' +
         '<span class="tl-shot-upload-plus">+</span>' +
         '<span class="tl-shot-upload-hint">Strg+V / Cmd+V<br>zum Einfügen</span>' +
