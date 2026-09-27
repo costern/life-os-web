@@ -151,10 +151,15 @@ section.page { display:none; } section.page.active { display:block; }
      Scrollen sonst mit der ersten Zeile weg */
   box-shadow:inset 0 -1px 0 var(--line); }
 .wl-table th { text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
-  padding:6px 10px; white-space:nowrap; }
+  padding:5px 8px; white-space:nowrap; }
 .wl-table th.wl-sortable { cursor:pointer; user-select:none; }
 .wl-table th.wl-sortable:hover { color:var(--accent); }
-.wl-table td { padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:middle; border-left:3px solid transparent; }
+/* Kompakter gemacht auf Colins Feedback hin: weniger Zeilenhoehe, damit mehr Zeilen ohne
+   Scrollen sichtbar sind. Erste Spalte (Datum + Uhrzeit-/Selber-Tag-Badges) zusaetzlich mit
+   white-space:nowrap - sonst brechen die Badges in dieser schmalen Spalte auf 2-3 Zeilen um
+   und blaehen die Zeilenhoehe unnoetig auf. */
+.wl-table td { padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:middle; border-left:3px solid transparent; }
+.wl-table td:first-child { white-space:nowrap; }
 /* Zwei Haeufungen, die in der Tabelle direkt untereinanderstehen, wechseln sich in der
    Helligkeit ab und werden oben durch eine Trennlinie getrennt - so sieht man sofort,
    wo eine Gruppe aufhoert und die naechste anfaengt. */
