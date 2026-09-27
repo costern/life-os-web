@@ -116,8 +116,10 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
 .wl-toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
 .wl-toolbar .muted { font-size:11px; }
-/* Asset-Filter oberhalb von Chart und Tabelle - schraenkt beides gleichzeitig ein. */
+/* Asset-Filter neben "Zu Datum springen" (ueber der Tabelle) - schraenkt Tabelle,
+   Chart-Marker und Statistiken gleichzeitig auf das gesuchte Asset ein. */
 .wl-asset-filter-wrap { display:flex; align-items:center; gap:4px; margin-left:auto; }
+.wl-asset-filter-label { color:var(--muted); }
 .wl-asset-filter { padding:5px 9px; border-radius:7px; border:1px solid var(--line);
   background:var(--card); color:inherit; font-size:12.5px; width:170px; }
 .wl-asset-filter-wrap .icon-btn { background:none; border:none; cursor:pointer; font-size:12px;

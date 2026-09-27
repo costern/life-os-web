@@ -2100,18 +2100,22 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const wlFilterCursor = wlFilterHatteFokus ? wlVorherAktiv.selectionStart : null;
 
     // Asset-Filter: wenn gesetzt, werden Tabelle, Chart-Marker UND Statistiken auf das
-    // gesuchte Asset eingeschraenkt (Substring, Gross-/Kleinschreibung egal). Bewusst keine
-    // eigene "const signale" hier (wuerde die aeussere Variable ab dieser Stelle im ganzen
-    // render() per Hoisting ueberschatten und vorher zu einem TDZ-Fehler fuehren) - stattdessen
-    // wird die vorhandene "let signale"-Variable fuer den Rest von render() einfach umgesetzt.
+    // gesuchte Asset eingeschraenkt (Substring, Gross-/Kleinschreibung egal). Wichtig: die
+    // aeussere "let signale"-Variable (die vollstaendige, ungefilterte Liste von der API)
+    // wird hier NICHT ueberschrieben - sonst wuerde nach dem Filtern fuer immer nur noch die
+    // gefilterte Teilmenge existieren, auch nachdem der Filter wieder geloescht wurde (Bug:
+    // "X druecken zeigt gar keine Trades mehr"). Stattdessen ab hier ausschliesslich mit der
+    // eigenen Variable "signaleGefiltert" weiterarbeiten.
     const alleSignale = signale;
     const wlFilterText = (wlAssetFilter || '').trim().toLowerCase();
-    if (wlFilterText) signale = alleSignale.filter(s => (s.asset||'').toLowerCase().includes(wlFilterText));
+    const signaleGefiltert = wlFilterText
+      ? alleSignale.filter(s => (s.asset||'').toLowerCase().includes(wlFilterText))
+      : alleSignale;
 
     // Haeufungen: Signale innerhalb eines FENSTERS von max. 2 Tagen ab dem ersten Signal
     // der Gruppe. Bewusst kein Verketten (0->2->4->6 Tage waere sonst eine einzige Gruppe) -
     // sobald ein Signal mehr als 2 Tage nach dem Gruppenstart liegt, beginnt eine neue Gruppe.
-    const sigSortiert = signale.slice().sort((a,b) => a.date.localeCompare(b.date));
+    const sigSortiert = signaleGefiltert.slice().sort((a,b) => a.date.localeCompare(b.date));
     const CLUSTER_GRENZE = 2 * 86400000;
     const cluster = [];
     let aktuellCluster = null;
@@ -2130,7 +2134,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
 
     // Signale an EXAKT demselben Tag: eigene, staerkere Markierung (unabhaengig von der Haeufung)
     const proTag = {};
-    signale.forEach(s => { proTag[s.date] = (proTag[s.date] || 0) + 1; });
+    signaleGefiltert.forEach(s => { proTag[s.date] = (proTag[s.date] || 0) + 1; });
     const gleicherTag = s => proTag[s.date] > 1 ? proTag[s.date] : 0;
 
     const [minT, maxT] = domain;
@@ -2150,7 +2154,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     // nicht zudecken; ein duenner Strich fuehrt von dort hoch zur Stelle im Kurs.
     // Ueberschneiden sich zwei Icons horizontal, rutscht das zweite eine Spur tiefer -
     // beim Reinzoomen loest sich der Stapel von selbst wieder auf.
-    const sichtbar = signale.filter(s => {
+    const sichtbar = signaleGefiltert.filter(s => {
       const t = new Date(s.date+'T00:00:00').getTime();
       return t >= minT - CLUSTER_GRENZE && t <= maxT + CLUSTER_GRENZE;
     }).slice().sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
@@ -2279,7 +2283,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     // Trade-ID) sind ein Trade. Weichen die Bewertungen innerhalb eines Trades ab,
     // zaehlt die des juengsten bewerteten Signals (= das Ergebnis am Ende).
     const trades = new Map();
-    signale.slice().sort((a,b) => a.date.localeCompare(b.date)).forEach(s => {
+    signaleGefiltert.slice().sort((a,b) => a.date.localeCompare(b.date)).forEach(s => {
       const k = wlTradeKey(s);
       if (!trades.has(k)) trades.set(k, { status: '' });
       if (s.status) trades.get(k).status = s.status;
@@ -2291,13 +2295,13 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const anzBeLoss = tradeStati.filter(x => x === 'be_loss').length;
     const anzLose = tradeStati.filter(x => x === 'lose').length;
     const anzNoEntry = tradeStati.filter(x => x === 'no_entry').length;
-    const assetsAnzahl = new Set(signale.map(s => s.asset)).size;
+    const assetsAnzahl = new Set(signaleGefiltert.map(s => s.asset)).size;
     // Bewusst von ALLEN Signalen (nicht der gefilterten Liste), da Trade-IDs
     // asset-uebergreifend hochgezaehlt werden - "naechste freie Nummer" muss beim Filtern
     // auf ein einzelnes Asset weiterhin global stimmen.
     const tradeIdInfo = wlTradeIdUebersicht(alleSignale);
 
-    const tabelleSortiert = signale.slice().sort((a,b) => {
+    const tabelleSortiert = signaleGefiltert.slice().sort((a,b) => {
       let cmp;
       if (sortSpalte === 'asset') cmp = a.asset.localeCompare(b.asset) || a.date.localeCompare(b.date);
       else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'');
@@ -2394,7 +2398,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
 
     el.innerHTML =
       '<div class="stats" style="margin-bottom:10px">' +
-        '<div class="stat"><div class="v">'+signale.length+'</div><div class="l">Signale</div></div>' +
+        '<div class="stat"><div class="v">'+signaleGefiltert.length+'</div><div class="l">Signale</div></div>' +
         '<div class="stat"><div class="v">'+anzTrades+'</div><div class="l">Trades</div></div>' +
         '<div class="stat"><div class="v">'+assetsAnzahl+'</div><div class="l">Assets</div></div>' +
         '<div class="stat"><div class="v pnl-pos">'+anzWin+'</div><div class="l">Win</div></div>' +
@@ -2407,10 +2411,6 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer. Aktuell höchste vergebene Trade-ID: '+tradeIdInfo.hoechste+'.</div>' +
       '<div class="wl-toolbar">' +
         '<span class="muted">🔍 Ziehen zum Hineinzoomen · Doppelklick zum Zurücksetzen</span>' +
-        '<span class="wl-asset-filter-wrap">' +
-          '<input type="text" id="wlAssetFilter" class="wl-asset-filter" placeholder="Asset filtern, z. B. Arbitrum" autocomplete="off" value="'+esc(wlAssetFilter)+'">' +
-          (wlAssetFilter ? '<button type="button" id="wlAssetFilterClear" class="icon-btn" title="Filter zurücksetzen">✕</button>' : '') +
-        '</span>' +
         (zoomAktiv ? '<button type="button" class="btn ghost" id="wlZoomReset">Zoom zurücksetzen</button>' : '') +
       '</div>' +
       '<div class="wl-chart-wrap" id="wlChartWrap">' +
@@ -2440,6 +2440,11 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       '<div class="tl-jump">' +
         '<label for="wlJumpDate">Zu Datum springen</label>' +
         '<input type="text" id="wlJumpDate" placeholder="z.B. 26.03.25, 09/25, 2025 …" autocomplete="off">' +
+        '<span class="wl-asset-filter-wrap">' +
+          '<label for="wlAssetFilter" class="wl-asset-filter-label">Asset filtern</label>' +
+          '<input type="text" id="wlAssetFilter" class="wl-asset-filter" placeholder="z. B. Arbitrum" autocomplete="off" value="'+esc(wlAssetFilter)+'">' +
+          (wlAssetFilter ? '<button type="button" id="wlAssetFilterClear" class="icon-btn" title="Filter zurücksetzen">✕</button>' : '') +
+        '</span>' +
       '</div>' +
       '<div class="wl-table-wrap">' +
         '<table class="wl-table">' +
@@ -2561,7 +2566,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const wlThead = tableWrap.querySelector('thead');
     if (wlThead) tableWrap.style.setProperty('--wl-thead-h', wlThead.offsetHeight + 'px');
 
-    schlausSprungfeld(document.getElementById('wlJumpDate'), () => tableWrap, () => signale.map(s => s.date));
+    schlausSprungfeld(document.getElementById('wlJumpDate'), () => tableWrap, () => signaleGefiltert.map(s => s.date));
 
     // Maus ueber einer Zeile mit Trade-ID hebt alle Zeilen desselben Trades hervor
     tableWrap.addEventListener('mouseover', ev => {
