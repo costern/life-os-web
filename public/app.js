@@ -2080,8 +2080,28 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
   let domain = [fullMinT, fullMaxT];
   let signale = [];
   let sortSpalte = 'date', sortRichtung = 'desc';
+  let wlAssetFilter = '';
 
   function render(){
+    // Neu gezeichnet wird komplett (innerHTML) - dabei wuerden Scroll-Position in der
+    // Tabelle und Fokus/Cursor im Asset-Filter sonst verloren gehen (z.B. nach jedem
+    // Tastendruck im Filter, oder nach dem Speichern eines Details -> nervig, siehe Colins
+    // Feedback "springt immer nach oben"). Deshalb vorher merken, nachher wiederherstellen.
+    const wlVorherTableWrap = el.querySelector('.wl-table-wrap');
+    const wlVorherScrollTop = wlVorherTableWrap ? wlVorherTableWrap.scrollTop : null;
+    const wlVorherAktiv = document.activeElement;
+    const wlFilterHatteFokus = !!(wlVorherAktiv && wlVorherAktiv.id === 'wlAssetFilter');
+    const wlFilterCursor = wlFilterHatteFokus ? wlVorherAktiv.selectionStart : null;
+
+    // Asset-Filter: wenn gesetzt, werden Tabelle, Chart-Marker UND Statistiken auf das
+    // gesuchte Asset eingeschraenkt (Substring, Gross-/Kleinschreibung egal). Bewusst keine
+    // eigene "const signale" hier (wuerde die aeussere Variable ab dieser Stelle im ganzen
+    // render() per Hoisting ueberschatten und vorher zu einem TDZ-Fehler fuehren) - stattdessen
+    // wird die vorhandene "let signale"-Variable fuer den Rest von render() einfach umgesetzt.
+    const alleSignale = signale;
+    const wlFilterText = (wlAssetFilter || '').trim().toLowerCase();
+    if (wlFilterText) signale = alleSignale.filter(s => (s.asset||'').toLowerCase().includes(wlFilterText));
+
     // Haeufungen: Signale innerhalb eines FENSTERS von max. 2 Tagen ab dem ersten Signal
     // der Gruppe. Bewusst kein Verketten (0->2->4->6 Tage waere sonst eine einzige Gruppe) -
     // sobald ein Signal mehr als 2 Tage nach dem Gruppenstart liegt, beginnt eine neue Gruppe.
@@ -2146,7 +2166,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       const setup = wlSetupText(s);
       const titel = wlDatumLabel(s)+(s.uhrzeit?' '+s.uhrzeit:'')+' · '+s.asset+' · '+(s.tf||'–')+' · '+WL_LABEL[wlStatus(s)]+
         (setup?' · '+setup:'')+(s.notiz?' · '+s.notiz:'')+' · BTC ≈ '+Math.round(preis).toLocaleString('de-DE')+' $'+zusatz;
-      marker.push({ cx, spur, preis, farbe: WL_FARBEN[wlStatus(s)], titel, asset: s.asset,
+      marker.push({ id: s.id, cx, spur, preis, farbe: WL_FARBEN[wlStatus(s)], titel, asset: s.asset,
         geclustert: clusterVonSignal.has(s), selberTag: !!tagAnzahl,
         tradeId: s.tradeId || null, datum: s.date });
     });
@@ -2243,7 +2263,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     }).join('');
 
     const markerHtml = marker.map((p,i) =>
-      '<span class="wl-marker'+(p.geclustert?' geclustert':'')+(p.selberTag?' selber-tag':'')+'" data-i="'+i+'" style="left:'+(p.cx/B*100).toFixed(2)+'%;top:'+(p.iconY/H*100).toFixed(2)+'%;border-color:'+p.farbe+'">' +
+      '<span class="wl-marker'+(p.geclustert?' geclustert':'')+(p.selberTag?' selber-tag':'')+'" data-i="'+i+'" data-id="'+esc(String(p.id))+'" style="left:'+(p.cx/B*100).toFixed(2)+'%;top:'+(p.iconY/H*100).toFixed(2)+'%;border-color:'+p.farbe+'">' +
         assetIconHtml(p.asset) +
       '</span>'
     ).join('');
@@ -2266,7 +2286,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const anzLose = tradeStati.filter(x => x === 'lose').length;
     const anzNoEntry = tradeStati.filter(x => x === 'no_entry').length;
     const assetsAnzahl = new Set(signale.map(s => s.asset)).size;
-    const tradeIdInfo = wlTradeIdUebersicht(signale);
+    // Bewusst von ALLEN Signalen (nicht der gefilterten Liste), da Trade-IDs
+    // asset-uebergreifend hochgezaehlt werden - "naechste freie Nummer" muss beim Filtern
+    // auf ein einzelnes Asset weiterhin global stimmen.
+    const tradeIdInfo = wlTradeIdUebersicht(alleSignale);
 
     const tabelleSortiert = signale.slice().sort((a,b) => {
       let cmp;
@@ -2377,6 +2400,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer. Aktuell höchste vergebene Trade-ID: '+tradeIdInfo.hoechste+'.</div>' +
       '<div class="wl-toolbar">' +
         '<span class="muted">🔍 Ziehen zum Hineinzoomen · Doppelklick zum Zurücksetzen</span>' +
+        '<span class="wl-asset-filter-wrap">' +
+          '<input type="text" id="wlAssetFilter" class="wl-asset-filter" placeholder="Asset filtern, z. B. Arbitrum" autocomplete="off" value="'+esc(wlAssetFilter)+'">' +
+          (wlAssetFilter ? '<button type="button" id="wlAssetFilterClear" class="icon-btn" title="Filter zurücksetzen">✕</button>' : '') +
+        '</span>' +
         (zoomAktiv ? '<button type="button" class="btn ghost" id="wlZoomReset">Zoom zurücksetzen</button>' : '') +
       '</div>' +
       '<div class="wl-chart-wrap" id="wlChartWrap">' +
@@ -2475,6 +2502,14 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const resetBtn = document.getElementById('wlZoomReset');
     if (resetBtn) resetBtn.addEventListener('click', () => { domain = [fullMinT, fullMaxT]; render(); });
 
+    // Asset-Filter: schraenkt Tabelle, Chart-Marker und Statistiken auf ein Asset ein.
+    // Fokus/Cursor bleiben trotz Neuzeichnen bei jedem Tastendruck erhalten (siehe Anfang
+    // von render()).
+    const filterInput = document.getElementById('wlAssetFilter');
+    if (filterInput) filterInput.addEventListener('input', () => { wlAssetFilter = filterInput.value; render(); });
+    const filterClear = document.getElementById('wlAssetFilterClear');
+    if (filterClear) filterClear.addEventListener('click', () => { wlAssetFilter = ''; render(); });
+
     // Neues Signal hinzufügen
     const addForm = document.getElementById('wlAddForm');
     const addMsg = document.getElementById('wlAddMsg');
@@ -2525,12 +2560,22 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     tableWrap.addEventListener('mouseover', ev => {
       const tr = ev.target.closest('tr[data-trade]');
       tableWrap.querySelectorAll('tr.wl-trade-hover').forEach(r => r.classList.remove('wl-trade-hover'));
-      if (!tr) return;
-      tableWrap.querySelectorAll('tr[data-trade="'+tr.dataset.trade.replace(/"/g,'\\"')+'"]')
-        .forEach(r => r.classList.add('wl-trade-hover'));
+      if (tr) {
+        tableWrap.querySelectorAll('tr[data-trade="'+tr.dataset.trade.replace(/"/g,'\\"')+'"]')
+          .forEach(r => r.classList.add('wl-trade-hover'));
+      }
+      // Maus ueber einer Zeile markiert sofort den passenden Punkt oben in der Grafik -
+      // so sieht man auf einen Blick, wo dieses Signal im Chart liegt.
+      const rowTr = ev.target.closest('tr[data-id]');
+      el.querySelectorAll('.wl-marker.wl-marker-hover').forEach(m => m.classList.remove('wl-marker-hover'));
+      if (rowTr && !rowTr.classList.contains('wl-edit-row')) {
+        const zielMarker = el.querySelector('.wl-marker[data-id="'+rowTr.dataset.id+'"]');
+        if (zielMarker) zielMarker.classList.add('wl-marker-hover');
+      }
     });
     tableWrap.addEventListener('mouseleave', () => {
       tableWrap.querySelectorAll('tr.wl-trade-hover').forEach(r => r.classList.remove('wl-trade-hover'));
+      el.querySelectorAll('.wl-marker.wl-marker-hover').forEach(m => m.classList.remove('wl-marker-hover'));
     });
 
     // Schlaues Datum im Bearbeiten-Panel: erkennt beliebig getippte Schreibweisen beim
@@ -2605,7 +2650,14 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           uhrzeit: row.querySelector('.wle-uhrzeit').value
         };
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
-        try { await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) }); await ladeUndZeichne(); }
+        try {
+          await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) });
+          // Nach dem Speichern soll die Zeile einfach zuklappen statt offen zu bleiben
+          // (und die Tabelle bleibt dank der Scroll-Erhaltung in render() an derselben
+          // Stelle stehen, statt nach oben zu springen - siehe Colins Feedback).
+          if (wlOffenId === id) wlOffenId = null;
+          await ladeUndZeichne();
+        }
         catch(e) { saveBtn.disabled = false; saveBtn.textContent = 'Speichern'; alert('Fehler: ' + e.message); }
         return;
       }
@@ -2645,6 +2697,21 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         if (shotsEl) wlLiesShots(wlOffenId).then(shots => { if (wlOffenId != null) renderWlShots(wlOffenId, shots, shotsEl); });
       } else {
         wlOffenId = null;
+      }
+    }
+
+    // Scroll-Position der Tabelle und Fokus/Cursor im Asset-Filter wiederherstellen (siehe
+    // Anfang von render()) - dadurch bleibt man beim Speichern/Filtern an derselben Stelle,
+    // statt dass die Tabelle nach oben springt.
+    if (wlVorherScrollTop != null) {
+      const neuerTableWrap = el.querySelector('.wl-table-wrap');
+      if (neuerTableWrap) neuerTableWrap.scrollTop = wlVorherScrollTop;
+    }
+    if (wlFilterHatteFokus) {
+      const neuesFilterFeld = document.getElementById('wlAssetFilter');
+      if (neuesFilterFeld) {
+        neuesFilterFeld.focus();
+        try { neuesFilterFeld.setSelectionRange(wlFilterCursor, wlFilterCursor); } catch(e){}
       }
     }
   }
