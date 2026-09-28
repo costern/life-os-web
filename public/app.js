@@ -465,7 +465,7 @@ function cycleDonutPath(cx, cy, rOuter, rInner, startDeg, endDeg){
 }
 function cycleWheelSvg(phaseKey, progress){
   const cx = 100, cy = 100, rOuter = 92, rInner = 62, gap = 3;
-  let svg = `<svg width="200" height="200" viewBox="0 0 200 200">`;
+  let svg = `<svg width="240" height="240" viewBox="-20 -20 240 240" style="overflow:visible">`;
   Object.entries(CYCLE_PHASEN).forEach(([key, p]) => {
     svg += `<path d="${cycleDonutPath(cx,cy,rOuter,rInner,p.start+gap,p.end-gap)}" fill="${p.farbe}" opacity="${key===phaseKey?1:0.35}"></path>`;
     const mid = (p.start+p.end)/2;
