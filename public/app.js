@@ -441,6 +441,79 @@ function stat(label, val, prev, unit, date){
     '<div class="l">'+label+'</div>' + (date?'<div class="l">'+esc(date)+'</div>':'') + '</div>';
 }
 
+const CYCLE_PHASEN = {
+  aufschwung: { label: 'Aufschwung', kurz: 'Frühzyklus', start: 270, end: 360, farbe: 'var(--green)' },
+  boom:       { label: 'Boom / Peak', kurz: 'Spätzyklus', start: 0,   end: 90,  farbe: 'var(--amber)' },
+  abschwung:  { label: 'Abschwung',   kurz: 'Rezession',  start: 90,  end: 180, farbe: 'var(--red)' },
+  tief:       { label: 'Tief',        kurz: 'Talsohle',   start: 180, end: 270, farbe: 'var(--accent)' },
+};
+const CYCLE_QUADRANTEN = [
+  ['reflation',   'Reflation',   'Wachstum niedrig, Inflation fällt'],
+  ['recovery',    'Recovery',    'Wachstum steigt, Inflation fällt'],
+  ['stagflation', 'Stagflation', 'Wachstum fällt, Inflation steigt'],
+  ['overheat',    'Overheat',    'Wachstum hoch, Inflation steigt'],
+];
+function cyclePolar(cx, cy, r, deg){
+  const rad = (deg - 90) * Math.PI / 180;
+  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+}
+function cycleDonutPath(cx, cy, rOuter, rInner, startDeg, endDeg){
+  const large = (endDeg - startDeg) > 180 ? 1 : 0;
+  const [x1,y1] = cyclePolar(cx,cy,rOuter,startDeg), [x2,y2] = cyclePolar(cx,cy,rOuter,endDeg);
+  const [x3,y3] = cyclePolar(cx,cy,rInner,endDeg),   [x4,y4] = cyclePolar(cx,cy,rInner,startDeg);
+  return `M ${x1} ${y1} A ${rOuter} ${rOuter} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${rInner} ${rInner} 0 ${large} 0 ${x4} ${y4} Z`;
+}
+function cycleWheelSvg(phaseKey, progress){
+  const cx = 100, cy = 100, rOuter = 92, rInner = 62, gap = 3;
+  let svg = `<svg width="200" height="200" viewBox="0 0 200 200">`;
+  Object.entries(CYCLE_PHASEN).forEach(([key, p]) => {
+    svg += `<path d="${cycleDonutPath(cx,cy,rOuter,rInner,p.start+gap,p.end-gap)}" fill="${p.farbe}" opacity="${key===phaseKey?1:0.35}"></path>`;
+    const mid = (p.start+p.end)/2;
+    const [lx,ly] = cyclePolar(cx,cy,rOuter+20,mid);
+    const anchor = mid < 180 ? 'start' : 'end'; // rechte Haelfte des Rads -> Label rechts vom Punkt, linke Haelfte -> links
+    svg += `<text x="${lx}" y="${ly}" text-anchor="${anchor}" dominant-baseline="middle" class="cycle-wheel-label">${p.label}</text>`;
+  });
+  // Marker: Position innerhalb der aktiven Phase (progress 0..1)
+  const ph = CYCLE_PHASEN[phaseKey];
+  if (ph){
+    const markerDeg = ph.start + Math.min(1,Math.max(0,progress ?? 0.5)) * (ph.end - ph.start);
+    const [mx,my] = cyclePolar(cx,cy,(rOuter+rInner)/2,markerDeg);
+    svg += `<circle cx="${mx}" cy="${my}" r="7" fill="#fff" stroke="${ph.farbe}" stroke-width="3"></circle>`;
+    svg += `<circle cx="${mx}" cy="${my}" r="2.5" fill="${ph.farbe}"></circle>`;
+  }
+  svg += `<text x="${cx}" y="${cy-6}" text-anchor="middle" class="cycle-center-phase">${ph ? ph.label : '–'}</text>`;
+  svg += `<text x="${cx}" y="${cy+12}" text-anchor="middle" class="cycle-center-sub">${ph ? ph.kurz : ''}</text>`;
+  svg += `</svg>`;
+  return svg;
+}
+async function ladeKonjunkturzyklus(){
+  const el = document.getElementById('cycle');
+  if (!el) return;
+  try {
+    const c = await api('/cycle');
+    if (!c || !c.phase){
+      el.innerHTML = '<div class="empty">Noch keine Einordnung eingetragen – frag mich einfach danach im Chat.</div>';
+      return;
+    }
+    const quadHtml = CYCLE_QUADRANTEN.map(([key,label,desc]) =>
+      `<div class="cycle-cell${key===c.quadrant?' active':''}"><b>${esc(label)}</b>${esc(desc)}</div>`
+    ).join('');
+    el.innerHTML =
+      '<div class="cycle-wrap">' +
+        '<div class="cycle-wheel-box">' + cycleWheelSvg(c.phase, c.phase_progress!=null?Number(c.phase_progress):0.5) + '</div>' +
+        '<div class="cycle-quad">' +
+          '<div class="cycle-quad-title">Investment Clock (Wachstum × Inflation)</div>' +
+          '<div class="cycle-quad-grid">' + quadHtml + '</div>' +
+        '</div>' +
+      '</div>' +
+      (c.headline ? '<div class="cycle-headline">'+esc(c.headline)+'</div>' : '') +
+      (c.note ? '<div class="cycle-note">'+esc(c.note)+'</div>' : '') +
+      '<div class="muted" style="margin-top:8px">Stand: '+(c.updated_at ? new Date(c.updated_at).toLocaleString('de-DE') : '–')+' · manuelle Einordnung, kein automatischer Datenfeed</div>';
+  } catch(e){
+    el.innerHTML = '<div class="err">Konjunkturzyklus nicht ladbar: '+esc(e.message)+'</div>';
+  }
+}
+
 async function ladeNews(){
   const el = document.getElementById('news');
   if (!el) return;
@@ -3556,7 +3629,7 @@ function seiteAuffrischen(id){
   if (id === 'trading'){ vielleichtAuffrischen(); ladeHistorie(); }
   else if (id === 'todos'){ if (window.ladeTodos) window.ladeTodos(); if (window.ladeKalenderMonat) window.ladeKalenderMonat(); }
   else if (id === 'disziplin'){ if (window.ladeReading) window.ladeReading(); }
-  else if (id === 'news'){ ladeMacro(); ladeNews(); }
+  else if (id === 'news'){ ladeMacro(); ladeKonjunkturzyklus(); ladeNews(); }
   else if (id === 'uebersicht'){ ladeMacro(); ladeHistorie(); ladeKalender(); ladeOvTrades(); if (window.ladeTodos) window.ladeTodos(); }
   else if (id === 'portfolio'){ if (window.ladePortfolioListe) window.ladePortfolioListe(); }
   else if (id === 'watchlist'){ if (window.ladeUndZeichneWatchlist) window.ladeUndZeichneWatchlist(); }
@@ -3586,6 +3659,6 @@ document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vie
 document.querySelectorAll('nav.side button[data-page]').forEach(b =>
   b.addEventListener('click', () => seiteAuffrischen(b.dataset.page)));
 
-ladeMacro(); ladeNews(); ladeHistorie(); ladeKalender(); ladeOvTrades();
+ladeMacro(); ladeKonjunkturzyklus(); ladeNews(); ladeHistorie(); ladeKalender(); ladeOvTrades();
 renderLivePos().then(() => { letzteAktualisierung = Date.now(); });
 setInterval(() => vielleichtAuffrischen(), AKTUALISIERUNG_MS);

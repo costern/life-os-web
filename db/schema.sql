@@ -89,6 +89,22 @@ ALTER TABLE macro_status ADD COLUMN IF NOT EXISTS prev_ffr NUMERIC;
 ALTER TABLE macro_status ADD COLUMN IF NOT EXISTS prev_ty NUMERIC;
 ALTER TABLE macro_status ADD COLUMN IF NOT EXISTS prev_inflation NUMERIC;
 ALTER TABLE macro_status ADD COLUMN IF NOT EXISTS prev_real_rate NUMERIC;
+
+-- Konjunkturzyklus-Einordnung fuer die "News"-Seite: manueller Schnappschuss
+-- (Claude recherchiert und setzt phase/progress/quadrant per Web-Recherche, kein
+-- automatischer Datenfeed), analog zu macro_status. Wird per PUT aktualisiert,
+-- wenn sich die Lage merklich aendert.
+CREATE TABLE IF NOT EXISTS cycle_status (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  phase TEXT,            -- 'aufschwung' | 'boom' | 'abschwung' | 'tief'
+  phase_progress NUMERIC, -- 0..1, Position innerhalb der Phasen-Arc (0=Anfang, 1=Ende der Phase)
+  quadrant TEXT,          -- 'reflation' | 'recovery' | 'overheat' | 'stagflation'
+  headline TEXT,          -- kurzer Einzeiler fuer die Mitte des Rads
+  note TEXT,              -- laengere Einordnung/Erklaerung
+  updated_at TIMESTAMPTZ,
+  CONSTRAINT single_row_cycle CHECK (id = 1)
+);
+INSERT INTO cycle_status (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 INSERT INTO macro_status (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS news (
