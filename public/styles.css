@@ -350,10 +350,10 @@ a { color:var(--accent); }
   font-size:11px; font-weight:600; color:var(--muted); margin-bottom:3px; }
 .jd-track { height:5px; border-radius:99px; background:var(--hover-bg); overflow:hidden; cursor:default; }
 .jd-fill { height:100%; border-radius:99px; background:var(--accent); transition:width .4s ease; }
-.quote-card { background:#1a1d23; color:#fff; border:1px solid var(--line); border-radius:13px;
-  padding:12px 18px; display:flex; flex-direction:column; justify-content:center;
-  font-size:13px; line-height:1.5; font-style:italic; }
-.quote-card .q-author { display:block; font-style:normal; font-size:11.5px; color:#9ca3af; opacity:.9; margin-top:6px; }
+.quote-card { background:#000; color:#fff; border:1px solid var(--line); border-radius:13px;
+  padding:14px 20px; display:flex; flex-direction:column; justify-content:center;
+  font-size:15.5px; line-height:1.5; font-style:italic; }
+.quote-card .q-author { display:block; font-style:normal; font-size:12.5px; color:#9ca3af; opacity:.9; margin-top:7px; }
 .row.today-mark .t { font-weight:700; }
 .row-actions { display:flex; gap:8px; flex:0 0 auto; }
 .icon-btn { cursor:pointer; color:var(--muted); font-size:13px; user-select:none; }
