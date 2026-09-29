@@ -283,9 +283,9 @@ function zeigeUndoToast(text, wiederherstellen){
     const heuteUtc = tagStempel(heute);
     const tagNr = Math.round((heuteUtc - START) / 86400000) + 1;
     elNum.textContent = tagNr.toLocaleString('de-DE');
-    document.getElementById('jdSince').textContent =
-      'seit ' + new Date(START).toLocaleDateString('de-DE',
-        { day:'2-digit', month:'long', year:'numeric', timeZone:'UTC' });
+    const jdDay = document.getElementById('jdDay');
+    if (jdDay) jdDay.title = 'seit ' + new Date(START).toLocaleDateString('de-DE',
+      { day:'2-digit', month:'long', year:'numeric', timeZone:'UTC' });
 
     const jahr = heute.getFullYear();
     const jahresStartUtc = Date.UTC(jahr, 0, 1);
@@ -300,8 +300,8 @@ function zeigeUndoToast(text, wiederherstellen){
       document.getElementById(prefix+'Label').textContent = titel;
       document.getElementById(prefix+'Pct').textContent = Math.round(pct) + ' %';
       document.getElementById(prefix+'Fill').style.width = pct.toFixed(1) + '%';
-      document.getElementById(prefix+'Sub').textContent =
-        'Tag ' + tag + ' von ' + gesamt + ' · noch ' + (gesamt - tag) + ' Tage';
+      const track = document.getElementById(prefix+'Track');
+      if (track) track.title = 'Tag ' + tag + ' von ' + gesamt + ' · noch ' + (gesamt - tag) + ' Tage';
     }
     setzen('jdYear', tagImJahr, tageImJahr, String(jahr));
     setzen('jdMonth', tagImMonat, tageImMonat,

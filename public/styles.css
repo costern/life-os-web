@@ -328,24 +328,25 @@ a { color:var(--accent); }
   nav.side .brand-row { flex:none; padding:0; }
   nav.side button { width:auto; white-space:nowrap; margin:0; }
 }
-/* Journal Day + Jahres-/Monatsfortschritt ganz oben auf der Uebersicht */
-.jd-card { background:var(--card); border:1px solid var(--line); border-radius:14px;
-  padding:16px 20px; margin-bottom:16px; display:flex; flex-direction:column; gap:14px; }
-.jd-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
-.jd-label { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
-.jd-num { font-size:34px; font-weight:700; line-height:1.1; }
-.jd-since { font-size:12px; }
-.jd-bars { display:flex; gap:22px; flex-wrap:wrap; }
-.jd-bar-block { flex:1 1 220px; min-width:0; }
-.jd-bar-top { display:flex; justify-content:space-between; align-items:baseline; gap:8px;
-  font-size:12px; font-weight:600; margin-bottom:5px; }
-.jd-track { height:8px; border-radius:99px; background:var(--hover-bg); overflow:hidden; }
+/* Journal Day + Jahres-/Monatsfortschritt + Zitat ganz oben auf der Uebersicht.
+   Bewusst als EINE flache, kompakte Karte (statt zwei separate Karten mit viel
+   Padding/grosser Zahl/grosser Zitat-Zeile) - Colin: braucht viel zu viel Platz.
+   Tagesdetails ("Tag X von Y") und "seit ..." stehen nur noch als Tooltip
+   (title-Attribut), nicht mehr als eigene sichtbare Zeile. */
+.jd-card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:9px 16px; margin-bottom:12px; }
+.jd-row { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+.jd-day { display:flex; align-items:baseline; gap:6px; white-space:nowrap; cursor:default; }
+.jd-day b { font-size:16px; font-weight:700; color:var(--ink); }
+.jd-label { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+.jd-bar-block { flex:1 1 130px; min-width:100px; }
+.jd-bar-top { display:flex; justify-content:space-between; gap:6px;
+  font-size:10.5px; font-weight:600; color:var(--muted); margin-bottom:3px; }
+.jd-track { height:5px; border-radius:99px; background:var(--hover-bg); overflow:hidden; cursor:default; }
 .jd-fill { height:100%; border-radius:99px; background:var(--accent); transition:width .4s ease; }
-.jd-sub { font-size:11px; margin-top:5px; }
-
-.quote-card { background:#1a1d23; color:#fff; border:1px solid var(--line); border-radius:14px; padding:18px 22px; margin-bottom:16px; }
-.q-text { font-size:16px; line-height:1.5; font-style:italic; }
-.q-author { font-size:12px; color:#9ca3af; margin-top:8px; }
+.jd-quote { margin-top:7px; padding-top:7px; border-top:1px solid var(--line);
+  font-size:11.5px; line-height:1.4; font-style:italic; color:var(--muted); }
+.jd-quote .q-author { font-style:normal; color:var(--muted); opacity:.8; margin-left:6px; }
 .row.today-mark .t { font-weight:700; }
 .row-actions { display:flex; gap:8px; flex:0 0 auto; }
 .icon-btn { cursor:pointer; color:var(--muted); font-size:13px; user-select:none; }

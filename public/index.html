@@ -39,29 +39,18 @@
 
     <section class="page active" id="page-uebersicht">
       <div class="jd-card">
-        <div class="jd-head">
-          <div>
-            <div class="jd-label">Journal Day</div>
-            <div class="jd-num" id="jdNum">–</div>
-          </div>
-          <div class="jd-since muted" id="jdSince"></div>
-        </div>
-        <div class="jd-bars">
+        <div class="jd-row">
+          <div class="jd-day" id="jdDay"><b id="jdNum">–</b><span class="jd-label">Journal Day</span></div>
           <div class="jd-bar-block">
             <div class="jd-bar-top"><span id="jdYearLabel">Jahr</span><span id="jdYearPct"></span></div>
-            <div class="jd-track"><div class="jd-fill" id="jdYearFill"></div></div>
-            <div class="jd-sub muted" id="jdYearSub"></div>
+            <div class="jd-track" id="jdYearTrack"><div class="jd-fill" id="jdYearFill"></div></div>
           </div>
           <div class="jd-bar-block">
             <div class="jd-bar-top"><span id="jdMonthLabel">Monat</span><span id="jdMonthPct"></span></div>
-            <div class="jd-track"><div class="jd-fill" id="jdMonthFill"></div></div>
-            <div class="jd-sub muted" id="jdMonthSub"></div>
+            <div class="jd-track" id="jdMonthTrack"><div class="jd-fill" id="jdMonthFill"></div></div>
           </div>
         </div>
-      </div>
-      <div class="quote-card">
-        <div class="q-text" id="qText">…</div>
-        <div class="q-author" id="qAuthor"></div>
+        <div class="jd-quote"><span id="qText">…</span><span class="q-author" id="qAuthor"></span></div>
       </div>
       <div class="grid">
         <div class="card wide" id="tradingTotalCard" style="display:none">
