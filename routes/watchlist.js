@@ -42,6 +42,12 @@ function zeitOrNull(v) {
 
 // Leerstring aus dem Formular als "nicht gesetzt" behandeln
 function orNull(v) { return v === '' || v === undefined ? null : v; }
+// regelkonform: Formular schickt '' | 'ja' | 'nein' -> null | true | false
+function regelkonformOrNull(v) {
+  if (v === 'ja') return true;
+  if (v === 'nein') return false;
+  return null;
+}
 function mtfOrNull(v) {
   const n = Number(v);
   return [1, 2, 3].includes(n) ? n : null;
@@ -75,7 +81,10 @@ function rowOut(r) {
     kursverlauf: r.kursverlauf,
     keinTradeGrund: r.kein_trade_grund,
     analysiert: !!r.analysiert,
-    uhrzeit: r.uhrzeit ? String(r.uhrzeit).slice(0, 5) : null
+    uhrzeit: r.uhrzeit ? String(r.uhrzeit).slice(0, 5) : null,
+    regelkonform: r.regelkonform === null || r.regelkonform === undefined ? null : !!r.regelkonform,
+    regelkonformGrund: r.regelkonform_grund,
+    levelGebrochenGehalten: !!r.level_gebrochen_gehalten
   };
 }
 
@@ -90,8 +99,8 @@ router.post('/', async (req, res) => {
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const status = STATI.has(b.status) ? b.status : null;
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
@@ -107,7 +116,8 @@ router.post('/', async (req, res) => {
      ENTRY_SIMULATION.has(b.entrySimulation) ? b.entrySimulation : null,
      KURSVERLAUF.has(b.kursverlauf) ? b.kursverlauf : null,
      KEIN_TRADE_GRUND.has(b.keinTradeGrund) ? b.keinTradeGrund : null,
-     zeitOrNull(b.uhrzeit)]
+     zeitOrNull(b.uhrzeit),
+     regelkonformOrNull(b.regelkonform), orNull(b.regelkonformGrund), !!b.levelGebrochenGehalten]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -127,7 +137,9 @@ router.patch('/:id', async (req, res) => {
                             ['entrySimulation','entry_simulation'],['kursverlauf','kursverlauf'],
                             ['keinTradeGrund','kein_trade_grund'],
                             ['analysiert','analysiert'],
-                            ['uhrzeit','uhrzeit']]) {
+                            ['uhrzeit','uhrzeit'],
+                            ['regelkonform','regelkonform'],['regelkonformGrund','regelkonform_grund'],
+                            ['levelGebrochenGehalten','level_gebrochen_gehalten']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -143,10 +155,11 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'kursverlauf') wert = KURSVERLAUF.has(wert) ? wert : null;
     else if (key === 'keinTradeGrund') wert = KEIN_TRADE_GRUND.has(wert) ? wert : null;
     else if (key === 'uhrzeit') wert = zeitOrNull(wert);
+    else if (key === 'regelkonform') wert = regelkonformOrNull(wert);
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);
-    else if (key === 'multiAsset' || key === 'analysiert') wert = !!wert;
+    else if (key === 'multiAsset' || key === 'analysiert' || key === 'levelGebrochenGehalten') wert = !!wert;
     else wert = orNull(wert);
     fields.push(`${col} = $${i++}`); vals.push(wert);
   }

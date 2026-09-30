@@ -236,6 +236,19 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS analysiert BOOLEAN NOT NU
 -- mitten am Tag; kuerzere Timeframes werden von Hand eingetragen. NULL = unbekannt.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS uhrzeit TIME;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+-- regelkonform: unabhaengig vom Ergebnis (status) - hat das Setup zum Zeitpunkt des
+-- Signals tatsaechlich die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset,
+-- saubere Pivot-Candles etc.)? NULL = noch nicht bewertet (zaehlt in Statistiken wie
+-- "ja", damit bestehende Eintraege nicht rueckwirkend rausfallen), true = ja, false =
+-- nein - dann greift regelkonform_grund. Trennt "waere ein Win gewesen" von "war
+-- ueberhaupt ein Trade, den das System haette generieren sollen".
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS regelkonform BOOLEAN;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS regelkonform_grund TEXT;
+-- level_gebrochen_gehalten: das Pivot-Level wurde zwischenzeitlich gebrochen (z.B.
+-- mehrere 3D-Kerzen schlossen darunter), hat am Ende aber trotzdem als Boden gehalten.
+-- Eigene Statistik, um einzuschaetzen, wie oft ein "Bruch" sich im Nachhinein als
+-- Fakeout statt als echte Invalidierung herausstellt.
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS level_gebrochen_gehalten BOOLEAN NOT NULL DEFAULT false;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).

@@ -2160,6 +2160,12 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
   let signale = [];
   let sortSpalte = 'date', sortRichtung = 'desc';
   let wlAssetFilter = '';
+  // Statistiken zaehlen standardmaessig alle Signale (regelkonform=null, also die grosse
+  // Mehrheit der Bestandsdaten, gilt als "ja") - nur explizit als regelkonform=false
+  // markierte Signale (nicht nach eigenen Kriterien getradet) fallen dann raus, damit die
+  // "echte" System-Performance nicht durch Setups verwaesserst wird, die man laut Regelwerk
+  // nie genommen haette. Ueber die Checkbox laesst sich das jederzeit abschalten.
+  let wlNurRegelkonform = true;
 
   function render(){
     // Neu gezeichnet wird komplett (innerHTML) - dabei wuerden Scroll-Position in der
@@ -2181,9 +2187,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     // eigenen Variable "signaleGefiltert" weiterarbeiten.
     const alleSignale = signale;
     const wlFilterText = (wlAssetFilter || '').trim().toLowerCase();
-    const signaleGefiltert = wlFilterText
-      ? alleSignale.filter(s => (s.asset||'').toLowerCase().includes(wlFilterText))
-      : alleSignale;
+    const signaleGefiltert = alleSignale.filter(s =>
+      (!wlFilterText || (s.asset||'').toLowerCase().includes(wlFilterText)) &&
+      (!wlNurRegelkonform || s.regelkonform !== false)
+    );
 
     // Haeufungen: Signale innerhalb eines FENSTERS von max. 2 Tagen ab dem ersten Signal
     // der Gruppe. Bewusst kein Verketten (0->2->4->6 Tage waere sonst eine einzige Gruppe) -
@@ -2358,8 +2365,9 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const trades = new Map();
     signaleGefiltert.slice().sort((a,b) => a.date.localeCompare(b.date)).forEach(s => {
       const k = wlTradeKey(s);
-      if (!trades.has(k)) trades.set(k, { status: '' });
+      if (!trades.has(k)) trades.set(k, { status: '', levelGebrochenGehalten: false });
       if (s.status) trades.get(k).status = s.status;
+      if (s.levelGebrochenGehalten) trades.get(k).levelGebrochenGehalten = true;
     });
     const tradeStati = [...trades.values()].map(t => t.status);
     const anzTrades = trades.size;
@@ -2368,6 +2376,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const anzBeLoss = tradeStati.filter(x => x === 'be_loss').length;
     const anzLose = tradeStati.filter(x => x === 'lose').length;
     const anzNoEntry = tradeStati.filter(x => x === 'no_entry').length;
+    // Wie oft hielt ein Pivot-Level trotz zwischenzeitlichem Bruch (z.B. mehrere
+    // 3D-Kerzen unter dem Level) am Ende doch noch - relevant, um einzuschaetzen, wie
+    // "hart" die eigene Regel "Level muss exakt halten" wirklich sein sollte.
+    const anzLevelGebrochenGehalten = [...trades.values()].filter(t => t.levelGebrochenGehalten).length;
     const assetsAnzahl = new Set(signaleGefiltert.map(s => s.asset)).size;
     // Bewusst von ALLEN Signalen (nicht der gefilterten Liste), da Trade-IDs
     // asset-uebergreifend hochgezaehlt werden - "naechste freie Nummer" muss beim Filtern
@@ -2431,7 +2443,9 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
             : '–') +
         '</td>' +
         '<td>'+(s.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span>' : '<span class="muted">–</span>')+'</td>' +
-        '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span></td>' +
+        '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span>'+
+          (s.regelkonform === false ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund ? 'Nicht regelkonform: '+s.regelkonformGrund : 'Nicht regelkonform')+'">nicht regelkonform</span>' : '')+
+        '</td>' +
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
       '</tr>' +
@@ -2446,6 +2460,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           '<label class="wl-detail-kurz" style="width:100px">Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
           '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
           '<label class="wl-detail-kurz" style="width:100px">Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
+          '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : ''))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
           '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
           '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
@@ -2479,10 +2494,12 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
             ['sl_zu_weit','Stop-Loss zu weit entfernt'],['ziel_zu_nah','Ziel zu nah'],
             ['keine_htf_bestaetigung','Keine höhere Timeframe-Bestätigung'],['pattern_nicht_sauber','Pattern nicht sauber'],
             ['divergenz_fehlte','Divergenz/Bestätigung fehlte'],['sonstiger_grund','Sonstiger Grund']], s.keinTradeGrund)+'</label>' +
+          '<label class="wl-detail-voll" style="max-width:340px">Grund (falls nicht regelkonform)<input type="text" class="wle-regelkonformgrund" value="'+esc(s.regelkonformGrund||'')+'" placeholder="z.B. keine MTF-Konfluenz auf 30m/1h, kein Multi-Asset-Signal"></label>' +
           '<label class="wl-detail-kurz" style="width:88px" title="gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'">Trade-ID' +
             '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="'+tradeIdInfo.naechsteFrei+'">' +
             '<span class="wl-tradeid-info muted" id="wl-tid-info-'+s.id+'"></span></label>' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
+          '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>' +
         '</div>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
         '<label class="wl-detail-voll">Details<textarea class="wle-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>' +
@@ -2503,6 +2520,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '<div class="stat"><div class="v pnl-orange">'+anzBeLoss+'</div><div class="l">BE Loss</div></div>' +
         '<div class="stat"><div class="v pnl-neg">'+anzLose+'</div><div class="l">Lose</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+anzNoEntry+'</div><div class="l">No Entry</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--accent)">'+anzLevelGebrochenGehalten+'</div><div class="l">Level gebrochen, aber gehalten</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+tradeIdInfo.naechsteFrei+'</div><div class="l">Nächste Trade-ID</div></div>' +
       '</div>' +
       '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer. Aktuell höchste vergebene Trade-ID: '+tradeIdInfo.hoechste+'.</div>' +
@@ -2542,6 +2560,8 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           '<input type="text" id="wlAssetFilter" class="wl-asset-filter" placeholder="z. B. Arbitrum" autocomplete="off" value="'+esc(wlAssetFilter)+'">' +
           (wlAssetFilter ? '<button type="button" id="wlAssetFilterClear" class="icon-btn" title="Filter zurücksetzen">✕</button>' : '') +
         '</span>' +
+        '<label class="wl-check" style="margin-left:14px" title="Signale, die als nicht regelkonform markiert sind, aus Tabelle/Chart/Statistiken ausblenden">' +
+          '<input type="checkbox" id="wlNurRegelkonform"'+(wlNurRegelkonform?' checked':'')+'> Nur regelkonforme zählen</label>' +
       '</div>' +
       '<div class="wl-table-wrap">' +
         '<table class="wl-table">' +
@@ -2619,6 +2639,8 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     if (filterInput) filterInput.addEventListener('input', () => { wlAssetFilter = filterInput.value; render(); });
     const filterClear = document.getElementById('wlAssetFilterClear');
     if (filterClear) filterClear.addEventListener('click', () => { wlAssetFilter = ''; render(); });
+    const nurRegelkonformBox = document.getElementById('wlNurRegelkonform');
+    if (nurRegelkonformBox) nurRegelkonformBox.addEventListener('change', () => { wlNurRegelkonform = nurRegelkonformBox.checked; render(); });
 
     // Neues Signal hinzufügen
     const addForm = document.getElementById('wlAddForm');
@@ -2793,7 +2815,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           entrySimulation: row.querySelector('.wle-entrysim').value,
           kursverlauf: row.querySelector('.wle-kursverlauf').value,
           keinTradeGrund: row.querySelector('.wle-keintradegrund').value,
-          uhrzeit: row.querySelector('.wle-uhrzeit').value
+          uhrzeit: row.querySelector('.wle-uhrzeit').value,
+          regelkonform: row.querySelector('.wle-regelkonform').value,
+          regelkonformGrund: row.querySelector('.wle-regelkonformgrund').value.trim() || null,
+          levelGebrochenGehalten: row.querySelector('.wle-levelgebrochen').checked
         };
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
         try {
