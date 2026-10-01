@@ -1950,6 +1950,32 @@ function renderWlShots(signalId, shots, el){
   if (browse) browse.addEventListener('click', ev => { ev.stopPropagation(); input.click(); });
 }
 
+// Zusammengefasste, rein lesbare Galerie ueber ALLE Signale eines zusammengeklappten
+// Trades hinweg (Colins Wunsch: "alle Bilder dann bei einer einzigen Uebersicht ueber
+// diesen Trade einfuegen"). Hochgeladen/geloescht wird weiterhin nur pro Signal, in
+// dessen eigenem Bearbeiten-Panel - hier nur Anzeige + Lightbox-Zoom, mit Datum des
+// jeweiligen Signals als Beschriftung, damit man sieht, aus welchem Zeitpunkt ein Bild stammt.
+function wlRenderGruppenGalerie(mitglieder, el){
+  Promise.all(mitglieder.map(m =>
+    wlLiesShots(m.id).then(shots => shots.map(sh => ({ shot: sh, signalId: m.id, label: m.label })))
+  )).then(listen => {
+    const alle = listen.flat();
+    if (!alle.length) {
+      el.innerHTML = '<span class="muted" style="font-size:12.5px">Noch keine Screenshots in diesem Trade.</span>';
+      return;
+    }
+    el.innerHTML = '<div class="tl-shots-grid wl-shots-grid wl-group-shots-grid">' +
+      alle.map(x => '<div class="tl-shot-thumb" title="'+esc(x.label)+'">' +
+        '<img src="/api/watchlist/'+x.signalId+'/screenshots/'+x.shot.id+'/image" loading="lazy" alt="Screenshot">' +
+        '<span class="wl-group-shot-label">'+esc(x.label)+'</span>' +
+      '</div>').join('') +
+    '</div>';
+    el.querySelectorAll('.tl-shot-thumb img').forEach(img => img.addEventListener('click', () => tlZeigeLightbox(img.src)));
+  }).catch(() => {
+    el.innerHTML = '<span class="muted" style="font-size:12.5px">Screenshots konnten nicht geladen werden.</span>';
+  });
+}
+
 async function wlLadeScreenshotHoch(signalId, file, el){
   const msg = el.querySelector('.tl-shots-msg');
   msg.textContent = ''; msg.className = 'te-msg tl-shots-msg';
@@ -2166,6 +2192,11 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
   // "echte" System-Performance nicht durch Setups verwaesserst wird, die man laut Regelwerk
   // nie genommen haette. Ueber die Checkbox laesst sich das jederzeit abschalten.
   let wlNurRegelkonform = true;
+  // Welche Trade-Gruppen (gleiche Trade-ID, mehrere Signale) gerade aufgeklappt sind -
+  // Colins Wunsch: Signale mit derselben Trade-ID standardmaessig zu einer Zeile
+  // zusammenklappen, mit Klick wieder aufklappbar; Zustand bleibt ueber Neuzeichnungen
+  // erhalten (gleiches Prinzip wie wlAssetFilter/wlNurRegelkonform oben).
+  let wlAufgeklappteGruppen = new Set();
 
   function render(){
     // Neu gezeichnet wird komplett (innerHTML) - dabei wuerden Scroll-Position in der
@@ -2392,24 +2423,26 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'');
       return sortRichtung === 'asc' ? cmp : -cmp;
     });
-    const tabelle = tabelleSortiert.map((s, idx) => {
-      const grp = clusterVonSignal.has(s) ? clusterVonSignal.get(s) : null;
-      const grpVorher = idx > 0 && clusterVonSignal.has(tabelleSortiert[idx-1]) ? clusterVonSignal.get(tabelleSortiert[idx-1]) : null;
-      // Gruppen wechseln sich farblich ab und bekommen oben eine Trennlinie, damit zwei
-      // direkt untereinanderstehende Haeufungen nicht wie eine einzige grosse aussehen.
-      const klassen = [];
-      if (grp !== null) {
-        klassen.push('wl-row-cluster', grp % 2 === 0 ? 'wl-grp-a' : 'wl-grp-b');
-        if (grp !== grpVorher) klassen.push('wl-grp-start');
-      }
-      // Beim Scrollen durch nach Datum sortierte Signale soll ein Jahreswechsel klar als
-      // eigener Balken erkennbar sein (bei Sortierung nach Asset ergibt eine Jahreszeile
-      // keinen Sinn, da die Reihenfolge dann nicht mehr chronologisch ist).
-      const jahr = s.date.slice(0, 4);
-      const jahrVorher = idx > 0 ? tabelleSortiert[idx-1].date.slice(0, 4) : null;
-      const jahrZeile = (sortSpalte === 'date' && jahr !== jahrVorher)
-        ? '<tr class="wl-year-row"><td colspan="13">'+jahr+'</td></tr>'
-        : '';
+    // Signale mit identischer Trade-ID lassen sich zu einer Zeile zusammenklappen (Colins
+    // Wunsch: "wenn ich den gleichen Trade habe, also gleiche Trade-ID, das zusammenklappen
+    // koennen"). Gruppiert wird unabhaengig von der aktuellen Tabellen-Sortierung immer
+    // chronologisch aufsteigend (= die Reihenfolge, in der die Signale tatsaechlich
+    // eintrafen) - so sieht man beim Aufklappen genau, was zuerst bewertet wurde und was
+    // erst durch spaetere, hoehere Signale dazu kam.
+    const gruppenNachKey = new Map();
+    signaleGefiltert.forEach(s => {
+      const k = wlTradeKey(s);
+      if (!gruppenNachKey.has(k)) gruppenNachKey.set(k, []);
+      gruppenNachKey.get(k).push(s);
+    });
+    gruppenNachKey.forEach(g => g.sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'')));
+
+    // Eine einzelne Signal-Zeile (Haupt- + Detailzeile) - unveraendert gegenueber vorher,
+    // nur aus der map()-Schleife herausgezogen, damit dieselbe Vorlage auch fuer jedes
+    // Mitglied einer aufgeklappten Trade-Gruppe verwendet werden kann (jedes Signal bleibt
+    // dabei komplett eigenstaendig bewertbar, siehe wlGruppenZeileHtml unten).
+    function wlZeileHtml(s, klassen){
+      klassen = klassen || [];
       const tagAnzahl = gleicherTag(s);
       // Kurzform "4×" statt "4× selber Tag" - spart Platz in der (ohnehin schon engen)
       // Datum-Spalte, volle Bedeutung steht als Tooltip dahinter.
@@ -2418,7 +2451,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       const setupRest = wlSetupRestText(s);
       const mtfWarnBadge = wlMtfWarnBadgeHtml(s);
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
-      return jahrZeile + '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'" data-date="'+s.date+'"'+tradeAttr+' title="Klick für Details">' +
+      return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'" data-date="'+s.date+'"'+tradeAttr+' title="Klick für Details">' +
         '<td class="wl-analysiert-cell"><button type="button" class="wl-analysiert-btn'+(s.analysiert?' ist-analysiert':'')+'" title="'+(s.analysiert?'Komplett analysiert – Klick zum Zurücksetzen':'Als komplett analysiert markieren')+'">✓</button></td>' +
         '<td class="muted">'+esc(wlDatumLabel(s)) +
           (s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') + tagBadge + '</td>' +
@@ -2508,6 +2541,100 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           '<button type="button" class="wl-cancel ghost">Schließen</button>' +
         '</div>' +
       '</div></td></tr>';
+    }
+
+    // Kopfzeile einer zusammengeklappten Trade-Gruppe: zeigt das Ergebnis/die zuletzt
+    // bekannten Eigenschaften des Trades (Stand: juengstes bewertetes Signal, gleiche
+    // Logik wie bei den Statistiken oben) kompakt in einer Zeile. Aufgeklappt erscheinen
+    // darunter eine gepoolte Screenshot-Uebersicht ueber alle Signale des Trades UND jedes
+    // einzelne Signal unveraendert mit seiner eigenen, eigenstaendigen Bewertung - so sieht
+    // Colin weiterhin, was sein Wissensstand VOR spaeteren/hoeheren Signalen war.
+    function wlGruppenZeileHtml(gruppe, key, aufgeklappt, klassen){
+      klassen = klassen || [];
+      const erste = gruppe[0], letzte = gruppe[gruppe.length - 1];
+      const assets = [...new Set(gruppe.map(s => s.asset))];
+      const tfs = [...new Set(gruppe.map(s => s.tf).filter(Boolean))];
+      // "Ergebnis" des Trades: wie bei den Statistiken oben zaehlt das Ergebnis des
+      // zeitlich juengsten Signals, das bereits bewertet wurde.
+      let status = '';
+      gruppe.forEach(s => { if (s.status) status = s.status; });
+      const nichtRegelkonform = gruppe.filter(s => s.regelkonform === false);
+      const levelGebrochenGehalten = gruppe.some(s => s.levelGebrochenGehalten);
+      const tradeId = erste.tradeId;
+      const datumText = erste.date === letzte.date
+        ? esc(wlDatumLabel(erste))
+        : esc(wlDatumLabel(erste)) + ' – ' + esc(wlDatumLabel(letzte));
+      const galerieZeile = aufgeklappt
+        ? '<tr class="wl-group-gallery-row" data-group-key="'+esc(key)+'"><td colspan="13"><div class="wl-group-gallery" data-group-key="'+esc(key)+'">Lädt…</div></td></tr>'
+        : '';
+      const mitgliederZeilen = aufgeklappt
+        ? gruppe.map(s => wlZeileHtml(s, ['wl-group-member-row'])).join('')
+        : '';
+      return '<tr class="'+klassen.concat(['wl-group-row']).join(' ')+'" data-group-key="'+esc(key)+'" data-trade="'+esc(String(tradeId))+'" title="Klick zum '+(aufgeklappt?'Zuklappen':'Aufklappen')+'">' +
+        '<td class="wl-analysiert-cell"><button type="button" class="wl-group-toggle" data-group-key="'+esc(key)+'" title="'+(aufgeklappt?'Gruppe zuklappen':'Gruppe aufklappen – alle Signale dieses Trades anzeigen')+'">'+(aufgeklappt?'▾':'▸')+'</button></td>' +
+        '<td class="muted">'+datumText+'</td>' +
+        '<td class="wl-trade-cell">' +
+          '<span class="wl-trade-bar" style="background:'+wlTradeFarbe(tradeId)+'"></span>' +
+          '<span class="wl-trade-chip" style="color:'+wlTradeFarbe(tradeId)+'">'+esc(String(tradeId))+'</span>' +
+        '</td>' +
+        '<td><span class="wl-table-asset">'+assets.map(a => assetIconHtml(a)).join('')+' '+esc(assets.join(' / '))+'</span></td>' +
+        '<td class="muted">'+(tfs.length ? esc(tfs.join(' · ')) : '–')+'</td>' +
+        '<td class="wl-setup-cell"><span class="muted">'+gruppe.length+' Signale im Trade</span></td>' +
+        '<td class="muted">'+WL_PHASE_LABEL[letzte.marktphase || '']+'</td>' +
+        '<td class="muted">'+
+          ([letzte.pattern ? WL_PATTERN_LABEL[letzte.pattern] : '', letzte.candles ? WL_CANDLE_LABEL[letzte.candles] : '', letzte.pivotLevel ? WL_PIVOT_KURZ[letzte.pivotLevel] : '']
+            .filter(Boolean).join(' · ') || '–') +
+        '</td>' +
+        '<td class="muted">'+
+          ((letzte.divLokal || letzte.divStruktur)
+            ? (wlDoppelteDivergenz(letzte) ? '<span class="wl-div-check" title="Doppelte Divergenz (lokal + strukturell)">✓</span> ' : '') +
+              'L: '+WL_DIV_KURZ[letzte.divLokal || '']+' · S: '+WL_DIV_KURZ[letzte.divStruktur || '']
+            : '–') +
+        '</td>' +
+        '<td>'+(letzte.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[letzte.note]+';color:'+WL_NOTE_FARBEN[letzte.note]+'">'+esc(letzte.note)+'</span>' : '<span class="muted">–</span>')+'</td>' +
+        '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[status]+';color:'+WL_FARBEN[status]+'">'+WL_LABEL[status]+'</span>'+
+          (nichtRegelkonform.length ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(nichtRegelkonform.map(s => wlDatumLabel(s)+(s.regelkonformGrund?': '+s.regelkonformGrund:'')).join(' · '))+'">nicht regelkonform</span>' : '')+
+          (levelGebrochenGehalten ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--accent);color:var(--accent)" title="Pivot-Level zwischenzeitlich gebrochen, am Ende aber gehalten">Level gehalten</span>' : '')+
+        '</td>' +
+        '<td class="muted">'+(aufgeklappt ? 'Zum Zuklappen klicken' : 'Klick für alle '+gruppe.length+' Signale') +'</td>' +
+        '<td class="wl-row-actions"></td>' +
+      '</tr>' + galerieZeile + mitgliederZeilen;
+    }
+
+    // Welche Trade-Gruppen (Groesse > 1) in diesem Durchlauf schon als eine Zeile
+    // ausgegeben wurden - verhindert, dass ein Signal, dessen Trade-Partner weiter oben
+    // oder unten in der sortierten Liste steht, noch ein zweites Mal auftaucht.
+    const wlGruppenAusgegeben = new Set();
+    const tabelle = tabelleSortiert.map((s, idx) => {
+      const grp = clusterVonSignal.has(s) ? clusterVonSignal.get(s) : null;
+      const grpVorher = idx > 0 && clusterVonSignal.has(tabelleSortiert[idx-1]) ? clusterVonSignal.get(tabelleSortiert[idx-1]) : null;
+      // Gruppen wechseln sich farblich ab und bekommen oben eine Trennlinie, damit zwei
+      // direkt untereinanderstehende Haeufungen nicht wie eine einzige grosse aussehen.
+      const klassen = [];
+      if (grp !== null) {
+        klassen.push('wl-row-cluster', grp % 2 === 0 ? 'wl-grp-a' : 'wl-grp-b');
+        if (grp !== grpVorher) klassen.push('wl-grp-start');
+      }
+      // Beim Scrollen durch nach Datum sortierte Signale soll ein Jahreswechsel klar als
+      // eigener Balken erkennbar sein (bei Sortierung nach Asset ergibt eine Jahreszeile
+      // keinen Sinn, da die Reihenfolge dann nicht mehr chronologisch ist).
+      const jahr = s.date.slice(0, 4);
+      const jahrVorher = idx > 0 ? tabelleSortiert[idx-1].date.slice(0, 4) : null;
+      const jahrZeile = (sortSpalte === 'date' && jahr !== jahrVorher)
+        ? '<tr class="wl-year-row"><td colspan="13">'+jahr+'</td></tr>'
+        : '';
+      const gruppenKey = wlTradeKey(s);
+      const gruppe = gruppenNachKey.get(gruppenKey);
+      if (gruppe.length <= 1) {
+        return jahrZeile + wlZeileHtml(s, klassen);
+      }
+      // Teil einer Trade-Gruppe mit mehreren Signalen: nur einmal ausgeben (an der Stelle,
+      // an der das erste Mitglied in der aktuellen Sortierung auftaucht), alle anderen
+      // Positionen dieser Gruppe in der sortierten Liste werden uebersprungen.
+      if (wlGruppenAusgegeben.has(gruppenKey)) return '';
+      wlGruppenAusgegeben.add(gruppenKey);
+      const aufgeklappt = wlAufgeklappteGruppen.has(gruppenKey);
+      return jahrZeile + wlGruppenZeileHtml(gruppe, gruppenKey, aufgeklappt, klassen);
     }).join('');
 
     el.innerHTML =
@@ -2686,6 +2813,17 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     const wlThead = tableWrap.querySelector('thead');
     if (wlThead) tableWrap.style.setProperty('--wl-thead-h', wlThead.offsetHeight + 'px');
 
+    // Fuer jede gerade aufgeklappte Trade-Gruppe die gepoolte Screenshot-Uebersicht ueber
+    // alle Signale dieses Trades laden (Bilder bleiben pro Signal gespeichert/hochladbar -
+    // hier nur zusammengefuehrte Anzeige, siehe wlRenderGruppenGalerie weiter oben).
+    tableWrap.querySelectorAll('.wl-group-gallery').forEach(galEl => {
+      const key = galEl.dataset.groupKey;
+      const gruppe = gruppenNachKey.get(key);
+      if (!gruppe) return;
+      const mitglieder = gruppe.map(s => ({ id: s.id, label: wlDatumLabel(s) + (s.uhrzeit ? ' · ' + s.uhrzeit : '') }));
+      wlRenderGruppenGalerie(mitglieder, galEl);
+    });
+
     schlausSprungfeld(document.getElementById('wlJumpDate'), () => tableWrap, () => signaleGefiltert.map(s => s.date));
 
     // Maus ueber einer Zeile mit Trade-ID hebt alle Zeilen desselben Trades hervor
@@ -2756,6 +2894,16 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       }
     }
     tableWrap.addEventListener('click', async ev => {
+      // Klick auf eine Trade-Gruppen-Kopfzeile (egal ob auf den Pfeil oder sonstwo in der
+      // Zeile) klappt die ganze Gruppe auf/zu - das neue Rendern laedt dann bei Bedarf
+      // auch die gepoolte Screenshot-Uebersicht nach (siehe Ende von render()).
+      const gruppenZeile = ev.target.closest('tr.wl-group-row');
+      if (gruppenZeile) {
+        const key = gruppenZeile.dataset.groupKey;
+        if (wlAufgeklappteGruppen.has(key)) wlAufgeklappteGruppen.delete(key); else wlAufgeklappteGruppen.add(key);
+        render();
+        return;
+      }
       const analysiertBtn = ev.target.closest('.wl-analysiert-btn');
       if (analysiertBtn) {
         const id = analysiertBtn.closest('tr').dataset.id;
