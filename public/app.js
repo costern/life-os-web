@@ -642,8 +642,20 @@ async function ladeOvTrades(){
       const inMonat = tag.getMonth() === aktMonat.getMonth();
       const istHeute = tag.toDateString() === heute.toDateString();
       const istWochenende = tag.getDay() === 0 || tag.getDay() === 6;
-      const tagEvents = events.filter(ev => evDatum(ev).toDateString() === tag.toDateString());
-      const evHtml = tagEvents.slice(0,3).map(ev => '<div class="cal-ev" data-id="'+esc(ev.id)+'" title="'+esc(ev.title)+'">'+esc(ev.title)+'</div>').join('') +
+      // Innerhalb eines Tages zuerst ganztaegige Termine, danach chronologisch nach Uhrzeit -
+      // sonst stehen Termine in der Reihenfolge der API-Antwort und nicht nach Uhrzeit sortiert da.
+      const tagEvents = events.filter(ev => evDatum(ev).toDateString() === tag.toDateString())
+        .slice().sort((a,b) => {
+          if (!!a.allDay !== !!b.allDay) return a.allDay ? -1 : 1;
+          return evDatum(a) - evDatum(b);
+        });
+      const evHtml = tagEvents.slice(0,3).map(ev => {
+        // Uhrzeit mit anzeigen (Colins Wunsch: man sieht sonst nicht, wann z.B. "Jan Schmolling"
+        // stattfindet) - ganztaegige Termine bekommen keine Uhrzeit vorangestellt.
+        const zeit = ev.allDay ? '' : new Date(ev.start).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+        return '<div class="cal-ev" data-id="'+esc(ev.id)+'" title="'+esc(ev.title)+(zeit?' · '+zeit+' Uhr':'')+'">'+
+          (zeit ? '<span class="cal-ev-zeit">'+zeit+'</span> ' : '') + esc(ev.title) + '</div>';
+      }).join('') +
         (tagEvents.length > 3 ? '<div class="muted">+'+(tagEvents.length-3)+' mehr</div>' : '');
       return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+(istWochenende?' weekend':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
     }).join('');
