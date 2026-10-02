@@ -2409,19 +2409,54 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'');
       return sortRichtung === 'asc' ? cmp : -cmp;
     });
-    // Signale mit identischer Trade-ID lassen sich zu einer Zeile zusammenklappen (Colins
-    // Wunsch: "wenn ich den gleichen Trade habe, also gleiche Trade-ID, das zusammenklappen
-    // koennen"). Gruppiert wird unabhaengig von der aktuellen Tabellen-Sortierung immer
-    // chronologisch aufsteigend (= die Reihenfolge, in der die Signale tatsaechlich
-    // eintrafen) - so sieht man beim Aufklappen genau, was zuerst bewertet wurde und was
-    // erst durch spaetere, hoehere Signale dazu kam.
-    const gruppenNachKey = new Map();
+    // Signale lassen sich zu einer Zeile zusammenklappen, wenn sie entweder dieselbe
+    // Trade-ID haben ODER exakt am selben Tag waren (Colins Praezisierung: "weil es ja
+    // gleicher Tag war, muss nicht nur gleiches Asset sein" - zwei verschiedene Trades/
+    // Assets am selben Tag, z.B. Trumpcoin + Canton am 19.08., sollen genauso zusammen
+    // aufklappbar sein wie mehrere Signale desselben Trades). Dafuer werden beide
+    // Verbindungen ueber Union-Find zu einer Gruppe verschmolzen (gleiche Trade-ID ODER
+    // gleiches Datum verbindet zwei Signale transitiv). Die Statistiken oben bleiben davon
+    // unberuehrt - die zaehlen weiterhin strikt nach Trade-ID (siehe wlTradeKey oben).
+    const wlUnionEltern = new Map();
+    function wlUnionFind(s){
+      let wurzel = s;
+      while (wlUnionEltern.get(wurzel) !== wurzel) wurzel = wlUnionEltern.get(wurzel);
+      let cur = s;
+      while (wlUnionEltern.get(cur) !== wurzel) { const next = wlUnionEltern.get(cur); wlUnionEltern.set(cur, wurzel); cur = next; }
+      return wurzel;
+    }
+    function wlUnion(a, b){ const ra = wlUnionFind(a), rb = wlUnionFind(b); if (ra !== rb) wlUnionEltern.set(ra, rb); }
+    signaleGefiltert.forEach(s => { if (!wlUnionEltern.has(s)) wlUnionEltern.set(s, s); });
+    const wlErstesProTradeId = new Map();
     signaleGefiltert.forEach(s => {
-      const k = wlTradeKey(s);
-      if (!gruppenNachKey.has(k)) gruppenNachKey.set(k, []);
-      gruppenNachKey.get(k).push(s);
+      const tid = s.tradeId ? String(s.tradeId).trim() : '';
+      if (!tid) return;
+      if (!wlErstesProTradeId.has(tid)) wlErstesProTradeId.set(tid, s); else wlUnion(s, wlErstesProTradeId.get(tid));
     });
-    gruppenNachKey.forEach(g => g.sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'')));
+    const wlErstesProDatum = new Map();
+    signaleGefiltert.forEach(s => {
+      if (!wlErstesProDatum.has(s.date)) wlErstesProDatum.set(s.date, s); else wlUnion(s, wlErstesProDatum.get(s.date));
+    });
+    // Gruppiert wird unabhaengig von der aktuellen Tabellen-Sortierung immer chronologisch
+    // aufsteigend (= die Reihenfolge, in der die Signale tatsaechlich eintrafen) - so sieht
+    // man beim Aufklappen genau, was zuerst bewertet wurde und was erst durch spaetere,
+    // hoehere Signale dazu kam. Der Gruppenschluessel ist inhaltsbasiert (sortierte Liste
+    // der einzelnen Signal-Schluessel) statt von der Union-Find-Wurzel abzuhaengen, damit
+    // aufgeklappte Gruppen (wlAufgeklappteGruppen) auch nach einer Neuzeichnung stabil bleiben.
+    const gruppenNachWurzel = new Map();
+    signaleGefiltert.forEach(s => {
+      const w = wlUnionFind(s);
+      if (!gruppenNachWurzel.has(w)) gruppenNachWurzel.set(w, []);
+      gruppenNachWurzel.get(w).push(s);
+    });
+    const gruppenNachKey = new Map();
+    const wlGruppenSchluesselVonSignal = new Map();
+    gruppenNachWurzel.forEach(gruppe => {
+      gruppe.sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
+      const key = gruppe.map(s => wlTradeKey(s)).sort().join('|');
+      gruppenNachKey.set(key, gruppe);
+      gruppe.forEach(s => wlGruppenSchluesselVonSignal.set(s, key));
+    });
 
     // Die aufklappbare Detailansicht (Bearbeiten-Panel) eines einzelnen Signals - komplett
     // unveraendert, nur aus der frueheren wlZeileHtml-Funktion herausgezogen, damit sie auch
@@ -2585,23 +2620,33 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       gruppe.forEach(s => { if (s.status) status = s.status; });
       const nichtRegelkonform = gruppe.filter(s => s.regelkonform === false);
       const levelGebrochenGehalten = gruppe.some(s => s.levelGebrochenGehalten);
-      const tradeId = erste.tradeId;
+      // Eine Gruppe entsteht entweder durch gemeinsame Trade-ID oder durch gleiches Datum
+      // (oder beides) - deshalb kann es 0, 1 oder mehrere unterschiedliche Trade-IDs geben.
+      const tradeIds = [...new Set(gruppe.map(s => s.tradeId).filter(Boolean).map(String))];
+      const alleGleicherTag = gruppe.every(s => s.date === erste.date);
       const datumText = erste.date === letzte.date
         ? esc(wlDatumLabel(erste))
         : esc(wlDatumLabel(erste)) + ' – ' + esc(wlDatumLabel(letzte));
+      const tradeCellHtml = tradeIds.length === 1
+        ? '<span class="wl-trade-bar" style="background:'+wlTradeFarbe(tradeIds[0])+'"></span>' +
+          '<span class="wl-trade-chip" style="color:'+wlTradeFarbe(tradeIds[0])+'">'+esc(tradeIds[0])+'</span>'
+        : tradeIds.length === 0
+          ? '<span class="muted">–</span>'
+          : tradeIds.map(tid => '<span class="wl-trade-chip" style="color:'+wlTradeFarbe(tid)+';margin-right:6px">'+esc(tid)+'</span>').join('');
+      const setupText = tradeIds.length === 1
+        ? gruppe.length+' Signale im Trade'
+        : alleGleicherTag ? gruppe.length+' Signale am selben Tag' : gruppe.length+' Signale';
       const mitgliederZeilen = aufgeklappt
         ? gruppe.map(s => wlGruppenMitgliedKarteHtml(s)).join('')
         : '';
-      return '<tr class="'+klassen.concat(['wl-group-row']).join(' ')+'" data-group-key="'+esc(key)+'" data-trade="'+esc(String(tradeId))+'" title="Klick zum '+(aufgeklappt?'Zuklappen':'Aufklappen')+'">' +
-        '<td class="wl-analysiert-cell"><button type="button" class="wl-group-toggle" data-group-key="'+esc(key)+'" title="'+(aufgeklappt?'Gruppe zuklappen':'Gruppe aufklappen – alle Signale dieses Trades anzeigen')+'">'+(aufgeklappt?'▾':'▸')+'</button></td>' +
+      const dataTradeAttr = tradeIds.length === 1 ? ' data-trade="'+esc(tradeIds[0])+'"' : '';
+      return '<tr class="'+klassen.concat(['wl-group-row']).join(' ')+'" data-group-key="'+esc(key)+'"'+dataTradeAttr+' title="Klick zum '+(aufgeklappt?'Zuklappen':'Aufklappen')+'">' +
+        '<td class="wl-analysiert-cell"><button type="button" class="wl-group-toggle" data-group-key="'+esc(key)+'" title="'+(aufgeklappt?'Gruppe zuklappen':'Gruppe aufklappen – alle Signale anzeigen')+'">'+(aufgeklappt?'▾':'▸')+'</button></td>' +
         '<td class="muted">'+datumText+'</td>' +
-        '<td class="wl-trade-cell">' +
-          '<span class="wl-trade-bar" style="background:'+wlTradeFarbe(tradeId)+'"></span>' +
-          '<span class="wl-trade-chip" style="color:'+wlTradeFarbe(tradeId)+'">'+esc(String(tradeId))+'</span>' +
-        '</td>' +
+        '<td class="wl-trade-cell">'+tradeCellHtml+'</td>' +
         '<td><span class="wl-table-asset">'+assets.map(a => assetIconHtml(a)).join('')+' '+esc(assets.join(' / '))+'</span></td>' +
         '<td class="muted">'+(tfs.length ? esc(tfs.join(' · ')) : '–')+'</td>' +
-        '<td class="wl-setup-cell"><span class="muted">'+gruppe.length+' Signale im Trade</span></td>' +
+        '<td class="wl-setup-cell"><span class="muted">'+setupText+'</span></td>' +
         '<td class="muted">'+WL_PHASE_LABEL[letzte.marktphase || '']+'</td>' +
         '<td class="muted">'+
           ([letzte.pattern ? WL_PATTERN_LABEL[letzte.pattern] : '', letzte.candles ? WL_CANDLE_LABEL[letzte.candles] : '', letzte.pivotLevel ? WL_PIVOT_KURZ[letzte.pivotLevel] : '']
@@ -2645,7 +2690,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       const jahrZeile = (sortSpalte === 'date' && jahr !== jahrVorher)
         ? '<tr class="wl-year-row"><td colspan="13">'+jahr+'</td></tr>'
         : '';
-      const gruppenKey = wlTradeKey(s);
+      const gruppenKey = wlGruppenSchluesselVonSignal.get(s);
       const gruppe = gruppenNachKey.get(gruppenKey);
       if (gruppe.length <= 1) {
         return jahrZeile + wlZeileHtml(s, klassen);
