@@ -2410,49 +2410,46 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       return sortRichtung === 'asc' ? cmp : -cmp;
     });
     // Signale lassen sich zu einer Zeile zusammenklappen, wenn sie entweder dieselbe
-    // Trade-ID haben ODER exakt am selben Tag waren (Colins Praezisierung: "weil es ja
-    // gleicher Tag war, muss nicht nur gleiches Asset sein" - zwei verschiedene Trades/
-    // Assets am selben Tag, z.B. Trumpcoin + Canton am 19.08., sollen genauso zusammen
-    // aufklappbar sein wie mehrere Signale desselben Trades). Dafuer werden beide
-    // Verbindungen ueber Union-Find zu einer Gruppe verschmolzen (gleiche Trade-ID ODER
-    // gleiches Datum verbindet zwei Signale transitiv). Die Statistiken oben bleiben davon
-    // unberuehrt - die zaehlen weiterhin strikt nach Trade-ID (siehe wlTradeKey oben).
-    const wlUnionEltern = new Map();
-    function wlUnionFind(s){
-      let wurzel = s;
-      while (wlUnionEltern.get(wurzel) !== wurzel) wurzel = wlUnionEltern.get(wurzel);
-      let cur = s;
-      while (wlUnionEltern.get(cur) !== wurzel) { const next = wlUnionEltern.get(cur); wlUnionEltern.set(cur, wurzel); cur = next; }
-      return wurzel;
-    }
-    function wlUnion(a, b){ const ra = wlUnionFind(a), rb = wlUnionFind(b); if (ra !== rb) wlUnionEltern.set(ra, rb); }
-    signaleGefiltert.forEach(s => { if (!wlUnionEltern.has(s)) wlUnionEltern.set(s, s); });
-    const wlErstesProTradeId = new Map();
+    // Trade-ID haben ODER (falls sie zu keinem mehrteiligen Trade gehoeren) exakt am selben
+    // Tag waren (Colins Praezisierung: "weil es ja gleicher Tag war, muss nicht nur gleiches
+    // Asset sein" - zwei verschiedene, voneinander unabhaengige Signale am selben Tag, z.B.
+    // Trumpcoin + Canton am 19.08., sollen genauso zusammen aufklappbar sein wie mehrere
+    // Signale desselben Trades).
+    //
+    // WICHTIG: Trade-ID-Gruppen bleiben von der Tages-Verknuepfung unberuehrt - sonst wuerde
+    // ein einzelner gemeinsamer Tag zwei voellig unabhaengige, mehrtaegige Trades (ueber
+    // transitive Verkettung) zu einem unuebersichtlichen Riesen-Block verschmelzen (z.B.
+    // Trade A am 17./20./24.08. + Trade B am 20./25./31.08. wuerden sich nur wegen des
+    // gemeinsamen 20.08. zu einem einzigen 2-Wochen-Block zusammenziehen - das war ein Bug
+    // in einer frueheren Version und nicht das, was Colin wollte). Daher zuerst strikt nach
+    // Trade-ID gruppieren, und nur die dabei uebrig bleibenden EINZELSIGNALE (kein Trade mit
+    // mehreren Signalen) zusaetzlich nach exaktem Datum zusammenfassen - das kann nicht
+    // transitiv ueber mehrere Tage hinweg verketten, weil jedes Signal genau ein Datum hat.
+    const gruppenNachTradeId = new Map();
     signaleGefiltert.forEach(s => {
-      const tid = s.tradeId ? String(s.tradeId).trim() : '';
-      if (!tid) return;
-      if (!wlErstesProTradeId.has(tid)) wlErstesProTradeId.set(tid, s); else wlUnion(s, wlErstesProTradeId.get(tid));
-    });
-    const wlErstesProDatum = new Map();
-    signaleGefiltert.forEach(s => {
-      if (!wlErstesProDatum.has(s.date)) wlErstesProDatum.set(s.date, s); else wlUnion(s, wlErstesProDatum.get(s.date));
-    });
-    // Gruppiert wird unabhaengig von der aktuellen Tabellen-Sortierung immer chronologisch
-    // aufsteigend (= die Reihenfolge, in der die Signale tatsaechlich eintrafen) - so sieht
-    // man beim Aufklappen genau, was zuerst bewertet wurde und was erst durch spaetere,
-    // hoehere Signale dazu kam. Der Gruppenschluessel ist inhaltsbasiert (sortierte Liste
-    // der einzelnen Signal-Schluessel) statt von der Union-Find-Wurzel abzuhaengen, damit
-    // aufgeklappte Gruppen (wlAufgeklappteGruppen) auch nach einer Neuzeichnung stabil bleiben.
-    const gruppenNachWurzel = new Map();
-    signaleGefiltert.forEach(s => {
-      const w = wlUnionFind(s);
-      if (!gruppenNachWurzel.has(w)) gruppenNachWurzel.set(w, []);
-      gruppenNachWurzel.get(w).push(s);
+      const k = wlTradeKey(s);
+      if (!gruppenNachTradeId.has(k)) gruppenNachTradeId.set(k, []);
+      gruppenNachTradeId.get(k).push(s);
     });
     const gruppenNachKey = new Map();
     const wlGruppenSchluesselVonSignal = new Map();
-    gruppenNachWurzel.forEach(gruppe => {
-      gruppe.sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
+    const wlEinzelSignale = [];
+    gruppenNachTradeId.forEach((gruppe, tradeKey) => {
+      if (gruppe.length > 1) {
+        gruppe.sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
+        gruppenNachKey.set(tradeKey, gruppe);
+        gruppe.forEach(s => wlGruppenSchluesselVonSignal.set(s, tradeKey));
+      } else {
+        wlEinzelSignale.push(gruppe[0]);
+      }
+    });
+    const wlEinzelNachDatum = new Map();
+    wlEinzelSignale.forEach(s => {
+      if (!wlEinzelNachDatum.has(s.date)) wlEinzelNachDatum.set(s.date, []);
+      wlEinzelNachDatum.get(s.date).push(s);
+    });
+    wlEinzelNachDatum.forEach(gruppe => {
+      gruppe.sort((a,b) => (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
       const key = gruppe.map(s => wlTradeKey(s)).sort().join('|');
       gruppenNachKey.set(key, gruppe);
       gruppe.forEach(s => wlGruppenSchluesselVonSignal.set(s, key));
