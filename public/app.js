@@ -183,11 +183,20 @@ function schlausSprungfeld(input, holeContainer, holeVerfuegbareDaten){
 // der es von CoinGecko holt - deckt auch kleinere/neuere Coins ab (GRAM, Kaspa, BGB,
 // ONDO, TAO, ...), nicht nur eine kuratierte Handvoll. Buchstaben-Badge als Fallback,
 // falls es fuer den Ticker kein Logo gibt.
+// Manche Formulare (v.a. Bottom Events) haben kein Autocomplete, Colin traegt dort
+// gelegentlich den vollen Namen statt des kurzen Tickers ein (z.B. "Arbitrum" statt
+// "ARB") - ohne diese Zuordnung findet CoinGecko dafuer nichts und es bleibt bei der
+// Buchstaben-Badge. Nur fuer bekannte Faelle, in denen Name und Ticker klar auseinanderfallen.
+const ASSET_TICKER_ALIAS = { ARBITRUM: 'ARB', QUANT: 'QNT', CANTON: 'CC' };
+function coinIconTicker(t){
+  const upper = String(t || '').toUpperCase();
+  return ASSET_TICKER_ALIAS[upper] || upper;
+}
 function coinIcon(ticker, name){
   const t = String(ticker || name || '').trim();
   const buchstabe = esc((t || '?').charAt(0).toUpperCase() || '?');
   if (!t) return '<span class="coin-icon coin-icon-fallback">'+buchstabe+'</span>';
-  return '<img class="coin-icon" src="/api/coinicon/'+encodeURIComponent(t.toUpperCase())+'" alt="" ' +
+  return '<img class="coin-icon" src="/api/coinicon/'+encodeURIComponent(coinIconTicker(t))+'" alt="" ' +
       'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\'">' +
     '<span class="coin-icon coin-icon-fallback" style="display:none">'+buchstabe+'</span>';
 }
@@ -1116,7 +1125,7 @@ function coinIconWlHtml(ticker, name){
   const buchstabe = esc((t || '?').slice(0,3).toUpperCase());
   if (!t) return '<span class="wl-icon"><span class="wl-icon-fallback">'+buchstabe+'</span></span>';
   return '<span class="wl-icon">' +
-    '<img src="/api/coinicon/'+encodeURIComponent(t.toUpperCase())+'" alt="" ' +
+    '<img src="/api/coinicon/'+encodeURIComponent(coinIconTicker(t))+'" alt="" ' +
       'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
     '<span class="wl-icon-fallback" style="display:none">'+buchstabe+'</span>' +
   '</span>';
@@ -2407,22 +2416,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'');
       return sortRichtung === 'asc' ? cmp : -cmp;
     });
-    // Signale lassen sich zu einer Zeile zusammenklappen, wenn sie entweder dieselbe
-    // Trade-ID haben ODER (falls sie zu keinem mehrteiligen Trade gehoeren) exakt am selben
-    // Tag waren (Colins Praezisierung: "weil es ja gleicher Tag war, muss nicht nur gleiches
-    // Asset sein" - zwei verschiedene, voneinander unabhaengige Signale am selben Tag, z.B.
-    // Trumpcoin + Canton am 19.08., sollen genauso zusammen aufklappbar sein wie mehrere
-    // Signale desselben Trades).
-    //
-    // WICHTIG: Trade-ID-Gruppen bleiben von der Tages-Verknuepfung unberuehrt - sonst wuerde
-    // ein einzelner gemeinsamer Tag zwei voellig unabhaengige, mehrtaegige Trades (ueber
-    // transitive Verkettung) zu einem unuebersichtlichen Riesen-Block verschmelzen (z.B.
-    // Trade A am 17./20./24.08. + Trade B am 20./25./31.08. wuerden sich nur wegen des
-    // gemeinsamen 20.08. zu einem einzigen 2-Wochen-Block zusammenziehen - das war ein Bug
-    // in einer frueheren Version und nicht das, was Colin wollte). Daher zuerst strikt nach
-    // Trade-ID gruppieren, und nur die dabei uebrig bleibenden EINZELSIGNALE (kein Trade mit
-    // mehreren Signalen) zusaetzlich nach exaktem Datum zusammenfassen - das kann nicht
-    // transitiv ueber mehrere Tage hinweg verketten, weil jedes Signal genau ein Datum hat.
+    // Signale lassen sich zu einer Zeile zusammenklappen, wenn sie dieselbe Trade-ID haben
+    // (mehrteiliger Trade ueber mehrere Timeframes/Tage). Signale OHNE gemeinsame Trade-ID
+    // werden NICHT mehr automatisch nur wegen desselben Kalendertags zusammengeklappt -
+    // Colin wollte das wieder zurueck: jedes eigenstaendige Signal bekommt wieder seine
+    // eigene, immer sichtbare Zeile (kein Klick zum Aufklappen noetig), und ein "Nx"-Badge
+    // neben dem Datum zeigt weiterhin an, wenn mehrere Signale auf denselben Tag fallen
+    // (siehe gleicherTag()/tagBadge in wlZeileHtml).
     const gruppenNachTradeId = new Map();
     signaleGefiltert.forEach(s => {
       const k = wlTradeKey(s);
@@ -2431,26 +2431,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     });
     const gruppenNachKey = new Map();
     const wlGruppenSchluesselVonSignal = new Map();
-    const wlEinzelSignale = [];
     gruppenNachTradeId.forEach((gruppe, tradeKey) => {
       if (gruppe.length > 1) {
         gruppe.sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
         gruppenNachKey.set(tradeKey, gruppe);
         gruppe.forEach(s => wlGruppenSchluesselVonSignal.set(s, tradeKey));
-      } else {
-        wlEinzelSignale.push(gruppe[0]);
       }
-    });
-    const wlEinzelNachDatum = new Map();
-    wlEinzelSignale.forEach(s => {
-      if (!wlEinzelNachDatum.has(s.date)) wlEinzelNachDatum.set(s.date, []);
-      wlEinzelNachDatum.get(s.date).push(s);
-    });
-    wlEinzelNachDatum.forEach(gruppe => {
-      gruppe.sort((a,b) => (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
-      const key = gruppe.map(s => wlTradeKey(s)).sort().join('|');
-      gruppenNachKey.set(key, gruppe);
-      gruppe.forEach(s => wlGruppenSchluesselVonSignal.set(s, key));
     });
 
     // Die aufklappbare Detailansicht (Bearbeiten-Panel) eines einzelnen Signals - komplett
@@ -2632,8 +2618,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const nichtRegelkonform = gruppe.filter(s => s.regelkonform === false);
       const levelGebrochenGehalten = gruppe.some(s => s.levelGebrochenGehalten);
       const nurBestaetigung = gruppe.some(s => s.nurBestaetigung);
-      // Eine Gruppe entsteht entweder durch gemeinsame Trade-ID oder durch gleiches Datum
-      // (oder beides) - deshalb kann es 0, 1 oder mehrere unterschiedliche Trade-IDs geben.
+      // Eine Gruppe entsteht ausschliesslich durch eine gemeinsame Trade-ID - daher hier
+      // immer genau eine (die Faelle 0/mehrere unten sind nur defensiv, kommen nicht vor).
       const tradeIds = [...new Set(gruppe.map(s => s.tradeId).filter(Boolean).map(String))];
       const alleGleicherTag = gruppe.every(s => s.date === erste.date);
       const datumText = erste.date === letzte.date
@@ -2702,8 +2688,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         ? '<tr class="wl-year-row"><td colspan="13">'+jahr+'</td></tr>'
         : '';
       const gruppenKey = wlGruppenSchluesselVonSignal.get(s);
-      const gruppe = gruppenNachKey.get(gruppenKey);
-      if (gruppe.length <= 1) {
+      const gruppe = gruppenKey ? gruppenNachKey.get(gruppenKey) : null;
+      if (!gruppe || gruppe.length <= 1) {
         return jahrZeile + wlZeileHtml(s, klassen);
       }
       // Teil einer Trade-Gruppe mit mehreren Signalen: nur einmal ausgeben (an der Stelle,
