@@ -283,6 +283,10 @@ tr.datum-sprung-highlight td { animation: datumSprungBlitz 2s ease-out; }
 .wl-tag-card-info { font-size:12px; }
 .wl-tag-line { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.55; }
 .wl-tag-line .wl-row-actions button { font-size:10.5px; }
+/* Fix: .wl-icon ist nur in Kontexten wie .wl-table-asset/.wl-detail-kopf auf 18x18px
+   begrenzt - hier fehlte diese Begrenzung, wodurch das Asset-Icon (z.B. GRAM/SUI/KASPA)
+   riesig und quadratisch die ganze Karte fuellte statt klein neben dem Namen zu stehen. */
+.wl-tag-line .wl-icon { display:inline-block; width:18px; height:18px; border-radius:50%; vertical-align:-4px; }
 @media (max-width:760px) {
   .wl-tag-card { flex:1 1 100%; min-width:0; }
 }
