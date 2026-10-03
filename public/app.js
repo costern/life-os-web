@@ -2511,6 +2511,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
             '<span class="wl-tradeid-info muted" id="wl-tid-info-'+s.id+'"></span></label>' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
           '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>' +
+          '<label class="wl-check" title="Kein eigenstaendiges, regelkonformes Setup (z.B. kein eindeutiges Pivot-Level, choppy Candles, Pattern zu kurz - keine/nur eine Kerze zwischen den Tiefpunkten) - bestaetigt nur eine groessere Bewegung. Ergebnis trotzdem eintragen, als haette man nach Standardregeln gehandelt, damit sichtbar bleibt, ob es funktioniert haette."><input type="checkbox" class="wle-nurbestaetigung"'+(s.nurBestaetigung?' checked':'')+'> Nur bestätigendes Signal (kein eigenständiges Setup)</label>' +
         '</div>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
         '<label class="wl-detail-voll">Details<textarea class="wle-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>' +
@@ -2559,6 +2560,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '<td>'+(s.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span>' : '<span class="muted">–</span>')+'</td>' +
         '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span>'+
           (s.regelkonform === false ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund ? 'Nicht regelkonform: '+s.regelkonformGrund : 'Nicht regelkonform')+'">nicht regelkonform</span>' : '')+
+          (s.nurBestaetigung ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)" title="Kein eigenstaendiges Setup, nur bestaetigendes Signal">nur Bestätigung</span>' : '')+
         '</td>' +
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
@@ -2588,6 +2590,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
               ' <span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span>' +
               (s.regelkonform === false ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund||'')+'">nicht regelkonform</span>' : '') +
               (s.levelGebrochenGehalten ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--accent);color:var(--accent)">Level gehalten</span>' : '') +
+              (s.nurBestaetigung ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)" title="Kein eigenstaendiges Setup, nur bestaetigendes Signal">nur Bestätigung</span>' : '') +
               ' <span class="wl-row-actions" style="float:right"><button type="button" class="wl-edit" title="Bearbeiten">✎ Bearbeiten</button><button type="button" class="wl-del" title="Löschen">🗑</button></span>' +
             '</div>' +
             '<div class="muted" style="margin-top:4px">'+esc(s.tf||'–')+(WL_PHASE_LABEL[s.marktphase||''] !== '–' ? ' · '+WL_PHASE_LABEL[s.marktphase||''] : '')+'</div>' +
@@ -2617,6 +2620,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       gruppe.forEach(s => { if (s.status) status = s.status; });
       const nichtRegelkonform = gruppe.filter(s => s.regelkonform === false);
       const levelGebrochenGehalten = gruppe.some(s => s.levelGebrochenGehalten);
+      const nurBestaetigung = gruppe.some(s => s.nurBestaetigung);
       // Eine Gruppe entsteht entweder durch gemeinsame Trade-ID oder durch gleiches Datum
       // (oder beides) - deshalb kann es 0, 1 oder mehrere unterschiedliche Trade-IDs geben.
       const tradeIds = [...new Set(gruppe.map(s => s.tradeId).filter(Boolean).map(String))];
@@ -2659,6 +2663,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
         '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[status]+';color:'+WL_FARBEN[status]+'">'+WL_LABEL[status]+'</span>'+
           (nichtRegelkonform.length ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(nichtRegelkonform.map(s => wlDatumLabel(s)+(s.regelkonformGrund?': '+s.regelkonformGrund:'')).join(' · '))+'">nicht regelkonform</span>' : '')+
           (levelGebrochenGehalten ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--accent);color:var(--accent)" title="Pivot-Level zwischenzeitlich gebrochen, am Ende aber gehalten">Level gehalten</span>' : '')+
+          (nurBestaetigung ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)" title="Mindestens ein Signal im Trade ist nur ein bestaetigendes Signal, kein eigenstaendiges Setup">nur Bestätigung</span>' : '')+
         '</td>' +
         '<td class="muted">'+(aufgeklappt ? 'Zum Zuklappen klicken' : 'Klick für alle '+gruppe.length+' Signale') +'</td>' +
         '<td class="wl-row-actions"></td>' +
@@ -3027,7 +3032,8 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           uhrzeit: row.querySelector('.wle-uhrzeit').value,
           regelkonform: row.querySelector('.wle-regelkonform').value,
           regelkonformGrund: row.querySelector('.wle-regelkonformgrund').value.trim() || null,
-          levelGebrochenGehalten: row.querySelector('.wle-levelgebrochen').checked
+          levelGebrochenGehalten: row.querySelector('.wle-levelgebrochen').checked,
+          nurBestaetigung: row.querySelector('.wle-nurbestaetigung').checked
         };
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
         try {

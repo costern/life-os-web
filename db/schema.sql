@@ -249,6 +249,13 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS regelkonform_grund TEXT;
 -- Eigene Statistik, um einzuschaetzen, wie oft ein "Bruch" sich im Nachhinein als
 -- Fakeout statt als echte Invalidierung herausstellt.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS level_gebrochen_gehalten BOOLEAN NOT NULL DEFAULT false;
+-- nur_bestaetigung: das Signal ist kein eigenstaendiges, regelkonformes Setup, sondern
+-- bestaetigt nur eine groessere/andere Bewegung (z.B. kein eindeutiges Pivot-Level,
+-- choppy Candles, oder das Pattern ist zu kurz - keine oder nur eine Kerze zwischen den
+-- beiden Tiefpunkten). Getrennt von "status" (Ergebnis): status wird trotzdem immer so
+-- eingetragen, als haette man nach Standardregeln gehandelt (Win/BE/Lose), damit man
+-- auch bei nicht genommenen Bestaetigungssignalen sieht, ob es am Ende funktioniert haette.
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS nur_bestaetigung BOOLEAN NOT NULL DEFAULT false;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).

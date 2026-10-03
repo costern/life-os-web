@@ -84,7 +84,8 @@ function rowOut(r) {
     uhrzeit: r.uhrzeit ? String(r.uhrzeit).slice(0, 5) : null,
     regelkonform: r.regelkonform === null || r.regelkonform === undefined ? null : !!r.regelkonform,
     regelkonformGrund: r.regelkonform_grund,
-    levelGebrochenGehalten: !!r.level_gebrochen_gehalten
+    levelGebrochenGehalten: !!r.level_gebrochen_gehalten,
+    nurBestaetigung: !!r.nur_bestaetigung
   };
 }
 
@@ -99,8 +100,8 @@ router.post('/', async (req, res) => {
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const status = STATI.has(b.status) ? b.status : null;
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten, nur_bestaetigung)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
@@ -117,7 +118,7 @@ router.post('/', async (req, res) => {
      KURSVERLAUF.has(b.kursverlauf) ? b.kursverlauf : null,
      KEIN_TRADE_GRUND.has(b.keinTradeGrund) ? b.keinTradeGrund : null,
      zeitOrNull(b.uhrzeit),
-     regelkonformOrNull(b.regelkonform), orNull(b.regelkonformGrund), !!b.levelGebrochenGehalten]
+     regelkonformOrNull(b.regelkonform), orNull(b.regelkonformGrund), !!b.levelGebrochenGehalten, !!b.nurBestaetigung]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -139,7 +140,8 @@ router.patch('/:id', async (req, res) => {
                             ['analysiert','analysiert'],
                             ['uhrzeit','uhrzeit'],
                             ['regelkonform','regelkonform'],['regelkonformGrund','regelkonform_grund'],
-                            ['levelGebrochenGehalten','level_gebrochen_gehalten']]) {
+                            ['levelGebrochenGehalten','level_gebrochen_gehalten'],
+                            ['nurBestaetigung','nur_bestaetigung']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -159,7 +161,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);
-    else if (key === 'multiAsset' || key === 'analysiert' || key === 'levelGebrochenGehalten') wert = !!wert;
+    else if (key === 'multiAsset' || key === 'analysiert' || key === 'levelGebrochenGehalten' || key === 'nurBestaetigung') wert = !!wert;
     else wert = orNull(wert);
     fields.push(`${col} = $${i++}`); vals.push(wert);
   }

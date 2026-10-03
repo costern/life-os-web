@@ -17,15 +17,17 @@
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:-apple-system,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--ink); }
-.shell { display:flex; align-items:flex-start; gap:18px; padding:18px; }
-nav.side { width:186px; flex:0 0 186px; position:sticky; top:18px; }
-nav.side .brand-row { display:flex; align-items:center; justify-content:space-between; padding:0 12px 10px; gap:8px; }
-nav.side .brand { font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); padding:0; }
-nav.side button { display:flex; align-items:center; gap:9px; width:100%; text-align:left; font-family:inherit; font-size:14px;
-  background:none; border:none; color:var(--ink); padding:9px 12px; border-radius:10px; cursor:pointer; margin-bottom:2px; }
+.shell { display:flex; align-items:flex-start; gap:14px; padding:18px; }
+/* Colins Wunsch: die Navi-Spalte etwas schmaler, damit Tabellen (z.B. Bottom Events)
+   mehr Breite bekommen und seltener horizontal gescrollt werden muss. */
+nav.side { width:146px; flex:0 0 146px; position:sticky; top:18px; }
+nav.side .brand-row { display:flex; align-items:center; justify-content:space-between; padding:0 8px 10px; gap:8px; }
+nav.side .brand { font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding:0; }
+nav.side button { display:flex; align-items:center; gap:7px; width:100%; text-align:left; font-family:inherit; font-size:13px;
+  background:none; border:none; color:var(--ink); padding:8px 9px; border-radius:10px; cursor:pointer; margin-bottom:2px; }
 nav.side button:hover { background:var(--hover-bg); }
 nav.side button.active { background:var(--accent); color:#fff; font-weight:600; }
-nav.side button .ico { width:18px; text-align:center; }
+nav.side button .ico { width:16px; text-align:center; }
 main { flex:1; min-width:0; }
 header.top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; flex-wrap:wrap; gap:6px; }
 h1 { font-size:23px; font-weight:700; } h1 span { color:var(--accent); }
