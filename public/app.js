@@ -643,7 +643,20 @@ async function ladeOvTrades(){
     return tage.length ? tage : [start]; // Sicherheitsnetz bei kaputten/fehlenden Enddaten
   }
 
+  // Wird bei jedem Aufruf von laden() erhoeht - damit erkennt eine spaet zurueckkommende
+  // (z.B. durch Render-Cold-Start verzoegerte) Antwort auf einen ALTEN Monat, dass
+  // inzwischen schon der naechste Monat angefordert wurde, und verwirft sich selbst statt
+  // das Grid mit veralteten Tagen zu ueberschreiben. Sonst konnte es passieren, dass bei
+  // schnellem Hin-und-her-Klicken die Monatsanzeige oben rechts zwar den neuesten Monat
+  // zeigt (die wird synchron VOR dem Request gesetzt), das Grid darunter aber von einer
+  // spaeter eintreffenden, eigentlich veralteten Antwort ueberschrieben wird und einen
+  // Monat zurueckbleibt.
+  let kalenderLadeGen = 0;
+
   async function laden(){
+    const meineGen = ++kalenderLadeGen;
+    const istNochAktuell = () => meineGen === kalenderLadeGen;
+
     // Seite soll beim Monatswechsel NICHT nach oben springen (Colins Feedback) - deshalb
     // die Scroll-Position vorher merken und danach wiederherstellen, UND das Grid nur dann
     // kurz auf "Lade…" leeren, wenn noch gar kein Monat angezeigt wurde. Sonst wuerde das
@@ -662,15 +675,18 @@ async function ladeOvTrades(){
     try {
       const q = '?start='+encodeURIComponent(gridStart.toISOString())+'&end='+encodeURIComponent(new Date(gridEnde.getTime()+864e5).toISOString());
       const d = await api('/calendar'+q);
+      if (!istNochAktuell()) return; // inzwischen wurde schon der naechste Monat angefordert
       if (!d.configured){ grid.innerHTML = '<div class="empty">Kalender noch nicht verbunden – sag mir Bescheid, dann richte ich das ein.</div>'; return; }
       if (d.error){ grid.innerHTML = '<div class="err">Kalender nicht erreichbar: '+esc(d.error)+'</div>'; return; }
       events = d.events || [];
-    } catch(e){ grid.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; return; }
+    } catch(e){ if (istNochAktuell()) grid.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; return; }
     finally {
       // Egal ob Erfolg oder Fehler: nach dem Neuzeichnen wieder an dieselbe Stelle scrollen
-      // (per rAF, damit das erst NACH dem Layout des neuen Inhalts passiert).
-      requestAnimationFrame(() => window.scrollTo(0, scrollVorher));
+      // (per rAF, damit das erst NACH dem Layout des neuen Inhalts passiert) - aber nur,
+      // wenn diese Antwort ueberhaupt noch aktuell ist.
+      if (istNochAktuell()) requestAnimationFrame(() => window.scrollTo(0, scrollVorher));
     }
+    if (!istNochAktuell()) return;
 
     aktuelleEvents = events;
     // Tage-Liste pro Termin einmal vorberechnen statt bei jedem Tag neu (siehe evTage()).
