@@ -605,6 +605,8 @@ async function ladeOvTrades(){
   const ceForm = document.getElementById('calEventForm');
   const ceTitle = document.getElementById('ceTitle');
   const ceDate = document.getElementById('ceDate');
+  const ceDateEnd = document.getElementById('ceDateEnd');
+  const ceDateEndLabel = document.getElementById('ceDateEndLabel');
   const ceTime = document.getElementById('ceTime');
   const ceAllDay = document.getElementById('ceAllDay');
   const ceLocation = document.getElementById('ceLocation');
@@ -620,13 +622,36 @@ async function ladeOvTrades(){
     t.setHours(0,0,0,0);
     return t;
   }
+  function isoDatumTeile(iso){
+    const [y,m,d] = iso.split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
   function evDatum(ev){
-    if (ev.allDay){ const [y,m,d] = ev.start.split('-').map(Number); return new Date(y, m-1, d); }
+    if (ev.allDay) return isoDatumTeile(ev.start);
     return new Date(ev.start);
+  }
+  // Alle Kalendertage, an denen ein Termin sichtbar sein soll. Bei mehrtaegigen
+  // ganztaegigen Terminen (z.B. Urlaub) liefert Google ein EXKLUSIVES Enddatum (ein Tag
+  // NACH dem letzten Urlaubstag) - vorher wurde das "end"-Feld vom Server gar nicht erst
+  // mitgeschickt, deshalb tauchte so ein Termin nur an seinem ersten Tag auf.
+  function evTage(ev){
+    if (!ev.allDay) return [evDatum(ev)];
+    const start = isoDatumTeile(ev.start);
+    const endExklusiv = ev.end ? isoDatumTeile(ev.end) : new Date(start.getFullYear(), start.getMonth(), start.getDate()+1);
+    const tage = [];
+    for (let d = new Date(start); d < endExklusiv; d.setDate(d.getDate()+1)) tage.push(new Date(d));
+    return tage.length ? tage : [start]; // Sicherheitsnetz bei kaputten/fehlenden Enddaten
   }
 
   async function laden(){
-    grid.innerHTML = '<div class="empty">Lade…</div>';
+    // Seite soll beim Monatswechsel NICHT nach oben springen (Colins Feedback) - deshalb
+    // die Scroll-Position vorher merken und danach wiederherstellen, UND das Grid nur dann
+    // kurz auf "Lade…" leeren, wenn noch gar kein Monat angezeigt wurde. Sonst wuerde das
+    // kurze Zusammenschrumpfen auf die eine Lade-Zeile die Seite ohnehin schon nach oben
+    // "clampen", bevor der neue (womoeglich genauso hohe) Monat wieder eingesetzt wird.
+    const scrollVorher = window.scrollY;
+    const hatteInhalt = grid.children.length > 0 && !grid.querySelector('.empty, .err');
+    if (!hatteInhalt) grid.innerHTML = '<div class="empty">Lade…</div>';
     const monatsStart = new Date(aktMonat.getFullYear(), aktMonat.getMonth(), 1);
     const monatsEnde = new Date(aktMonat.getFullYear(), aktMonat.getMonth()+1, 0);
     const gridStart = montag(monatsStart);
@@ -641,8 +666,15 @@ async function ladeOvTrades(){
       if (d.error){ grid.innerHTML = '<div class="err">Kalender nicht erreichbar: '+esc(d.error)+'</div>'; return; }
       events = d.events || [];
     } catch(e){ grid.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; return; }
+    finally {
+      // Egal ob Erfolg oder Fehler: nach dem Neuzeichnen wieder an dieselbe Stelle scrollen
+      // (per rAF, damit das erst NACH dem Layout des neuen Inhalts passiert).
+      requestAnimationFrame(() => window.scrollTo(0, scrollVorher));
+    }
 
     aktuelleEvents = events;
+    // Tage-Liste pro Termin einmal vorberechnen statt bei jedem Tag neu (siehe evTage()).
+    const eventTage = new Map(events.map(ev => [ev, evTage(ev)]));
     const heute = new Date(); heute.setHours(0,0,0,0);
     const tage = [];
     for (let d = new Date(gridStart); d <= gridEnde; d.setDate(d.getDate()+1)) tage.push(new Date(d));
@@ -653,7 +685,7 @@ async function ladeOvTrades(){
       const istWochenende = tag.getDay() === 0 || tag.getDay() === 6;
       // Innerhalb eines Tages zuerst ganztaegige Termine, danach chronologisch nach Uhrzeit -
       // sonst stehen Termine in der Reihenfolge der API-Antwort und nicht nach Uhrzeit sortiert da.
-      const tagEvents = events.filter(ev => evDatum(ev).toDateString() === tag.toDateString())
+      const tagEvents = events.filter(ev => eventTage.get(ev).some(t => t.toDateString() === tag.toDateString()))
         .slice().sort((a,b) => {
           if (!!a.allDay !== !!b.allDay) return a.allDay ? -1 : 1;
           return evDatum(a) - evDatum(b);
@@ -662,8 +694,17 @@ async function ladeOvTrades(){
         // Uhrzeit mit anzeigen (Colins Wunsch: man sieht sonst nicht, wann z.B. "Jan Schmolling"
         // stattfindet) - ganztaegige Termine bekommen keine Uhrzeit vorangestellt.
         const zeit = ev.allDay ? '' : new Date(ev.start).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-        return '<div class="cal-ev" data-id="'+esc(ev.id)+'" title="'+esc(ev.title)+(zeit?' · '+zeit+' Uhr':'')+'">'+
-          (zeit ? '<span class="cal-ev-zeit">'+zeit+'</span> ' : '') + esc(ev.title) + '</div>';
+        // Mehrtaegige Termine bekommen einen durchgehenden "Strich" ueber alle ihre Tage:
+        // volle Breite, eckige statt runde Ecken, ausser am ersten/letzten Tag (siehe CSS
+        // .cal-ev-multi) - der Titel steht dabei nur am ersten Tag, damit es wie ein
+        // zusammenhaengender Balken wirkt statt den Titel jeden Tag zu wiederholen.
+        const tageDesTermins = eventTage.get(ev);
+        const mehrtaegig = tageDesTermins.length > 1;
+        const ersterTag = mehrtaegig && tageDesTermins[0].toDateString() === tag.toDateString();
+        const letzterTag = mehrtaegig && tageDesTermins[tageDesTermins.length-1].toDateString() === tag.toDateString();
+        const multiKlasse = mehrtaegig ? ' cal-ev-multi'+(ersterTag?' cal-ev-start':'')+(letzterTag?' cal-ev-end':'') : '';
+        return '<div class="cal-ev'+multiKlasse+'" data-id="'+esc(ev.id)+'" title="'+esc(ev.title)+(zeit?' · '+zeit+' Uhr':'')+'">'+
+          (zeit ? '<span class="cal-ev-zeit">'+zeit+'</span> ' : '') + (mehrtaegig && !ersterTag ? '&nbsp;' : esc(ev.title)) + '</div>';
       }).join('') +
         (tagEvents.length > 3 ? '<div class="muted">+'+(tagEvents.length-3)+' mehr</div>' : '');
       return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+(istWochenende?' weekend':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
@@ -677,13 +718,26 @@ async function ladeOvTrades(){
     ceLocation.value = ev.location || '';
     ceAllDay.checked = !!ev.allDay;
     ceTime.disabled = !!ev.allDay;
+    ceDateEnd.disabled = !ev.allDay;
+    ceDateEnd.hidden = ceDateEndLabel.hidden = !ev.allDay;
     if (ev.allDay){
       ceDate.value = ev.start;
       ceTime.value = '';
+      // ev.end ist exklusiv (ein Tag nach dem letzten Urlaubstag) - im Formular den
+      // tatsaechlichen letzten Tag zeigen, nicht den Exklusiv-Wert; bei eintaegigen
+      // Terminen bleibt "bis" leer, damit das Formular wie gewohnt aussieht.
+      if (ev.end) {
+        const letzterTag = isoDatumTeile(ev.end); letzterTag.setDate(letzterTag.getDate()-1);
+        const letzterTagIso = letzterTag.toLocaleDateString('sv-SE');
+        ceDateEnd.value = letzterTagIso !== ev.start ? letzterTagIso : '';
+      } else {
+        ceDateEnd.value = '';
+      }
     } else {
       const d = new Date(ev.start);
       ceDate.value = d.toLocaleDateString('sv-SE');
       ceTime.value = d.toTimeString().slice(0,5);
+      ceDateEnd.value = '';
     }
     modal.hidden = false;
   }
@@ -706,7 +760,12 @@ async function ladeOvTrades(){
   modal.addEventListener('click', ev => { if (ev.target === modal) schliesseModal(); });
   ceCancel.addEventListener('click', schliesseModal);
 
-  ceAllDay.addEventListener('change', () => { ceTime.disabled = ceAllDay.checked; });
+  ceAllDay.addEventListener('change', () => {
+    ceTime.disabled = ceAllDay.checked;
+    ceDateEnd.disabled = !ceAllDay.checked;
+    ceDateEnd.hidden = ceDateEndLabel.hidden = !ceAllDay.checked;
+    if (!ceAllDay.checked) ceDateEnd.value = '';
+  });
 
   ceForm.addEventListener('submit', async ev => {
     ev.preventDefault();
@@ -715,14 +774,30 @@ async function ladeOvTrades(){
     const title = ceTitle.value.trim();
     if (!title){ ceMsg.textContent = 'Titel fehlt.'; ceMsg.classList.add('bad'); return; }
     if (!ceDate.value){ ceMsg.textContent = 'Datum fehlt.'; ceMsg.classList.add('bad'); return; }
+    if (ceAllDay.checked && ceDateEnd.value && ceDateEnd.value < ceDate.value){
+      ceMsg.textContent = '"Bis"-Datum liegt vor dem Start.'; ceMsg.classList.add('bad'); return;
+    }
     const allDay = ceAllDay.checked;
-    const start = allDay ? ceDate.value : new Date(ceDate.value + 'T' + (ceTime.value || '00:00') + ':00').toISOString();
+    const body = { title, location: ceLocation.value.trim(), allDay };
+    if (allDay) {
+      body.start = ceDate.value;
+      if (ceDateEnd.value && ceDateEnd.value > ceDate.value) {
+        // Google erwartet ein EXKLUSIVES Enddatum - ein Tag nach dem zuletzt gewaehlten
+        // Urlaubstag, sonst wuerde der letzte Tag selbst fehlen.
+        const endExklusiv = isoDatumTeile(ceDateEnd.value); endExklusiv.setDate(endExklusiv.getDate()+1);
+        body.end = endExklusiv.toLocaleDateString('sv-SE');
+      } else {
+        body.end = ceDate.value; // unveraendertes Verhalten fuer eintaegige Termine
+      }
+    } else {
+      body.start = new Date(ceDate.value + 'T' + (ceTime.value || '00:00') + ':00').toISOString();
+    }
     ceMsg.textContent = ''; ceMsg.classList.remove('bad');
     ceSave.disabled = true; ceSave.textContent = 'speichert…';
     try {
       await api('/calendar/' + encodeURIComponent(id), {
         method: 'PATCH',
-        body: JSON.stringify({ title, location: ceLocation.value.trim(), allDay, start })
+        body: JSON.stringify(body)
       });
       schliesseModal();
       await laden();
@@ -1475,8 +1550,16 @@ function renderTlAnalyse(){
 (function(){
   const prev = document.getElementById('tlCalPrev');
   const next = document.getElementById('tlCalNext');
-  if (prev) prev.addEventListener('click', () => { tlCalMonat.setMonth(tlCalMonat.getMonth()-1); renderTlKalender(); });
-  if (next) next.addEventListener('click', () => { tlCalMonat.setMonth(tlCalMonat.getMonth()+1); renderTlKalender(); });
+  // Wie beim To-Do-Kalender: Monatswechsel soll die Seite nicht nach oben springen lassen,
+  // falls der neue Monat eine Zeile weniger/mehr hat (5 statt 6 Kalenderwochen).
+  function wechsleMonat(delta){
+    const scrollVorher = window.scrollY;
+    tlCalMonat.setMonth(tlCalMonat.getMonth()+delta);
+    renderTlKalender();
+    requestAnimationFrame(() => window.scrollTo(0, scrollVorher));
+  }
+  if (prev) prev.addEventListener('click', () => wechsleMonat(-1));
+  if (next) next.addEventListener('click', () => wechsleMonat(1));
 })();
 
 function tlSetupViewTabs(){
@@ -2185,11 +2268,6 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
   // Erst wenn Colin sie aktiviert, fallen explizit als regelkonform=false markierte Signale
   // (nicht nach eigenen Kriterien getradet) aus Tabelle/Chart/Statistiken raus.
   let wlNurRegelkonform = false;
-  // Welche Trade-Gruppen (gleiche Trade-ID, mehrere Signale) gerade aufgeklappt sind -
-  // Colins Wunsch: Signale mit derselben Trade-ID standardmaessig zu einer Zeile
-  // zusammenklappen, mit Klick wieder aufklappbar; Zustand bleibt ueber Neuzeichnungen
-  // erhalten (gleiches Prinzip wie wlAssetFilter/wlNurRegelkonform oben).
-  let wlAufgeklappteGruppen = new Set();
 
   function render(){
     // Neu gezeichnet wird komplett (innerHTML) - dabei wuerden Scroll-Position in der
@@ -2416,33 +2494,14 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'');
       return sortRichtung === 'asc' ? cmp : -cmp;
     });
-    // Signale lassen sich zu einer Zeile zusammenklappen, wenn sie dieselbe Trade-ID haben
-    // (mehrteiliger Trade ueber mehrere Timeframes/Tage). Signale OHNE gemeinsame Trade-ID
-    // werden NICHT mehr automatisch nur wegen desselben Kalendertags zusammengeklappt -
-    // Colin wollte das wieder zurueck: jedes eigenstaendige Signal bekommt wieder seine
-    // eigene, immer sichtbare Zeile (kein Klick zum Aufklappen noetig), und ein "Nx"-Badge
-    // neben dem Datum zeigt weiterhin an, wenn mehrere Signale auf denselben Tag fallen
-    // (siehe gleicherTag()/tagBadge in wlZeileHtml).
-    const gruppenNachTradeId = new Map();
-    signaleGefiltert.forEach(s => {
-      const k = wlTradeKey(s);
-      if (!gruppenNachTradeId.has(k)) gruppenNachTradeId.set(k, []);
-      gruppenNachTradeId.get(k).push(s);
-    });
-    const gruppenNachKey = new Map();
-    const wlGruppenSchluesselVonSignal = new Map();
-    gruppenNachTradeId.forEach((gruppe, tradeKey) => {
-      if (gruppe.length > 1) {
-        gruppe.sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
-        gruppenNachKey.set(tradeKey, gruppe);
-        gruppe.forEach(s => wlGruppenSchluesselVonSignal.set(s, tradeKey));
-      }
-    });
+    // Keine automatische Zusammenklapp-Gruppierung mehr - weder nach Trade-ID noch nach
+    // Kalendertag. Colin wollte das komplett weg: jedes Signal bekommt immer seine eigene,
+    // sofort sichtbare Zeile (kein Klick zum Aufklappen noetig). Die Trade-ID bleibt pro
+    // Zeile als Chip sichtbar (siehe wlZeileHtml), damit zusammengehoerige Signale trotzdem
+    // erkennbar sind, und das "Nx"-Badge neben dem Datum zeigt weiterhin an, wenn mehrere
+    // Signale auf denselben Tag fallen (siehe gleicherTag()/tagBadge in wlZeileHtml).
 
-    // Die aufklappbare Detailansicht (Bearbeiten-Panel) eines einzelnen Signals - komplett
-    // unveraendert, nur aus der frueheren wlZeileHtml-Funktion herausgezogen, damit sie auch
-    // von den Tages-Mini-Karten (wlTagKarteHtml) ueber denselben ✎-Button
-    // erreichbar ist, ohne die ganze Haupt-Tabellenzeile mit auszugeben.
+    // Die aufklappbare Detailansicht (Bearbeiten-Panel) eines einzelnen Signals.
     function wlEditRowHtml(s){
       const st = wlStatus(s);
       return '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="13"><div class="wl-detail">' +
@@ -2551,124 +2610,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       '</tr>' + wlEditRowHtml(s);
     }
 
-    // Eine kompakte Mini-Karte innerhalb eines Tages-Blocks: Bild OBEN, Infos in maximal
-    // drei Zeilen DRUNTER - Colins neuester Wunsch, nachdem die vorige Bild-links/Info-
-    // rechts-Karte (vollbreit, eine pro Zeile) ihm nicht mehr gefiel. Mehrere Karten
-    // desselben Tages liegen per Flexbox nebeneinander (siehe wlGruppenTageHtml), damit man
-    // auf einen Blick sieht, was am selben Tag passierte, ohne viel Platz zu verschwenden.
-    function wlTagKarteHtml(s){
-      const st = wlStatus(s);
-      const setupTeile = [wlEventBadgeHtml(s), wlMtfWarnBadgeHtml(s), wlSetupRestText(s) ? esc(wlSetupRestText(s)) : ''].filter(Boolean);
-      const chartTeile = [s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '', s.pivotLevel ? WL_PIVOT_KURZ[s.pivotLevel] : ''].filter(Boolean);
-      const flagTeile = [
-        s.regelkonform === false ? '<span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund||'')+'">nicht regelkonform</span>' : '',
-        s.levelGebrochenGehalten ? '<span class="badge" style="background:transparent;border:1.5px solid var(--accent);color:var(--accent)">Level gehalten</span>' : '',
-        s.nurBestaetigung ? '<span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)">nur Bestätigung</span>' : ''
-      ].filter(Boolean);
-      const zeile3 = [chartTeile.join(' · '), s.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span>' : '', flagTeile.join(' '), s.notiz ? esc(s.notiz) : '']
-        .filter(Boolean).join(' · ') || '<span class="muted">–</span>';
-      return '<div class="wl-tag-card" data-id="'+s.id+'">' +
-        '<div class="wl-tag-card-img tl-shots-wrap" id="wl-cardshots-'+s.id+'"><span class="muted" style="font-size:12px">Lädt…</span></div>' +
-        '<div class="wl-tag-card-info">' +
-          '<div class="wl-tag-line">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b>'+(s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') +
-            ' <span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span>' +
-            '<span class="wl-row-actions" style="float:right"><button type="button" class="wl-edit" title="Bearbeiten">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></span>' +
-          '</div>' +
-          '<div class="wl-tag-line muted">'+esc(s.tf||'–')+(setupTeile.length ? ' · '+setupTeile.join(' ') : '')+'</div>' +
-          '<div class="wl-tag-line muted">'+zeile3+'</div>' +
-        '</div>' +
-      '</div>';
-    }
 
-    // Alle Signale einer (bereits chronologisch sortierten) Trade-Gruppe nach Kalendertag
-    // zusammenfassen: Signale desselben Tages liegen als Mini-Karten nebeneinander, bei
-    // Tageswechsel folgt eine klare Trennzeile mit dem neuen Datum - genau Colins Wunsch:
-    // "diese Trennzeile, sodass man sieht: neuer Tag, und dann kommen die naechsten Signale
-    // von diesem Tag".
-    function wlGruppenTageHtml(gruppe){
-      const tage = [];
-      gruppe.forEach(s => {
-        const letztesTag = tage[tage.length - 1];
-        if (letztesTag && letztesTag.datum === s.date) letztesTag.signale.push(s);
-        else tage.push({ datum: s.date, signale: [s] });
-      });
-      return tage.map(tag => {
-        const divider = '<tr class="wl-tag-divider"><td colspan="13">'+esc(wlDatumLabel(tag.signale[0]))+'</td></tr>';
-        const karten = tag.signale.map(s => wlTagKarteHtml(s)).join('');
-        const editRows = tag.signale.map(s => wlEditRowHtml(s)).join('');
-        return divider + '<tr class="wl-tag-row"><td colspan="13"><div class="wl-tag-cards">'+karten+'</div></td></tr>' + editRows;
-      }).join('');
-    }
-
-    // Kopfzeile einer zusammengeklappten Trade-Gruppe: zeigt das Ergebnis/die zuletzt
-    // bekannten Eigenschaften des Trades (Stand: juengstes bewertetes Signal, gleiche
-    // Logik wie bei den Statistiken oben) kompakt in einer Zeile. Aufgeklappt erscheinen
-    // darunter die Signale nach Tag gruppiert (siehe wlGruppenTageHtml) - so sieht Colin
-    // weiterhin, was sein Wissensstand VOR spaeteren/hoeheren Signalen war, UND auf einen
-    // Blick, welche Signale/Bilder zum selben Kalendertag gehoeren.
-    function wlGruppenZeileHtml(gruppe, key, aufgeklappt, klassen){
-      klassen = klassen || [];
-      const erste = gruppe[0], letzte = gruppe[gruppe.length - 1];
-      const assets = [...new Set(gruppe.map(s => s.asset))];
-      const tfs = [...new Set(gruppe.map(s => s.tf).filter(Boolean))];
-      // "Ergebnis" des Trades: wie bei den Statistiken oben zaehlt das Ergebnis des
-      // zeitlich juengsten Signals, das bereits bewertet wurde.
-      let status = '';
-      gruppe.forEach(s => { if (s.status) status = s.status; });
-      const nichtRegelkonform = gruppe.filter(s => s.regelkonform === false);
-      const levelGebrochenGehalten = gruppe.some(s => s.levelGebrochenGehalten);
-      const nurBestaetigung = gruppe.some(s => s.nurBestaetigung);
-      // Eine Gruppe entsteht ausschliesslich durch eine gemeinsame Trade-ID - daher hier
-      // immer genau eine (die Faelle 0/mehrere unten sind nur defensiv, kommen nicht vor).
-      const tradeIds = [...new Set(gruppe.map(s => s.tradeId).filter(Boolean).map(String))];
-      const alleGleicherTag = gruppe.every(s => s.date === erste.date);
-      const datumText = erste.date === letzte.date
-        ? esc(wlDatumLabel(erste))
-        : esc(wlDatumLabel(erste)) + ' – ' + esc(wlDatumLabel(letzte));
-      const tradeCellHtml = tradeIds.length === 1
-        ? '<span class="wl-trade-bar" style="background:'+wlTradeFarbe(tradeIds[0])+'"></span>' +
-          '<span class="wl-trade-chip" style="color:'+wlTradeFarbe(tradeIds[0])+'">'+esc(tradeIds[0])+'</span>'
-        : tradeIds.length === 0
-          ? '<span class="muted">–</span>'
-          : tradeIds.map(tid => '<span class="wl-trade-chip" style="color:'+wlTradeFarbe(tid)+';margin-right:6px">'+esc(tid)+'</span>').join('');
-      const setupText = tradeIds.length === 1
-        ? gruppe.length+' Signale im Trade'
-        : alleGleicherTag ? gruppe.length+' Signale am selben Tag' : gruppe.length+' Signale';
-      const mitgliederZeilen = aufgeklappt ? wlGruppenTageHtml(gruppe) : '';
-      const dataTradeAttr = tradeIds.length === 1 ? ' data-trade="'+esc(tradeIds[0])+'"' : '';
-      return '<tr class="'+klassen.concat(['wl-group-row']).join(' ')+'" data-group-key="'+esc(key)+'"'+dataTradeAttr+' title="Klick zum '+(aufgeklappt?'Zuklappen':'Aufklappen')+'">' +
-        '<td class="wl-analysiert-cell"><button type="button" class="wl-group-toggle" data-group-key="'+esc(key)+'" title="'+(aufgeklappt?'Gruppe zuklappen':'Gruppe aufklappen – alle Signale anzeigen')+'">'+(aufgeklappt?'▾':'▸')+'</button></td>' +
-        '<td class="muted">'+datumText+'</td>' +
-        '<td class="wl-trade-cell">'+tradeCellHtml+'</td>' +
-        '<td><span class="wl-table-asset">'+assets.map(a => assetIconHtml(a)).join('')+' '+esc(assets.join(' / '))+'</span></td>' +
-        '<td class="muted">'+(tfs.length ? esc(tfs.join(' · ')) : '–')+'</td>' +
-        '<td class="wl-setup-cell"><span class="muted">'+setupText+'</span></td>' +
-        '<td class="muted">'+WL_PHASE_LABEL[letzte.marktphase || '']+'</td>' +
-        '<td class="muted">'+
-          ([letzte.pattern ? WL_PATTERN_LABEL[letzte.pattern] : '', letzte.candles ? WL_CANDLE_LABEL[letzte.candles] : '', letzte.pivotLevel ? WL_PIVOT_KURZ[letzte.pivotLevel] : '']
-            .filter(Boolean).join(' · ') || '–') +
-        '</td>' +
-        '<td class="muted">'+
-          ((letzte.divLokal || letzte.divStruktur)
-            ? (wlDoppelteDivergenz(letzte) ? '<span class="wl-div-check" title="Doppelte Divergenz (lokal + strukturell)">✓</span> ' : '') +
-              'L: '+WL_DIV_KURZ[letzte.divLokal || '']+' · S: '+WL_DIV_KURZ[letzte.divStruktur || '']
-            : '–') +
-        '</td>' +
-        '<td>'+(letzte.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[letzte.note]+';color:'+WL_NOTE_FARBEN[letzte.note]+'">'+esc(letzte.note)+'</span>' : '<span class="muted">–</span>')+'</td>' +
-        '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[status]+';color:'+WL_FARBEN[status]+'">'+WL_LABEL[status]+'</span>'+
-          (nichtRegelkonform.length ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(nichtRegelkonform.map(s => wlDatumLabel(s)+(s.regelkonformGrund?': '+s.regelkonformGrund:'')).join(' · '))+'">nicht regelkonform</span>' : '')+
-          (levelGebrochenGehalten ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--accent);color:var(--accent)" title="Pivot-Level zwischenzeitlich gebrochen, am Ende aber gehalten">Level gehalten</span>' : '')+
-          (nurBestaetigung ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)" title="Mindestens ein Signal im Trade ist nur ein bestaetigendes Signal, kein eigenstaendiges Setup">nur Bestätigung</span>' : '')+
-        '</td>' +
-        '<td class="muted">'+(aufgeklappt ? 'Zum Zuklappen klicken' : 'Klick für alle '+gruppe.length+' Signale') +'</td>' +
-        '<td class="wl-row-actions"></td>' +
-      '</tr>' + mitgliederZeilen;
-    }
-
-    // Welche Trade-Gruppen (Groesse > 1) in diesem Durchlauf schon als eine Zeile
-    // ausgegeben wurden - verhindert, dass ein Signal, dessen Trade-Partner weiter oben
-    // oder unten in der sortierten Liste steht, noch ein zweites Mal auftaucht.
-    const wlGruppenAusgegeben = new Set();
+    // Keine Gruppen mehr - jedes Signal bekommt immer seine eigene Zeile (siehe oben).
     const tabelle = tabelleSortiert.map((s, idx) => {
       const grp = clusterVonSignal.has(s) ? clusterVonSignal.get(s) : null;
       const grpVorher = idx > 0 && clusterVonSignal.has(tabelleSortiert[idx-1]) ? clusterVonSignal.get(tabelleSortiert[idx-1]) : null;
@@ -2687,18 +2630,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const jahrZeile = (sortSpalte === 'date' && jahr !== jahrVorher)
         ? '<tr class="wl-year-row"><td colspan="13">'+jahr+'</td></tr>'
         : '';
-      const gruppenKey = wlGruppenSchluesselVonSignal.get(s);
-      const gruppe = gruppenKey ? gruppenNachKey.get(gruppenKey) : null;
-      if (!gruppe || gruppe.length <= 1) {
-        return jahrZeile + wlZeileHtml(s, klassen);
-      }
-      // Teil einer Trade-Gruppe mit mehreren Signalen: nur einmal ausgeben (an der Stelle,
-      // an der das erste Mitglied in der aktuellen Sortierung auftaucht), alle anderen
-      // Positionen dieser Gruppe in der sortierten Liste werden uebersprungen.
-      if (wlGruppenAusgegeben.has(gruppenKey)) return '';
-      wlGruppenAusgegeben.add(gruppenKey);
-      const aufgeklappt = wlAufgeklappteGruppen.has(gruppenKey);
-      return jahrZeile + wlGruppenZeileHtml(gruppe, gruppenKey, aufgeklappt, klassen);
+      return jahrZeile + wlZeileHtml(s, klassen);
     }).join('');
 
     el.innerHTML =
@@ -2955,16 +2887,6 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       }
     }
     tableWrap.addEventListener('click', async ev => {
-      // Klick auf eine Trade-Gruppen-Kopfzeile (egal ob auf den Pfeil oder sonstwo in der
-      // Zeile) klappt die ganze Gruppe auf/zu - das neue Rendern laedt dann bei Bedarf
-      // auch die gepoolte Screenshot-Uebersicht nach (siehe Ende von render()).
-      const gruppenZeile = ev.target.closest('tr.wl-group-row');
-      if (gruppenZeile) {
-        const key = gruppenZeile.dataset.groupKey;
-        if (wlAufgeklappteGruppen.has(key)) wlAufgeklappteGruppen.delete(key); else wlAufgeklappteGruppen.add(key);
-        render();
-        return;
-      }
       const analysiertBtn = ev.target.closest('.wl-analysiert-btn');
       if (analysiertBtn) {
         const id = analysiertBtn.closest('tr').dataset.id;

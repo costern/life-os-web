@@ -103,6 +103,10 @@ router.get('/', async (req, res) => {
       id: e.id,
       title: e.summary || '(ohne Titel)',
       start: (e.start && (e.start.dateTime || e.start.date)) || null,
+      // end wird gebraucht, damit mehrtaegige Termine (z.B. Urlaub) im Frontend auch an
+      // jedem ihrer Tage angezeigt werden koennen, nicht nur am ersten - vorher fehlte das
+      // Feld komplett in der Antwort, obwohl Google es liefert.
+      end: (e.end && (e.end.dateTime || e.end.date)) || null,
       allDay: !!(e.start && e.start.date && !e.start.dateTime),
       location: e.location || null
     }));

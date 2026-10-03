@@ -439,6 +439,13 @@ a { color:var(--accent); }
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
 .cal-ev:hover { filter:brightness(0.92); }
 .cal-ev-zeit { font-weight:700; opacity:.85; }
+/* Mehrtaegige Termine (z.B. Urlaub): ueber die volle Breite der Tageszelle bis an den Rand
+   gezogen (negative Margin gleicht das .cal-day-Padding aus) und eckig, ausser am ersten/
+   letzten Tag des Termins - dadurch wirken die aneinandergereihten Zellen wie ein
+   durchgehender Balken "auf gleicher Hoehe" ueber alle Urlaubstage. */
+.cal-ev-multi { margin-left:-6px; margin-right:-6px; padding-left:6px; padding-right:6px; border-radius:0; }
+.cal-ev-multi.cal-ev-start { margin-left:0; padding-left:5px; border-top-left-radius:5px; border-bottom-left-radius:5px; }
+.cal-ev-multi.cal-ev-end { margin-right:0; padding-right:5px; border-top-right-radius:5px; border-bottom-right-radius:5px; }
 .donut-wrap { display:flex; align-items:center; gap:26px; flex-wrap:wrap; }
 .donut-labelbox { position:relative; width:300px; height:300px; flex:0 0 300px; }
 .donut-outer { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:170px; height:170px; }
