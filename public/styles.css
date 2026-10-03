@@ -262,33 +262,29 @@ tr.datum-sprung-highlight td { animation: datumSprungBlitz 2s ease-out; }
 .wl-table tr.wl-group-row:hover td { background:rgba(139,92,246,.16); }
 .wl-group-toggle { background:none; border:none; color:inherit; font-size:13px; line-height:1;
   cursor:pointer; padding:2px 5px; }
-/* Signal-Karte innerhalb einer aufgeklappten Trade-Gruppe: Screenshot(s) links, Infos
-   rechts daneben, mehrere Karten (= mehrere Signale) direkt untereinander - Colins Wunsch,
-   bei mehreren Signalen in kurzer Zeit alle Bilder samt Kontext auf einen Blick zu sehen,
-   statt sie in einer gemeinsamen Galerie zu vermischen oder jede Zeile einzeln aufklappen
-   zu muessen. */
-/* Colins Praezisierung: die Bilder mehrerer gestapelter Karten sollen direkt
-   aneinanderliegen (kein grosser Leerraum dazwischen), die Bildspalte soll ca.
-   zwei Drittel der Breite bekommen (Platz fuer 2-3 Bilder nebeneinander), und
-   das kleine Upload/Paste-Feld darf nicht mehr unter das Bild in eine eigene
-   Zeile umbrechen, sondern muss klein daneben (rechts vom Bild) sitzen. Daher:
-   kaum noch vertikales Padding auf der Zeile, Bildspalte auf ~64% verbreitert,
-   Upload-Feld in dieser Spalte stark verkleinert (statt 130px Basisbreite) und
-   Thumbnail-Mindestbreite reduziert, damit beide nebeneinander in eine Zeile
-   passen statt umzubrechen. */
-.wl-table tr.wl-group-member-row td { padding:2px 14px; border-left:3px solid rgba(139,92,246,.35); }
-.wl-group-card { display:flex; gap:16px; align-items:flex-start; }
-.wl-group-card-img { flex:0 0 64%; max-width:64%; }
-.wl-group-card-img .tl-shots-grid { gap:6px; }
-.wl-group-card-img .tl-shot-thumb { flex:1 1 140px; min-width:110px; }
-.wl-group-card-img .tl-shot-upload { flex:0 0 64px; min-height:64px; padding:4px; }
-.wl-group-card-img .tl-shot-upload-hint { display:none; }
-.wl-group-card-img .tl-shot-upload-plus { font-size:18px; }
-.wl-group-card-info { flex:1 1 auto; min-width:0; font-size:12.5px; }
-.wl-group-card-info .wl-row-actions button { font-size:11.5px; }
+/* Dritte Iteration (Colins Praezisierung): Signale DESSELBEN Kalendertags sollen
+   nebeneinander liegen (Bild je Karte oben, max. drei Zeilen Info drunter - statt wie
+   zuvor Bild links/Info rechts vollbreit), damit man bei einer Haeufung (z.B. Multi-
+   Timeframe-Signal Tag davor/danach, oder mehrere Assets am selben Tag) auf einen Blick
+   sieht, was am selben Tag passierte, ohne viel Platz zu verschwenden. Bei Tageswechsel
+   folgt eine klare Trennzeile mit dem neuen Datum (wl-tag-divider). */
+.wl-table tr.wl-tag-divider td { padding:10px 14px 5px; border-top:1px solid var(--line);
+  font-weight:700; font-size:12px; color:var(--muted); text-transform:none; letter-spacing:0; }
+.wl-table tr.wl-tag-row td { padding:4px 14px 12px; }
+.wl-tag-cards { display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; }
+.wl-tag-card { flex:1 1 0; min-width:190px; border-left:3px solid rgba(139,92,246,.35); padding-left:8px; }
+.wl-tag-card-img { margin-bottom:5px; }
+.wl-tag-card-img .tl-shots-grid { gap:5px; }
+.wl-tag-card-img .tl-shot-thumb { flex:1 1 100%; min-width:100%; }
+.wl-tag-card-img .tl-shots-grid .tl-shot-thumb:first-child:nth-last-child(2) { flex:1 1 100%; max-width:100%; }
+.wl-tag-card-img .tl-shot-upload { flex:0 0 42px; min-height:42px; padding:3px; }
+.wl-tag-card-img .tl-shot-upload-hint { display:none; }
+.wl-tag-card-img .tl-shot-upload-plus { font-size:15px; }
+.wl-tag-card-info { font-size:12px; }
+.wl-tag-line { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.55; }
+.wl-tag-line .wl-row-actions button { font-size:10.5px; }
 @media (max-width:760px) {
-  .wl-group-card { flex-direction:column; }
-  .wl-group-card-img { flex-basis:auto; max-width:none; width:100%; }
+  .wl-tag-card { flex:1 1 100%; min-width:0; }
 }
 .wl-trade-linie { fill:none; stroke-width:1.5; stroke-dasharray:4,3;
   opacity:.8; stroke-linecap:round; }

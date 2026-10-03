@@ -2457,7 +2457,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
 
     // Die aufklappbare Detailansicht (Bearbeiten-Panel) eines einzelnen Signals - komplett
     // unveraendert, nur aus der frueheren wlZeileHtml-Funktion herausgezogen, damit sie auch
-    // von der Trade-Gruppen-Karte (wlGruppenMitgliedKarteHtml) ueber denselben ✎-Button
+    // von den Tages-Mini-Karten (wlTagKarteHtml) ueber denselben ✎-Button
     // erreichbar ist, ohne die ganze Haupt-Tabellenzeile mit auszugeben.
     function wlEditRowHtml(s){
       const st = wlStatus(s);
@@ -2567,48 +2567,61 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       '</tr>' + wlEditRowHtml(s);
     }
 
-    // Eine Signal-Karte innerhalb einer aufgeklappten Trade-Gruppe: Screenshot(s) LINKS,
-    // die wichtigsten Infos RECHTS daneben - Colins Wunsch, alle Bilder eines Trades direkt
-    // untereinander mit ihren Infos zu sehen, statt sie wie vorher in einer gemeinsamen
-    // Galerie zusammenzuwerfen oder jede Zeile einzeln aufklappen zu muessen. Die Bilder
-    // sind sofort sichtbar (kein Klick noetig) und weiterhin normal hochladbar/loeschbar -
-    // ueber "✎ Bearbeiten" kommt man bei Bedarf an alle Felder (gleiches Panel wie sonst).
-    function wlGruppenMitgliedKarteHtml(s){
+    // Eine kompakte Mini-Karte innerhalb eines Tages-Blocks: Bild OBEN, Infos in maximal
+    // drei Zeilen DRUNTER - Colins neuester Wunsch, nachdem die vorige Bild-links/Info-
+    // rechts-Karte (vollbreit, eine pro Zeile) ihm nicht mehr gefiel. Mehrere Karten
+    // desselben Tages liegen per Flexbox nebeneinander (siehe wlGruppenTageHtml), damit man
+    // auf einen Blick sieht, was am selben Tag passierte, ohne viel Platz zu verschwenden.
+    function wlTagKarteHtml(s){
       const st = wlStatus(s);
       const setupTeile = [wlEventBadgeHtml(s), wlMtfWarnBadgeHtml(s), wlSetupRestText(s) ? esc(wlSetupRestText(s)) : ''].filter(Boolean);
       const chartTeile = [s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '', s.pivotLevel ? WL_PIVOT_KURZ[s.pivotLevel] : ''].filter(Boolean);
-      const divText = (s.divLokal || s.divStruktur)
-        ? ((wlDoppelteDivergenz(s) ? '✓ ' : '') + 'Div. L: '+WL_DIV_KURZ[s.divLokal || '']+' · S: '+WL_DIV_KURZ[s.divStruktur || ''])
-        : '';
-      const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
-      return '<tr class="wl-group-member-row" data-id="'+s.id+'" data-date="'+s.date+'"'+tradeAttr+'>' +
-        '<td colspan="13"><div class="wl-group-card">' +
-          '<div class="wl-group-card-img tl-shots-wrap" id="wl-cardshots-'+s.id+'"><span class="muted" style="font-size:12.5px">Lädt…</span></div>' +
-          '<div class="wl-group-card-info">' +
-            '<div class="wl-group-card-head">' +
-              '<b>'+esc(wlDatumLabel(s))+'</b>'+(s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') +
-              ' <span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span>' +
-              (s.regelkonform === false ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund||'')+'">nicht regelkonform</span>' : '') +
-              (s.levelGebrochenGehalten ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--accent);color:var(--accent)">Level gehalten</span>' : '') +
-              (s.nurBestaetigung ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)" title="Kein eigenstaendiges Setup, nur bestaetigendes Signal">nur Bestätigung</span>' : '') +
-              ' <span class="wl-row-actions" style="float:right"><button type="button" class="wl-edit" title="Bearbeiten">✎ Bearbeiten</button><button type="button" class="wl-del" title="Löschen">🗑</button></span>' +
-            '</div>' +
-            '<div class="muted" style="margin-top:4px">'+esc(s.tf||'–')+(WL_PHASE_LABEL[s.marktphase||''] !== '–' ? ' · '+WL_PHASE_LABEL[s.marktphase||''] : '')+'</div>' +
-            (setupTeile.length ? '<div style="margin-top:4px">'+setupTeile.join(' ')+'</div>' : '') +
-            (chartTeile.length || divText ? '<div class="muted" style="margin-top:4px">'+[chartTeile.join(' · '), divText].filter(Boolean).join(' · ')+'</div>' : '') +
-            (s.note ? '<div style="margin-top:4px"><span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span></div>' : '') +
-            (s.notiz ? '<div style="margin-top:6px">'+esc(s.notiz)+'</div>' : '') +
+      const flagTeile = [
+        s.regelkonform === false ? '<span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund||'')+'">nicht regelkonform</span>' : '',
+        s.levelGebrochenGehalten ? '<span class="badge" style="background:transparent;border:1.5px solid var(--accent);color:var(--accent)">Level gehalten</span>' : '',
+        s.nurBestaetigung ? '<span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)">nur Bestätigung</span>' : ''
+      ].filter(Boolean);
+      const zeile3 = [chartTeile.join(' · '), s.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span>' : '', flagTeile.join(' '), s.notiz ? esc(s.notiz) : '']
+        .filter(Boolean).join(' · ') || '<span class="muted">–</span>';
+      return '<div class="wl-tag-card" data-id="'+s.id+'">' +
+        '<div class="wl-tag-card-img tl-shots-wrap" id="wl-cardshots-'+s.id+'"><span class="muted" style="font-size:12px">Lädt…</span></div>' +
+        '<div class="wl-tag-card-info">' +
+          '<div class="wl-tag-line">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b>'+(s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') +
+            ' <span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span>' +
+            '<span class="wl-row-actions" style="float:right"><button type="button" class="wl-edit" title="Bearbeiten">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></span>' +
           '</div>' +
-        '</div></td>' +
-      '</tr>' + wlEditRowHtml(s);
+          '<div class="wl-tag-line muted">'+esc(s.tf||'–')+(setupTeile.length ? ' · '+setupTeile.join(' ') : '')+'</div>' +
+          '<div class="wl-tag-line muted">'+zeile3+'</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    // Alle Signale einer (bereits chronologisch sortierten) Trade-Gruppe nach Kalendertag
+    // zusammenfassen: Signale desselben Tages liegen als Mini-Karten nebeneinander, bei
+    // Tageswechsel folgt eine klare Trennzeile mit dem neuen Datum - genau Colins Wunsch:
+    // "diese Trennzeile, sodass man sieht: neuer Tag, und dann kommen die naechsten Signale
+    // von diesem Tag".
+    function wlGruppenTageHtml(gruppe){
+      const tage = [];
+      gruppe.forEach(s => {
+        const letztesTag = tage[tage.length - 1];
+        if (letztesTag && letztesTag.datum === s.date) letztesTag.signale.push(s);
+        else tage.push({ datum: s.date, signale: [s] });
+      });
+      return tage.map(tag => {
+        const divider = '<tr class="wl-tag-divider"><td colspan="13">'+esc(wlDatumLabel(tag.signale[0]))+'</td></tr>';
+        const karten = tag.signale.map(s => wlTagKarteHtml(s)).join('');
+        const editRows = tag.signale.map(s => wlEditRowHtml(s)).join('');
+        return divider + '<tr class="wl-tag-row"><td colspan="13"><div class="wl-tag-cards">'+karten+'</div></td></tr>' + editRows;
+      }).join('');
     }
 
     // Kopfzeile einer zusammengeklappten Trade-Gruppe: zeigt das Ergebnis/die zuletzt
     // bekannten Eigenschaften des Trades (Stand: juengstes bewertetes Signal, gleiche
-    // Logik wie bei den Statistiken oben) kompakt in einer Zeile. Aufgeklappt erscheint
-    // darunter fuer jedes Signal eine eigene Karte (Bild links, Infos rechts), chronologisch
-    // untereinander - so sieht Colin weiterhin, was sein Wissensstand VOR spaeteren/hoeheren
-    // Signalen war, ohne Bilder mehrerer Signale in einer Galerie zu vermischen.
+    // Logik wie bei den Statistiken oben) kompakt in einer Zeile. Aufgeklappt erscheinen
+    // darunter die Signale nach Tag gruppiert (siehe wlGruppenTageHtml) - so sieht Colin
+    // weiterhin, was sein Wissensstand VOR spaeteren/hoeheren Signalen war, UND auf einen
+    // Blick, welche Signale/Bilder zum selben Kalendertag gehoeren.
     function wlGruppenZeileHtml(gruppe, key, aufgeklappt, klassen){
       klassen = klassen || [];
       const erste = gruppe[0], letzte = gruppe[gruppe.length - 1];
@@ -2637,9 +2650,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       const setupText = tradeIds.length === 1
         ? gruppe.length+' Signale im Trade'
         : alleGleicherTag ? gruppe.length+' Signale am selben Tag' : gruppe.length+' Signale';
-      const mitgliederZeilen = aufgeklappt
-        ? gruppe.map(s => wlGruppenMitgliedKarteHtml(s)).join('')
-        : '';
+      const mitgliederZeilen = aufgeklappt ? wlGruppenTageHtml(gruppe) : '';
       const dataTradeAttr = tradeIds.length === 1 ? ' data-trade="'+esc(tradeIds[0])+'"' : '';
       return '<tr class="'+klassen.concat(['wl-group-row']).join(' ')+'" data-group-key="'+esc(key)+'"'+dataTradeAttr+' title="Klick zum '+(aufgeklappt?'Zuklappen':'Aufklappen')+'">' +
         '<td class="wl-analysiert-cell"><button type="button" class="wl-group-toggle" data-group-key="'+esc(key)+'" title="'+(aufgeklappt?'Gruppe zuklappen':'Gruppe aufklappen – alle Signale anzeigen')+'">'+(aufgeklappt?'▾':'▸')+'</button></td>' +
@@ -2885,7 +2896,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
     // In jeder aufgeklappten Trade-Gruppen-Karte die Screenshots DES EIGENEN Signals laden -
     // jede Karte zeigt nur ihre eigenen Bilder (gleiche Lade-/Upload-/Loesch-Funktion wie im
     // normalen Bearbeiten-Panel, nur sofort sichtbar statt erst nach Klick).
-    tableWrap.querySelectorAll('.wl-group-card-img').forEach(imgEl => {
+    tableWrap.querySelectorAll('.wl-tag-card-img').forEach(imgEl => {
       const id = imgEl.id.replace('wl-cardshots-', '');
       wlLiesShots(id).then(shots => { if (tableWrap.contains(imgEl)) renderWlShots(id, shots, imgEl); });
     });
@@ -2990,7 +3001,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       }
       const editBtn = ev.target.closest('.wl-edit');
       if (editBtn) {
-        const id = editBtn.closest('tr').dataset.id;
+        // closest('[data-id]') statt closest('tr'): in einem Tages-Block liegen mehrere
+        // Mini-Karten (je ein data-id-Div) nebeneinander in DERSELBEN <tr> - closest('tr')
+        // wuerde dort gar keine id liefern (die <tr> selbst traegt keine).
+        const id = editBtn.closest('[data-id]').dataset.id;
         const editRow = tableWrap.querySelector('tr.wl-edit-row[data-id="'+id+'"]');
         if (editRow) wlOeffneDetail(id, editRow);
         return;
@@ -3055,7 +3069,7 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
           setTimeout(() => { if (delBtn.dataset.confirm==='1'){ delete delBtn.dataset.confirm; delBtn.textContent='🗑'; } }, 4000);
           return;
         }
-        const id = delBtn.closest('tr').dataset.id;
+        const id = delBtn.closest('[data-id]').dataset.id;
         try {
           await api('/watchlist/'+id, { method: 'DELETE' });
           if (wlOffenId === id) wlOffenId = null;
@@ -3067,11 +3081,13 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
       }
 
       // Klick auf eine normale Zeile (nicht auf Button/Detailbereich) klappt die Detailansicht auf/zu.
-      // Die Trade-Gruppen-Karte ist davon ausgenommen (dort liegt die Screenshot-Flaeche direkt
-      // in der Zeile - ein Klick aufs Bild soll nur zoomen, nicht gleichzeitig das Bearbeiten-
-      // Panel auf-/zuklappen); dort oeffnet ausschliesslich der "✎ Bearbeiten"-Button.
+      // Die Tages-Karten innerhalb einer aufgeklappten Trade-Gruppe sind davon automatisch
+      // ausgenommen, weil ihre <tr> (wl-tag-row) gar kein data-id traegt (die einzelnen
+      // Mini-Karten darin tragen data-id als <div>, nicht die Zeile) - ein Klick aufs Bild
+      // soll dort nur zoomen, nicht gleichzeitig das Bearbeiten-Panel auf-/zuklappen; dort
+      // oeffnet ausschliesslich der "✎"-Button.
       const tr = ev.target.closest('tr[data-id]');
-      if (!tr || tr.classList.contains('wl-edit-row') || tr.classList.contains('wl-group-member-row')) return;
+      if (!tr || tr.classList.contains('wl-edit-row')) return;
       const detail = tableWrap.querySelector('tr.wl-edit-row[data-id="'+tr.dataset.id+'"]');
       if (detail) wlOeffneDetail(tr.dataset.id, detail);
     });
