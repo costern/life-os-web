@@ -2172,12 +2172,10 @@ const BTC_DAILY = [["2017-08-17",4285],["2017-08-18",4108],["2017-08-19",4140],[
   let signale = [];
   let sortSpalte = 'date', sortRichtung = 'desc';
   let wlAssetFilter = '';
-  // Statistiken zaehlen standardmaessig alle Signale (regelkonform=null, also die grosse
-  // Mehrheit der Bestandsdaten, gilt als "ja") - nur explizit als regelkonform=false
-  // markierte Signale (nicht nach eigenen Kriterien getradet) fallen dann raus, damit die
-  // "echte" System-Performance nicht durch Setups verwaesserst wird, die man laut Regelwerk
-  // nie genommen haette. Ueber die Checkbox laesst sich das jederzeit abschalten.
-  let wlNurRegelkonform = true;
+  // Checkbox ist standardmaessig AUS: Statistiken zaehlen alle Signale (regelkonform=null/true).
+  // Erst wenn Colin sie aktiviert, fallen explizit als regelkonform=false markierte Signale
+  // (nicht nach eigenen Kriterien getradet) aus Tabelle/Chart/Statistiken raus.
+  let wlNurRegelkonform = false;
   // Welche Trade-Gruppen (gleiche Trade-ID, mehrere Signale) gerade aufgeklappt sind -
   // Colins Wunsch: Signale mit derselben Trade-ID standardmaessig zu einer Zeile
   // zusammenklappen, mit Klick wieder aufklappbar; Zustand bleibt ueber Neuzeichnungen
