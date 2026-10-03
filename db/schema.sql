@@ -256,6 +256,11 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS level_gebrochen_gehalten 
 -- eingetragen, als haette man nach Standardregeln gehandelt (Win/BE/Lose), damit man
 -- auch bei nicht genommenen Bestaetigungssignalen sieht, ob es am Ende funktioniert haette.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS nur_bestaetigung BOOLEAN NOT NULL DEFAULT false;
+-- strategie: welche Setup-Art das Signal ist - eigene Seite im Dashboard je Strategie
+-- (Bottom Events / 50er-EMA-Retests / Multi-Timeframe-Bottoms), aber dieselbe Tabelle und
+-- dieselben Felder, da sich Tracking-Logik (Status, Note, Screenshots, Trade-Gruppierung)
+-- ueber alle Strategien hinweg gleicht. Bestehende Eintraege sind alle 'double_bottom'.
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS strategie TEXT NOT NULL DEFAULT 'double_bottom';
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).

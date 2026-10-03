@@ -32,6 +32,8 @@ const KURSVERLAUF = new Set(['direkt_target', 'unter_entry_dann_target', '2r_dan
   'direkt_stop', 'laenger_seitwaerts', 'entry_nie_erreicht', 'stop_target_gleiche_kerze', 'sonstiger_verlauf']);
 const KEIN_TRADE_GRUND = new Set(['rr_schlecht', 'langer_docht', 'sl_zu_weit', 'ziel_zu_nah',
   'keine_htf_bestaetigung', 'pattern_nicht_sauber', 'divergenz_fehlte', 'sonstiger_grund']);
+// strategie: eigene Seite im Dashboard je Setup-Art (siehe db/schema.sql), gleiche Tabelle/Felder.
+const STRATEGIEN = new Set(['double_bottom', 'ema50_retest', 'mtf_bottom']);
 
 // Uhrzeit: "HH:MM" bzw. "HH:MM:SS" aus dem Formular, sonst nicht gesetzt
 function zeitOrNull(v) {
@@ -85,12 +87,20 @@ function rowOut(r) {
     regelkonform: r.regelkonform === null || r.regelkonform === undefined ? null : !!r.regelkonform,
     regelkonformGrund: r.regelkonform_grund,
     levelGebrochenGehalten: !!r.level_gebrochen_gehalten,
-    nurBestaetigung: !!r.nur_bestaetigung
+    nurBestaetigung: !!r.nur_bestaetigung,
+    strategie: r.strategie
   };
 }
 
 router.get('/', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM watchlist_signals WHERE deleted_at IS NULL ORDER BY date ASC, uhrzeit ASC NULLS FIRST, id ASC');
+  const { strategie } = req.query;
+  const where = ['deleted_at IS NULL'];
+  const params = [];
+  if (strategie) { params.push(strategie); where.push(`strategie = $${params.length}`); }
+  const { rows } = await pool.query(
+    `SELECT * FROM watchlist_signals WHERE ${where.join(' AND ')} ORDER BY date ASC, uhrzeit ASC NULLS FIRST, id ASC`,
+    params
+  );
   res.json(rows.map(rowOut));
 });
 
@@ -99,9 +109,10 @@ router.post('/', async (req, res) => {
   if (!b.date) return res.status(400).json({ error: 'date ist Pflicht' });
   if (!b.asset) return res.status(400).json({ error: 'asset ist Pflicht' });
   const status = STATI.has(b.status) ? b.status : null;
+  const strategie = STRATEGIEN.has(b.strategie) ? b.strategie : 'double_bottom';
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten, nur_bestaetigung)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten, nur_bestaetigung, strategie)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
@@ -118,7 +129,8 @@ router.post('/', async (req, res) => {
      KURSVERLAUF.has(b.kursverlauf) ? b.kursverlauf : null,
      KEIN_TRADE_GRUND.has(b.keinTradeGrund) ? b.keinTradeGrund : null,
      zeitOrNull(b.uhrzeit),
-     regelkonformOrNull(b.regelkonform), orNull(b.regelkonformGrund), !!b.levelGebrochenGehalten, !!b.nurBestaetigung]
+     regelkonformOrNull(b.regelkonform), orNull(b.regelkonformGrund), !!b.levelGebrochenGehalten, !!b.nurBestaetigung,
+     strategie]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -141,7 +153,8 @@ router.patch('/:id', async (req, res) => {
                             ['uhrzeit','uhrzeit'],
                             ['regelkonform','regelkonform'],['regelkonformGrund','regelkonform_grund'],
                             ['levelGebrochenGehalten','level_gebrochen_gehalten'],
-                            ['nurBestaetigung','nur_bestaetigung']]) {
+                            ['nurBestaetigung','nur_bestaetigung'],
+                            ['strategie','strategie']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -162,6 +175,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);
     else if (key === 'multiAsset' || key === 'analysiert' || key === 'levelGebrochenGehalten' || key === 'nurBestaetigung') wert = !!wert;
+    else if (key === 'strategie') wert = STRATEGIEN.has(wert) ? wert : 'double_bottom';
     else wert = orNull(wert);
     fields.push(`${col} = $${i++}`); vals.push(wert);
   }
