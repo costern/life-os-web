@@ -184,8 +184,11 @@ section.page { display:none; } section.page.active { display:block; }
   white-space:normal; max-width:280px; z-index:5; }
 /* Eigener Scrollbereich, damit die Kopfzeile beim Scrollen oben stehen bleiben kann:
    sticky braucht einen scrollenden Vorfahren, und overflow-x macht den Wrapper
-   ohnehin schon zu einem. */
-.wl-table-wrap { overflow:auto; margin-top:16px; max-height:70vh; }
+   ohnehin schon zu einem. War vorher auf 70vh gedeckelt - das liess bei Bottom Events
+   deutlich weniger Zeilen zu, als eigentlich noch Platz im Fenster war (Colins Wunsch:
+   mehr Trades auf einmal sehen, auch wenn dafuer die Grafik weiter nach oben aus dem
+   Blick scrollt). Jetzt reicht der Scrollbereich fast bis zum unteren Fensterrand. */
+.wl-table-wrap { overflow:auto; margin-top:16px; max-height:calc(100vh - 110px); }
 .wl-table { width:100%; border-collapse:collapse; font-size:13px; }
 .wl-table thead th { position:sticky; top:0; z-index:3; background:var(--card);
   /* box-shadow statt border-bottom: bei border-collapse wandert der Rahmen beim
