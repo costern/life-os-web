@@ -2357,14 +2357,21 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       return t >= minT - CLUSTER_GRENZE && t <= maxT + CLUSTER_GRENZE;
     }).slice().sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
 
-    const ICON = 22, MAXSPUREN = 5;
+    // Keine feste Obergrenze an Spuren mehr (vorher MAXSPUREN=5): bei mehr als 5
+    // Signalen am selben Tag (oder dicht gedraengten Nachbartagen beim Rauszoomen)
+    // wurden ueberzaehlige Icons sonst einfach in dieselbe letzte Spur gequetscht und
+    // lagen exakt uebereinander - nicht mehr unterscheidbar (siehe Colins Beispiel 20.08.
+    // mit mehr als 3 sichtbaren von eigentlich mehreren Trades). Jetzt wird bei Bedarf
+    // einfach eine neue Spur eroeffnet, der Chart waechst dafuer automatisch in der Hoehe
+    // (siehe LANE_H unten) - dadurch bleiben wirklich ALLE Icons einzeln sichtbar.
+    const ICON = 22;
     const spurBelegt = [];
     const marker = [];
     sichtbar.forEach(s => {
       const cx = x(new Date(s.date+'T00:00:00').getTime());
       if (cx < PADL - 20 || cx > B - PADR + 20) return;
-      let spur = MAXSPUREN - 1;
-      for (let r = 0; r < MAXSPUREN; r++) {
+      let spur = spurBelegt.length;
+      for (let r = 0; r < spurBelegt.length; r++) {
         if (spurBelegt[r] === undefined || cx - spurBelegt[r] >= ICON) { spur = r; break; }
       }
       spurBelegt[spur] = cx;
