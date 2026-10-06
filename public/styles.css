@@ -28,6 +28,13 @@ nav.side button { display:flex; align-items:center; gap:7px; width:100%; text-al
 nav.side button:hover { background:var(--hover-bg); }
 nav.side button.active { background:var(--accent); color:#fff; font-weight:600; }
 nav.side button .ico { width:16px; text-align:center; }
+/* Gruppen-Label "Strategie" ueber den zugehoerigen Watchlist-Seiten (Bottom Events, 50er
+   EMA, MTF Bottoms, FVG) - rein optisch, kein Button. Die zugehoerigen Buttons bekommen
+   zusaetzlich etwas Einzug (.nav-sub), damit auf den ersten Blick klar ist, dass sie zu
+   diesem Label gehoeren. */
+nav.side .nav-label { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); padding:14px 9px 4px; }
+nav.side button.nav-sub { padding-left:20px; }
 main { flex:1; min-width:0; }
 header.top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; flex-wrap:wrap; gap:6px; }
 h1 { font-size:23px; font-weight:700; } h1 span { color:var(--accent); }
@@ -367,6 +374,11 @@ a { color:var(--accent); }
   nav.side .brand { display:none; }
   nav.side .brand-row { flex:none; padding:0; }
   nav.side button { width:auto; white-space:nowrap; margin:0; }
+  /* Auf Mobile ist nav.side eine horizontale Scroll-Leiste - das Gruppen-Label
+     "Strategie" wuerde dort nur Platz wegnehmen, und der extra Einzug der
+     nav-sub-Buttons ist in der Reihe auch nicht mehr sinnvoll. */
+  nav.side .nav-label { display:none; }
+  nav.side button.nav-sub { padding-left:9px; }
 }
 /* Journal Day + Jahres-/Monatsfortschritt + Zitat ganz oben auf der Uebersicht:
    zwei schmale Kaestchen nebeneinander (Colin: braucht sonst zu viel Platz) -

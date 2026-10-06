@@ -3062,6 +3062,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
 wlBaueSeite('double_bottom', '', 'watchlist');
 wlBaueSeite('ema50_retest', '-ema50', 'watchlist-ema50');
 wlBaueSeite('mtf_bottom', '-mtf', 'watchlist-mtf');
+wlBaueSeite('fvg', '-fvg', 'watchlist-fvg');
 
 function rundPreis(v){
   if (!isFinite(v)) return '';

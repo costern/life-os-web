@@ -257,8 +257,8 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS level_gebrochen_gehalten 
 -- auch bei nicht genommenen Bestaetigungssignalen sieht, ob es am Ende funktioniert haette.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS nur_bestaetigung BOOLEAN NOT NULL DEFAULT false;
 -- strategie: welche Setup-Art das Signal ist - eigene Seite im Dashboard je Strategie
--- (Bottom Events / 50er-EMA-Retests / Multi-Timeframe-Bottoms), aber dieselbe Tabelle und
--- dieselben Felder, da sich Tracking-Logik (Status, Note, Screenshots, Trade-Gruppierung)
+-- (Bottom Events / 50er-EMA-Retests / Multi-Timeframe-Bottoms / FVG), aber dieselbe Tabelle
+-- und dieselben Felder, da sich Tracking-Logik (Status, Note, Screenshots, Trade-Gruppierung)
 -- ueber alle Strategien hinweg gleicht. Bestehende Eintraege sind alle 'double_bottom'.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS strategie TEXT NOT NULL DEFAULT 'double_bottom';
 

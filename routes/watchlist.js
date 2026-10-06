@@ -33,7 +33,7 @@ const KURSVERLAUF = new Set(['direkt_target', 'unter_entry_dann_target', '2r_dan
 const KEIN_TRADE_GRUND = new Set(['rr_schlecht', 'langer_docht', 'sl_zu_weit', 'ziel_zu_nah',
   'keine_htf_bestaetigung', 'pattern_nicht_sauber', 'divergenz_fehlte', 'sonstiger_grund']);
 // strategie: eigene Seite im Dashboard je Setup-Art (siehe db/schema.sql), gleiche Tabelle/Felder.
-const STRATEGIEN = new Set(['double_bottom', 'ema50_retest', 'mtf_bottom']);
+const STRATEGIEN = new Set(['double_bottom', 'ema50_retest', 'mtf_bottom', 'fvg']);
 
 // Uhrzeit: "HH:MM" bzw. "HH:MM:SS" aus dem Formular, sonst nicht gesetzt
 function zeitOrNull(v) {
