@@ -585,17 +585,15 @@ a { color:var(--accent); }
    white-space:nowrap erzwungen haben, siehe Kommentar oben bei .tl-table td - das ist jetzt
    behoben, dadurch passt diese Zeile jetzt wirklich von ganz links nach ganz rechts.) */
 .tl-shots-grid { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; }
+/* Feste Maximalgroesse fuer Screenshot-Kacheln, UNBEDINGT (nicht an Geschwisteranzahl
+   oder Upload-Feld gekoppelt) - gilt fuer .tl-shots-grid ueberall im Dashboard: Trading-Log,
+   Bottom Events (alle Strategien), und die Trade-Gesamtansicht (dort gibt es keine
+   Upload-Kachel als Geschwister, weshalb der fruehere :nth-last-child(2)-Trick dort nie
+   griff und Einzelbilder auf volle Breite wuchsen). Colin will IMMER dieselbe Maximalgroesse,
+   egal in welcher Ansicht/Strategie - deshalb ein hartes max-width statt einer Bedingung. */
 .tl-shot-thumb { position:relative; border-radius:8px; overflow:hidden;
   border:1px solid var(--line); cursor:zoom-in; background:var(--hover-bg); line-height:0;
-  flex:1 1 380px; min-width:290px; max-width:100%; }
-/* Ist genau ein Screenshot vorhanden (Kachel + Upload-Feld = 2 Kinder, die Kachel ist
-   das erste), soll er NICHT groesser werden als er es waere, wenn zwei Screenshots
-   nebeneinander laegen - er behaelt also die gleiche (kleine) Breite wie ein einzelnes
-   Bild im Zwei-Bilder-Fall, statt sich per flex-grow den ganzen freien Platz neben dem
-   "+"-Upload-Feld zu schnappen. Gilt fuer Trading-Log UND Bottom Events gleichermassen
-   (beide nutzen .tl-shots-grid) - Colins Feedback: im Trading-Log wirkten Einzelbilder
-   dadurch deutlich groesser als bei Bottom Events. */
-.tl-shots-grid .tl-shot-thumb:first-child:nth-last-child(2) { flex:0 1 calc(50% - 6px); max-width:calc(50% - 6px); }
+  flex:1 1 380px; min-width:290px; max-width:380px; }
 .tl-shot-thumb img { display:block; width:100%; height:auto; }
 .tl-shot-del { position:absolute; top:5px; right:5px; font-size:12px; line-height:1; padding:4px 7px;
   border-radius:5px; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; }
