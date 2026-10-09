@@ -617,17 +617,16 @@ a { color:var(--accent); }
    ersetzt dann komplett den einzelnen Screenshot-Bereich weiter unten (siehe
    wlEditRowHtml/wlOeffneDetail in app.js).
    Groessen-Vorgabe von Colin: in dieser Ansicht sollen die Bilder deutlich groesser
-   sein als die normale 380px-Basisgroesse, aber trotzdem nie mehr als zwei pro Zeile
-   nebeneinander passen. WICHTIG: bewusst KEIN max-width auf Gruppe oder Bild - ein
-   hartes max-width:48% wuerde ein einzelnes Bild (der haeufigste Fall: ein Signal hat
-   genau einen Screenshot) auf halbe Breite zwingen, obwohl es gar keinen Nachbarn zum
-   Teilen gibt, und genau DAS hat es zuvor zu klein gemacht. Stattdessen nur
-   flex-basis:48% + ein hoher min-width - dank flex-grow:1 (Standardwert) waechst ein
-   alleinstehendes Bild/eine alleinstehende Gruppe automatisch auf die volle verfuegbare
-   Breite, waehrend zwei nebeneinander (Gruppen am selben Tag ODER mehrere Screenshots
-   eines Signals) sich die Breite automatisch zu ca. 50/50 teilen; ein drittes Element
-   wrappt durch den hohen min-width-Wert automatisch in die naechste Zeile - kein
-   max-width noetig. Die Upload-Kachel (zum Einfuegen neuer Screenshots) bleibt dagegen
+   sein als die normale 380px-Basisgroesse - ein alleinstehendes Signal an einem Tag
+   bekommt die VOLLE Breite, zwei Signale am selben Tag teilen sich die Breite exakt
+   50/50, nie mehr als zwei nebeneinander. WICHTIG: die Breite der .wl-trade-gesamt-
+   gruppe wird NICHT mehr per CSS/flex-grow bestimmt (das war unzuverlaessig, weil die
+   Tabellenzelle <td colspan> die flex-Berechnung verzerrt und ein alleinstehendes Bild
+   trotzdem klein blieb), sondern direkt per Inline-Style in app.js
+   (wlRenderTradeGesamt: flex:0 0 100% bzw. flex:0 0 calc(50% - 8px)) gesetzt - hier nur
+   noch Basis-Layout (Flex-Container + Abstand). Das Bild selbst fuellt seine Gruppe
+   komplett aus (100%), damit die tatsaechliche Breite 1:1 der oben gesetzten
+   Gruppenbreite entspricht. Die Upload-Kachel (zum Einfuegen neuer Screenshots) bleibt
    bewusst winzig - sie soll hier nicht so viel Platz wie ein echtes Bild einnehmen
    (gleiches Prinzip wie .wl-tag-card-img .tl-shot-upload weiter oben in dieser Datei). */
 .wl-trade-gesamt-wrap:empty { display:none; }
@@ -635,9 +634,9 @@ a { color:var(--accent); }
 .wl-trade-gesamt-tage { display:flex; flex-direction:column; gap:16px; margin-bottom:14px;
   padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--hover-bg); }
 .wl-trade-gesamt-tagreihe { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
-.wl-trade-gesamt-gruppe { flex:1 1 48%; min-width:480px; }
+.wl-trade-gesamt-gruppe { min-width:0; }
 .wl-trade-gesamt-label { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:6px; }
-.wl-trade-gesamt-gruppe .tl-shots-grid .tl-shot-thumb { flex:1 1 48%; min-width:440px; }
+.wl-trade-gesamt-gruppe .tl-shots-grid .tl-shot-thumb { flex:1 1 100%; max-width:100%; min-width:0; }
 .wl-trade-gesamt-gruppe .tl-shot-upload { flex:0 0 42px; min-height:42px; padding:3px; }
 .wl-trade-gesamt-gruppe .tl-shot-upload-hint { display:none; }
 .wl-trade-gesamt-gruppe .tl-shot-upload-plus { font-size:15px; }

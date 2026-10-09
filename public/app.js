@@ -2957,16 +2957,23 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       el.innerHTML =
         '<div class="wl-trade-gesamt-kopf">📎 Trade-Gesamtansicht – Trade-ID '+esc(tid)+' ('+verwandte.length+' Signale, alle Timeframes auf einen Blick)</div>' +
         '<div class="wl-trade-gesamt-tage">' +
-        tage.map(d =>
-          '<div class="wl-trade-gesamt-tagreihe">' +
-          tageMap.get(d).map(s =>
-            '<div class="wl-trade-gesamt-gruppe">' +
-              '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+' · '+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
-              '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
-            '</div>'
-          ).join('') +
-          '</div>'
-        ).join('') +
+        tage.map(d => {
+          const sigsAmTag = tageMap.get(d);
+          // Breite je Gruppe fest per Inline-Style statt ueber flex-grow bestimmen -
+          // flex-grow innerhalb der Tabellenzelle (<td colspan>) verhaelt sich je nach
+          // Tabellenbreite/-layout unzuverlaessig (wuchs in der Praxis nicht auf die
+          // erwartete Breite). Ein alleinstehendes Signal an diesem Tag bekommt die
+          // VOLLE Breite, zwei Signale am selben Tag teilen sich die Breite exakt 50/50.
+          const breite = sigsAmTag.length <= 1 ? '100%' : 'calc(50% - 8px)';
+          return '<div class="wl-trade-gesamt-tagreihe">' +
+            sigsAmTag.map(s =>
+              '<div class="wl-trade-gesamt-gruppe" style="flex:0 0 '+breite+';max-width:'+breite+';">' +
+                '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+' · '+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
+                '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
+              '</div>'
+            ).join('') +
+          '</div>';
+        }).join('') +
         '</div>';
 
       verwandte.forEach(s => {
