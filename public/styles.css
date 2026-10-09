@@ -616,24 +616,28 @@ a { color:var(--accent); }
    das Tageschart-Signal vom Folgetag in einer eigenen Zeile darunter. Diese Ansicht
    ersetzt dann komplett den einzelnen Screenshot-Bereich weiter unten (siehe
    wlEditRowHtml/wlOeffneDetail in app.js).
-   Groessen-Vorgabe von Colin: in dieser Ansicht sollen maximal ZWEI Bilder pro Zeile
-   nebeneinander passen (nicht drei oder vier wie bei der normalen, kleineren
-   .tl-shot-thumb-Basisgroesse). Deshalb zwei Ebenen mit 48%-Breite statt fixer Pixel:
-   erstens die Tages-Gruppe selbst (je Timeframe eine Spalte, max. 2 pro Tagesreihe),
-   zweitens das Bild darin (falls ein Signal mehrere Screenshots hat, max. 2 davon pro
-   Zeile) - das Bild darf dabei die volle Breite seiner Gruppe ausfuellen, also deutlich
-   groesser als die 380px-Basisgroesse sein. Die Upload-Kachel (zum Einfuegen neuer
-   Screenshots) bleibt dagegen bewusst winzig - sie soll hier nicht so viel Platz wie
-   ein echtes Bild einnehmen (gleiches Prinzip wie .wl-tag-card-img .tl-shot-upload
-   weiter oben in dieser Datei). */
+   Groessen-Vorgabe von Colin: in dieser Ansicht sollen die Bilder deutlich groesser
+   sein als die normale 380px-Basisgroesse, aber trotzdem nie mehr als zwei pro Zeile
+   nebeneinander passen. WICHTIG: bewusst KEIN max-width auf Gruppe oder Bild - ein
+   hartes max-width:48% wuerde ein einzelnes Bild (der haeufigste Fall: ein Signal hat
+   genau einen Screenshot) auf halbe Breite zwingen, obwohl es gar keinen Nachbarn zum
+   Teilen gibt, und genau DAS hat es zuvor zu klein gemacht. Stattdessen nur
+   flex-basis:48% + ein hoher min-width - dank flex-grow:1 (Standardwert) waechst ein
+   alleinstehendes Bild/eine alleinstehende Gruppe automatisch auf die volle verfuegbare
+   Breite, waehrend zwei nebeneinander (Gruppen am selben Tag ODER mehrere Screenshots
+   eines Signals) sich die Breite automatisch zu ca. 50/50 teilen; ein drittes Element
+   wrappt durch den hohen min-width-Wert automatisch in die naechste Zeile - kein
+   max-width noetig. Die Upload-Kachel (zum Einfuegen neuer Screenshots) bleibt dagegen
+   bewusst winzig - sie soll hier nicht so viel Platz wie ein echtes Bild einnehmen
+   (gleiches Prinzip wie .wl-tag-card-img .tl-shot-upload weiter oben in dieser Datei). */
 .wl-trade-gesamt-wrap:empty { display:none; }
 .wl-trade-gesamt-kopf { font-weight:600; font-size:13px; margin-bottom:8px; }
 .wl-trade-gesamt-tage { display:flex; flex-direction:column; gap:16px; margin-bottom:14px;
   padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--hover-bg); }
 .wl-trade-gesamt-tagreihe { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
-.wl-trade-gesamt-gruppe { flex:1 1 48%; max-width:48%; min-width:420px; }
+.wl-trade-gesamt-gruppe { flex:1 1 48%; min-width:480px; }
 .wl-trade-gesamt-label { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:6px; }
-.wl-trade-gesamt-gruppe .tl-shots-grid .tl-shot-thumb { flex:1 1 48%; max-width:48%; min-width:380px; }
+.wl-trade-gesamt-gruppe .tl-shots-grid .tl-shot-thumb { flex:1 1 48%; min-width:440px; }
 .wl-trade-gesamt-gruppe .tl-shot-upload { flex:0 0 42px; min-height:42px; padding:3px; }
 .wl-trade-gesamt-gruppe .tl-shot-upload-hint { display:none; }
 .wl-trade-gesamt-gruppe .tl-shot-upload-plus { font-size:15px; }
