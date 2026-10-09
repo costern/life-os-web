@@ -2126,6 +2126,10 @@ const WL_STATUS_HINT = { win:'Win', be_win:'BE Win (2R erreicht)',
   be_loss:'BE Loss (2R nicht erreicht)', lose:'Lose',
   no_entry:'No Entry (kein Einstieg, aber auch nicht gefallen)', '':'Noch nicht bewertet' };
 const WL_FORM_LABEL = { bogen:'Bogen', bogen_unsauber:'Bogen unsauber', kein_bogen:'kein Bogen', '':'' };
+// boden_typ: nur fuer Bottom Events - basisboden (lange Seitwaerts-Akkumulation auf
+// gleichem Level, typischerweise im 1W/1M-Chart sichtbar) vs. w_pattern (kompakter,
+// scharfer Doppelboden ueber wenige Kerzen, klassisches W).
+const WL_BODENTYP_LABEL = { basisboden:'Basisboden', w_pattern:'W-Pattern', '':'' };
 // Chart-Eigenschaften, aus denen zusammen mit der eigenen Einschaetzung die Note entsteht
 const WL_PHASE_LABEL = { uptrend:'Uptrend', downtrend:'Downtrend', ranging:'Range', '':'–' };
 const WL_PATTERN_LABEL = { valid:'valid', clean:'clean', choppy:'choppy', '':'–' };
@@ -2190,6 +2194,7 @@ function wlSetupText(s){
   if (s.mtf > 1) teile.push('MTF ' + s.mtf);
   if (s.multiAsset) teile.push('Multi-Asset');
   if (s.form) teile.push(WL_FORM_LABEL[s.form] || s.form);
+  if (s.bodenTyp) teile.push(WL_BODENTYP_LABEL[s.bodenTyp] || s.bodenTyp);
   return teile.join(' · ');
 }
 // Wie wlSetupText, aber ohne den Event-Typ - der bekommt in der Tabelle ein eigenes,
@@ -2199,6 +2204,7 @@ function wlSetupRestText(s){
   if (s.mtf > 1) teile.push('MTF ' + s.mtf);
   if (s.multiAsset) teile.push('Multi-Asset');
   if (s.form) teile.push(WL_FORM_LABEL[s.form] || s.form);
+  if (s.bodenTyp) teile.push(WL_BODENTYP_LABEL[s.bodenTyp] || s.bodenTyp);
   return teile.join(' · ');
 }
 function wlEventBadgeHtml(s){
@@ -2541,6 +2547,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['rsi','RSI Div.'],['leicht','Leichte RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
           '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level']], s.pivotLevel)+'</label>' +
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
+          '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>' +
           '<label>Ergebnis (Detail)'+auswahlHtml('wle-ergebnisdetail', [['','–'],
             ['noch_nicht_bewertet','Noch nicht bewertet'],['target_erreicht','Target erreicht'],
             ['be_2r','Break-even nach 2R'],['stop_loss','Stop-Loss erreicht'],
@@ -2950,6 +2957,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           mtf: row.querySelector('.wle-mtf').value,
           multiAsset: row.querySelector('.wle-multiasset').checked,
           form: row.querySelector('.wle-form').value,
+          bodenTyp: row.querySelector('.wle-bodentyp').value,
           notiz: row.querySelector('.wle-notiz').value.trim() || null,
           details: row.querySelector('.wle-details').value.trim() || null,
           tradeId: row.querySelector('.wle-tradeid').value.trim() || null,

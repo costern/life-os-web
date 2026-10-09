@@ -34,6 +34,9 @@ const KEIN_TRADE_GRUND = new Set(['rr_schlecht', 'langer_docht', 'sl_zu_weit', '
   'keine_htf_bestaetigung', 'pattern_nicht_sauber', 'divergenz_fehlte', 'sonstiger_grund']);
 // strategie: eigene Seite im Dashboard je Setup-Art (siehe db/schema.sql), gleiche Tabelle/Felder.
 const STRATEGIEN = new Set(['double_bottom', 'ema50_retest', 'mtf_bottom', 'fvg']);
+// boden_typ: nur fuer Bottom-Events - basisboden (lange Seitwaerts-Akkumulation, 1W/1M) vs.
+// w_pattern (kompakter, scharfer Doppelboden ueber wenige Kerzen).
+const BODEN_TYPEN = new Set(['basisboden', 'w_pattern']);
 
 // Uhrzeit: "HH:MM" bzw. "HH:MM:SS" aus dem Formular, sonst nicht gesetzt
 function zeitOrNull(v) {
@@ -88,7 +91,8 @@ function rowOut(r) {
     regelkonformGrund: r.regelkonform_grund,
     levelGebrochenGehalten: !!r.level_gebrochen_gehalten,
     nurBestaetigung: !!r.nur_bestaetigung,
-    strategie: r.strategie
+    strategie: r.strategie,
+    bodenTyp: r.boden_typ
   };
 }
 
@@ -111,8 +115,8 @@ router.post('/', async (req, res) => {
   const status = STATI.has(b.status) ? b.status : null;
   const strategie = STRATEGIEN.has(b.strategie) ? b.strategie : 'double_bottom';
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten, nur_bestaetigung, strategie)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten, nur_bestaetigung, strategie, boden_typ)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
@@ -130,7 +134,7 @@ router.post('/', async (req, res) => {
      KEIN_TRADE_GRUND.has(b.keinTradeGrund) ? b.keinTradeGrund : null,
      zeitOrNull(b.uhrzeit),
      regelkonformOrNull(b.regelkonform), orNull(b.regelkonformGrund), !!b.levelGebrochenGehalten, !!b.nurBestaetigung,
-     strategie]
+     strategie, BODEN_TYPEN.has(b.bodenTyp) ? b.bodenTyp : null]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -154,7 +158,8 @@ router.patch('/:id', async (req, res) => {
                             ['regelkonform','regelkonform'],['regelkonformGrund','regelkonform_grund'],
                             ['levelGebrochenGehalten','level_gebrochen_gehalten'],
                             ['nurBestaetigung','nur_bestaetigung'],
-                            ['strategie','strategie']]) {
+                            ['strategie','strategie'],
+                            ['bodenTyp','boden_typ']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -176,6 +181,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'mtf') wert = mtfOrNull(wert);
     else if (key === 'multiAsset' || key === 'analysiert' || key === 'levelGebrochenGehalten' || key === 'nurBestaetigung') wert = !!wert;
     else if (key === 'strategie') wert = STRATEGIEN.has(wert) ? wert : 'double_bottom';
+    else if (key === 'bodenTyp') wert = BODEN_TYPEN.has(wert) ? wert : null;
     else wert = orNull(wert);
     fields.push(`${col} = $${i++}`); vals.push(wert);
   }

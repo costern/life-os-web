@@ -261,6 +261,11 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS nur_bestaetigung BOOLEAN 
 -- und dieselben Felder, da sich Tracking-Logik (Status, Note, Screenshots, Trade-Gruppierung)
 -- ueber alle Strategien hinweg gleicht. Bestehende Eintraege sind alle 'double_bottom'.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS strategie TEXT NOT NULL DEFAULT 'double_bottom';
+-- boden_typ: nur fuer Bottom-Events relevant - unterscheidet strukturell zwei Boden-Arten,
+-- vor allem im 1W/1M-Chart sichtbar: basisboden = langgezogene Seitwaerts-Akkumulation auf
+-- gleichem Level ueber viele Wochen/Monate mit mehreren Touches, bevor es dreht;
+-- w_pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen (klassisches W).
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS boden_typ TEXT;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).
