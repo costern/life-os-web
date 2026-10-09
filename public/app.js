@@ -2529,7 +2529,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       return '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="13"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
         '<div class="wl-trade-gesamt-wrap" id="wl-trade-gesamt-'+s.id+'"></div>' +
-        '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>' +
+        (wlTradeGesamtSignale(s).length ? '' : '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>') +
         '<div class="wl-detail-grid">' +
           '<label class="wl-detail-kurz" style="width:82px">Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
           '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = 02:00 (Tageschart)">Uhrzeit' +
@@ -2897,38 +2897,70 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       aktualisieren();
     });
 
-    // Trade-Gesamtansicht: bei einem Multi-Timeframe-Trade (mehrere Signale mit derselben
-    // Trade-ID, z.B. Gold auf 1H/4H/1D) sieht man beim Oeffnen EINES der drei Signale sofort
-    // die Screenshots ALLER zusammengehoerigen Signale nebeneinander - egal, welches der
-    // drei man aufklappt. Rein lesend (kein Upload/Loeschen hier), die Bilder bleiben pro
-    // Signal editierbar im normalen Screenshot-Bereich weiter unten.
-    function wlRenderTradeGesamt(signal, el){
+    // Timeframe-Dauer grob in Minuten parsen, um Signale, die am selben Tag liegen,
+    // nach Timeframe aufsteigend nebeneinander zu sortieren (kurz links, lang rechts).
+    // s.tf ist Freitext (z.B. "4H", "12H", "1D", auch kombiniert wie "1D + 3D") - bei
+    // kombinierten Werten wird der erste (kuerzere) Teil fuer die Sortierung genommen.
+    function wlTfMinuten(tf){
+      if (!tf) return 0;
+      const erster = String(tf).split('+')[0].trim();
+      const m = erster.match(/^(\d+)\s*([mMhHdDwW])/);
+      if (!m) return 0;
+      const zahl = parseInt(m[1], 10);
+      const einheit = m[2].toUpperCase();
+      const faktor = einheit === 'M' ? 1 : einheit === 'H' ? 60 : einheit === 'D' ? 1440 : einheit === 'W' ? 10080 : 1;
+      return zahl * faktor;
+    }
+
+    // Liefert die zu einem Signal gehoerenden Trade-Gesamt-Signale (inkl. sich selbst),
+    // aber nur wenn es mindestens 2 sind (sonst gibt es keine Gesamtansicht - ein
+    // einzelnes Signal behaelt seinen normalen, einzelnen Screenshot-Bereich).
+    function wlTradeGesamtSignale(signal){
       const tid = signal.tradeId != null ? String(signal.tradeId).trim() : '';
-      if (!tid) { el.innerHTML = ''; return; }
+      if (!tid) return [];
       const verwandte = alleSignale.filter(s => (s.tradeId != null ? String(s.tradeId).trim() : '') === tid);
-      if (verwandte.length < 2) { el.innerHTML = ''; return; }
-      const sortiert = verwandte.slice().sort((a,b) =>
-        (a.tf||'').localeCompare(b.tf||'') || a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
+      return verwandte.length >= 2 ? verwandte : [];
+    }
+
+    // Trade-Gesamtansicht: bei einem Multi-Timeframe-Trade (mehrere Signale mit derselben
+    // Trade-ID, z.B. Gold auf 4H/12H/1D) sieht man beim Oeffnen EINES der Signale sofort
+    // die Screenshots ALLER zusammengehoerigen Signale - gruppiert nach Kalendertag
+    // (frueherer Tag oben), innerhalb eines Tages nebeneinander sortiert nach
+    // Timeframe-Dauer aufsteigend (kurz links, lang rechts). Diese Ansicht ist voll
+    // editierbar (Upload/Loeschen pro Signal via renderWlShots) und ERSETZT dann den
+    // einzelnen Screenshot-Bereich weiter unten komplett (siehe wlEditRowHtml).
+    function wlRenderTradeGesamt(signal, el){
+      const verwandte = wlTradeGesamtSignale(signal);
+      if (!verwandte.length) { el.innerHTML = ''; return; }
+      const tid = String(signal.tradeId).trim();
+      const tageMap = new Map();
+      verwandte.forEach(s => {
+        if (!tageMap.has(s.date)) tageMap.set(s.date, []);
+        tageMap.get(s.date).push(s);
+      });
+      const tage = [...tageMap.keys()].sort();
+      tage.forEach(d => tageMap.get(d).sort((a,b) =>
+        wlTfMinuten(a.tf) - wlTfMinuten(b.tf) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'')));
+
       el.innerHTML =
-        '<div class="wl-trade-gesamt-kopf">📎 Trade-Gesamtansicht – Trade-ID '+esc(tid)+' ('+sortiert.length+' Signale, alle Timeframes auf einen Blick)</div>' +
-        '<div class="wl-trade-gesamt-gruppen">' +
-        sortiert.map(s =>
-          '<div class="wl-trade-gesamt-gruppe">' +
-            '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+' · '+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
-            '<div class="tl-shots-grid wl-trade-gesamt-bilder" id="wl-trade-gesamt-bilder-'+s.id+'"><span class="muted" style="font-size:12px">Lädt…</span></div>' +
+        '<div class="wl-trade-gesamt-kopf">📎 Trade-Gesamtansicht – Trade-ID '+esc(tid)+' ('+verwandte.length+' Signale, alle Timeframes auf einen Blick)</div>' +
+        '<div class="wl-trade-gesamt-tage">' +
+        tage.map(d =>
+          '<div class="wl-trade-gesamt-tagreihe">' +
+          tageMap.get(d).map(s =>
+            '<div class="wl-trade-gesamt-gruppe">' +
+              '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+' · '+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
+              '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
+            '</div>'
+          ).join('') +
           '</div>'
         ).join('') +
         '</div>';
-      sortiert.forEach(s => {
-        wlLiesShots(s.id).then(shots => {
-          const zielEl = el.querySelector('#wl-trade-gesamt-bilder-'+s.id);
-          if (!zielEl) return;
-          if (!shots.length) { zielEl.innerHTML = '<span class="muted" style="font-size:12px">Keine Screenshots</span>'; return; }
-          zielEl.innerHTML = shots.map(shot =>
-            '<div class="tl-shot-thumb"><img src="/api/watchlist/'+s.id+'/screenshots/'+shot.id+'/image" loading="lazy" alt="Screenshot"></div>'
-          ).join('');
-          zielEl.querySelectorAll('img').forEach(img => img.addEventListener('click', () => tlZeigeLightbox(img.src)));
-        });
+
+      verwandte.forEach(s => {
+        const zielEl = el.querySelector('#wl-trade-gesamt-shots-'+s.id);
+        if (!zielEl) return;
+        wlLiesShots(s.id).then(shots => renderWlShots(s.id, shots, zielEl));
       });
     }
 
