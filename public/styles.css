@@ -615,16 +615,28 @@ a { color:var(--accent); }
    aufsteigend (kurz links, lang rechts) - z.B. 4H links, 12H rechts am selben Tag,
    das Tageschart-Signal vom Folgetag in einer eigenen Zeile darunter. Diese Ansicht
    ersetzt dann komplett den einzelnen Screenshot-Bereich weiter unten (siehe
-   wlEditRowHtml/wlOeffneDetail in app.js) - deshalb hier bewusst KEINE eigene,
-   kleinere Thumbnail-Groesse: die Bilder sollen genauso gross sein wie ueberall sonst
-   im Dashboard (.tl-shot-thumb Basisregel, max-width:380px). */
+   wlEditRowHtml/wlOeffneDetail in app.js).
+   Groessen-Vorgabe von Colin: in dieser Ansicht sollen maximal ZWEI Bilder pro Zeile
+   nebeneinander passen (nicht drei oder vier wie bei der normalen, kleineren
+   .tl-shot-thumb-Basisgroesse). Deshalb zwei Ebenen mit 48%-Breite statt fixer Pixel:
+   erstens die Tages-Gruppe selbst (je Timeframe eine Spalte, max. 2 pro Tagesreihe),
+   zweitens das Bild darin (falls ein Signal mehrere Screenshots hat, max. 2 davon pro
+   Zeile) - das Bild darf dabei die volle Breite seiner Gruppe ausfuellen, also deutlich
+   groesser als die 380px-Basisgroesse sein. Die Upload-Kachel (zum Einfuegen neuer
+   Screenshots) bleibt dagegen bewusst winzig - sie soll hier nicht so viel Platz wie
+   ein echtes Bild einnehmen (gleiches Prinzip wie .wl-tag-card-img .tl-shot-upload
+   weiter oben in dieser Datei). */
 .wl-trade-gesamt-wrap:empty { display:none; }
 .wl-trade-gesamt-kopf { font-weight:600; font-size:13px; margin-bottom:8px; }
 .wl-trade-gesamt-tage { display:flex; flex-direction:column; gap:16px; margin-bottom:14px;
   padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--hover-bg); }
 .wl-trade-gesamt-tagreihe { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
-.wl-trade-gesamt-gruppe { flex:1 1 320px; min-width:290px; }
+.wl-trade-gesamt-gruppe { flex:1 1 48%; max-width:48%; min-width:420px; }
 .wl-trade-gesamt-label { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:6px; }
+.wl-trade-gesamt-gruppe .tl-shots-grid .tl-shot-thumb { flex:1 1 48%; max-width:48%; min-width:380px; }
+.wl-trade-gesamt-gruppe .tl-shot-upload { flex:0 0 42px; min-height:42px; padding:3px; }
+.wl-trade-gesamt-gruppe .tl-shot-upload-hint { display:none; }
+.wl-trade-gesamt-gruppe .tl-shot-upload-plus { font-size:15px; }
 
 .tl-lightbox { position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex;
   align-items:center; justify-content:center; z-index:999; cursor:zoom-out; padding:24px; }

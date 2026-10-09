@@ -2736,6 +2736,18 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         tooltip.innerHTML = esc(p.titel);
       });
       m.addEventListener('pointerleave', () => { tooltip.style.display = 'none'; });
+      // Klick auf einen Marker springt direkt zur zugehoerigen Zeile unten in der
+      // Tabelle (ins Blickfeld scrollen + Detailansicht aufklappen), damit man vom
+      // Chart aus schnell zum Trade kommt, statt ihn erst mit der Maus suchen zu
+      // muessen. tableWrap/wlOeffneDetail werden weiter unten in render() definiert,
+      // sind aber dank Closure beim tatsaechlichen Klick (danach) bereits verfuegbar.
+      m.addEventListener('click', () => {
+        const row = tableWrap.querySelector('tr[data-id="'+esc(String(p.id))+'"]:not(.wl-edit-row)');
+        if (!row) return;
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const detail = tableWrap.querySelector('tr.wl-edit-row[data-id="'+esc(String(p.id))+'"]');
+        if (detail && detail.hidden) wlOeffneDetail(String(p.id), detail);
+      });
     });
 
     // Zoom per Ziehen auf der Chart-Fläche
