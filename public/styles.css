@@ -616,27 +616,30 @@ a { color:var(--accent); }
    das Tageschart-Signal vom Folgetag in einer eigenen Zeile darunter. Diese Ansicht
    ersetzt dann komplett den einzelnen Screenshot-Bereich weiter unten (siehe
    wlEditRowHtml/wlOeffneDetail in app.js).
-   Groessen-Vorgabe von Colin: in dieser Ansicht sollen die Bilder deutlich groesser
-   sein als die normale 380px-Basisgroesse - ein alleinstehendes Signal an einem Tag
-   bekommt die VOLLE Breite, zwei Signale am selben Tag teilen sich die Breite exakt
-   50/50, nie mehr als zwei nebeneinander. WICHTIG: die Breite der .wl-trade-gesamt-
-   gruppe wird NICHT mehr per CSS/flex-grow bestimmt (das war unzuverlaessig, weil die
-   Tabellenzelle <td colspan> die flex-Berechnung verzerrt und ein alleinstehendes Bild
-   trotzdem klein blieb), sondern direkt per Inline-Style in app.js
-   (wlRenderTradeGesamt: flex:0 0 100% bzw. flex:0 0 calc(50% - 8px)) gesetzt - hier nur
-   noch Basis-Layout (Flex-Container + Abstand). Das Bild selbst fuellt seine Gruppe
-   komplett aus (100%), damit die tatsaechliche Breite 1:1 der oben gesetzten
-   Gruppenbreite entspricht. Die Upload-Kachel (zum Einfuegen neuer Screenshots) bleibt
-   bewusst winzig - sie soll hier nicht so viel Platz wie ein echtes Bild einnehmen
-   (gleiches Prinzip wie .wl-tag-card-img .tl-shot-upload weiter oben in dieser Datei). */
+   Ausdrueckliche Entscheidung von Colin (nach mehreren Anlaeufen mit variabler,
+   nachbarn-abhaengiger Breite, die mal zu klein, mal "ploetzlich wieder riesig"
+   wirkte): EIN einziges, FESTES Bild-Mass fuer ALLE Screenshots innerhalb dieser
+   Bottom-Events-Detailansicht - egal ob Trade-Gesamtansicht oder der normale
+   Einzel-Screenshot-Bereich (.tl-shots-wrap) eines einzelnen Signals, egal ob ein
+   Bild allein in seiner Zeile steht oder sich die Zeile mit einem zweiten teilt.
+   Keine Prozent-/Nachbarn-abhaengige Breite mehr (siehe .wl-detail .tl-shot-thumb
+   unten) - wie viele Bilder pro Zeile nebeneinander passen, ergibt sich rein aus
+   dem verfuegbaren Platz (flex-wrap), nicht aus einer berechneten Breite. Die
+   Gruppen/Tages-Container brauchen deshalb selbst keine eigene Breitenvorgabe mehr -
+   sie umschliessen einfach ihr (jetzt immer gleich grosses) Bild. Die Upload-Kachel
+   (zum Einfuegen neuer Screenshots) bleibt bewusst winzig - sie soll hier nicht so
+   viel Platz wie ein echtes Bild einnehmen (gleiches Prinzip wie .wl-tag-card-img
+   .tl-shot-upload weiter oben in dieser Datei). */
 .wl-trade-gesamt-wrap:empty { display:none; }
 .wl-trade-gesamt-kopf { font-weight:600; font-size:13px; margin-bottom:8px; }
 .wl-trade-gesamt-tage { display:flex; flex-direction:column; gap:16px; margin-bottom:14px;
   padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--hover-bg); }
 .wl-trade-gesamt-tagreihe { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
-.wl-trade-gesamt-gruppe { min-width:0; }
 .wl-trade-gesamt-label { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:6px; }
-.wl-trade-gesamt-gruppe .tl-shots-grid .tl-shot-thumb { flex:1 1 100%; max-width:100%; min-width:0; }
+/* Das EINE feste Bild-Mass fuer diese gesamte Detailansicht - Trade-Gesamtansicht UND
+   Einzel-Screenshot-Bereich. Fixe Pixelbreite statt Prozent, damit die Groesse wirklich
+   konstant bleibt, egal wie viele Bilder gerade in derselben Zeile liegen. */
+.wl-detail .tl-shot-thumb { flex:0 0 640px; width:640px; max-width:640px; }
 .wl-trade-gesamt-gruppe .tl-shot-upload { flex:0 0 42px; min-height:42px; padding:3px; }
 .wl-trade-gesamt-gruppe .tl-shot-upload-hint { display:none; }
 .wl-trade-gesamt-gruppe .tl-shot-upload-plus { font-size:15px; }
