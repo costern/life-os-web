@@ -2528,6 +2528,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const st = wlStatus(s);
       return '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="13"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
+        '<div class="wl-trade-gesamt-wrap" id="wl-trade-gesamt-'+s.id+'"></div>' +
         '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>' +
         '<div class="wl-detail-grid">' +
           '<label class="wl-detail-kurz" style="width:82px">Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
@@ -2896,6 +2897,41 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       aktualisieren();
     });
 
+    // Trade-Gesamtansicht: bei einem Multi-Timeframe-Trade (mehrere Signale mit derselben
+    // Trade-ID, z.B. Gold auf 1H/4H/1D) sieht man beim Oeffnen EINES der drei Signale sofort
+    // die Screenshots ALLER zusammengehoerigen Signale nebeneinander - egal, welches der
+    // drei man aufklappt. Rein lesend (kein Upload/Loeschen hier), die Bilder bleiben pro
+    // Signal editierbar im normalen Screenshot-Bereich weiter unten.
+    function wlRenderTradeGesamt(signal, el){
+      const tid = signal.tradeId != null ? String(signal.tradeId).trim() : '';
+      if (!tid) { el.innerHTML = ''; return; }
+      const verwandte = alleSignale.filter(s => (s.tradeId != null ? String(s.tradeId).trim() : '') === tid);
+      if (verwandte.length < 2) { el.innerHTML = ''; return; }
+      const sortiert = verwandte.slice().sort((a,b) =>
+        (a.tf||'').localeCompare(b.tf||'') || a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
+      el.innerHTML =
+        '<div class="wl-trade-gesamt-kopf">📎 Trade-Gesamtansicht – Trade-ID '+esc(tid)+' ('+sortiert.length+' Signale, alle Timeframes auf einen Blick)</div>' +
+        '<div class="wl-trade-gesamt-gruppen">' +
+        sortiert.map(s =>
+          '<div class="wl-trade-gesamt-gruppe">' +
+            '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+' · '+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
+            '<div class="tl-shots-grid wl-trade-gesamt-bilder" id="wl-trade-gesamt-bilder-'+s.id+'"><span class="muted" style="font-size:12px">Lädt…</span></div>' +
+          '</div>'
+        ).join('') +
+        '</div>';
+      sortiert.forEach(s => {
+        wlLiesShots(s.id).then(shots => {
+          const zielEl = el.querySelector('#wl-trade-gesamt-bilder-'+s.id);
+          if (!zielEl) return;
+          if (!shots.length) { zielEl.innerHTML = '<span class="muted" style="font-size:12px">Keine Screenshots</span>'; return; }
+          zielEl.innerHTML = shots.map(shot =>
+            '<div class="tl-shot-thumb"><img src="/api/watchlist/'+s.id+'/screenshots/'+shot.id+'/image" loading="lazy" alt="Screenshot"></div>'
+          ).join('');
+          zielEl.querySelectorAll('img').forEach(img => img.addEventListener('click', () => tlZeigeLightbox(img.src)));
+        });
+      });
+    }
+
     // Klick auf eine Zeile klappt die Detailansicht auf/zu
     function wlOeffneDetail(id, detailRow){
       detailRow.hidden = !detailRow.hidden;
@@ -2903,6 +2939,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       if (!detailRow.hidden) {
         const shotsEl = document.getElementById('wl-shots-'+id);
         if (shotsEl) wlLiesShots(id).then(shots => { if (wlOffenId === id) renderWlShots(id, shots, shotsEl); });
+        const gesamtEl = document.getElementById('wl-trade-gesamt-'+id);
+        if (gesamtEl) {
+          const sigRef = alleSignale.find(s => String(s.id) === String(id));
+          if (sigRef) wlRenderTradeGesamt(sigRef, gesamtEl);
+        }
         // Details-Textarea war unsichtbar (scrollHeight=0) - jetzt, da die Zeile sichtbar
         // ist, die Hoehe passend zum tatsaechlichen Inhalt setzen.
         const detailsFeld = detailRow.querySelector('.wle-details');

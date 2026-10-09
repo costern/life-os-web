@@ -608,6 +608,18 @@ a { color:var(--accent); }
 .tl-shot-browse { position:absolute; bottom:5px; right:5px; font-size:12px; line-height:1; padding:3px 6px;
   border-radius:5px; border:1px solid var(--line); background:var(--card); color:var(--muted); cursor:pointer; }
 .tl-shot-browse:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Bottom Events: Trade-Gesamtansicht - bei Multi-Timeframe-Trades (gleiche Trade-ID auf
+   mehreren Signalen, z.B. Gold 1H+4H+1D) alle Screenshots aller zugehoerigen Signale
+   zusammen anzeigen, egal welches der Signale man aufklappt. Rein lesend. */
+.wl-trade-gesamt-wrap:empty { display:none; }
+.wl-trade-gesamt-kopf { font-weight:600; font-size:13px; margin-bottom:8px; }
+.wl-trade-gesamt-gruppen { display:flex; flex-direction:column; gap:14px; margin-bottom:14px;
+  padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--hover-bg); }
+.wl-trade-gesamt-label { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:6px; }
+.wl-trade-gesamt-bilder.tl-shots-grid { gap:8px; }
+.wl-trade-gesamt-bilder .tl-shot-thumb { flex:1 1 220px; min-width:160px; cursor:zoom-in; }
+
 .tl-lightbox { position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex;
   align-items:center; justify-content:center; z-index:999; cursor:zoom-out; padding:24px; }
 .tl-lightbox img { max-width:100%; max-height:100%; border-radius:6px; }
