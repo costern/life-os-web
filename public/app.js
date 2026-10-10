@@ -672,6 +672,7 @@ async function ladeOvTrades(){
     label.textContent = aktMonat.toLocaleDateString('de-DE',{month:'long', year:'numeric'});
 
     let events = [];
+    let todoEvents = [];
     try {
       const q = '?start='+encodeURIComponent(gridStart.toISOString())+'&end='+encodeURIComponent(new Date(gridEnde.getTime()+864e5).toISOString());
       const d = await api('/calendar'+q);
@@ -679,6 +680,23 @@ async function ladeOvTrades(){
       if (!d.configured){ grid.innerHTML = '<div class="empty">Kalender noch nicht verbunden – sag mir Bescheid, dann richte ich das ein.</div>'; return; }
       if (d.error){ grid.innerHTML = '<div class="err">Kalender nicht erreichbar: '+esc(d.error)+'</div>'; return; }
       events = d.events || [];
+      // To-Dos mit Faelligkeitsdatum zusaetzlich im Grid anzeigen (Colins Wunsch: ein
+      // To-Do mit Datum soll auch im Kalender auftauchen, optisch klar von echten
+      // Terminen unterschieden). Erledigte To-Dos werden ausgeblendet - die sind nicht
+      // mehr "geplant". Als Pseudo-Termine behandelt (allDay), damit sie denselben
+      // Tages-/Sortier-Code (evDatum/evTage) wie normale ganztaegige Termine durchlaufen.
+      const gridStartIso = gridStart.toLocaleDateString('sv-SE');
+      const gridEndeIso = gridEnde.toLocaleDateString('sv-SE');
+      const alleTodos = await api('/todos').catch(() => []);
+      if (!istNochAktuell()) return;
+      // r.due kommt vom Server als volle ISO-Zeit ("2026-10-15T00:00:00.000Z", siehe
+      // Postgres DATE-Spalte -> pg -> JSON) - auf die reinen "JJJJ-MM-TT" zehn Zeichen
+      // kuerzen, genau wie es an anderer Stelle im Todos-Formular schon gemacht wird
+      // (".te-due"-Wert), sonst scheitert isoDatumTeile()/evDatum() beim Parsen.
+      todoEvents = alleTodos
+        .map(t => ({ ...t, dueTag: t.due ? String(t.due).slice(0,10) : null }))
+        .filter(t => t.dueTag && !t.done && t.dueTag >= gridStartIso && t.dueTag <= gridEndeIso)
+        .map(t => ({ id: 'todo-'+t.id, title: t.text, start: t.dueTag, allDay: true, isTodo: true }));
     } catch(e){ if (istNochAktuell()) grid.innerHTML = '<div class="err">Kalender nicht ladbar: '+esc(e.message)+'</div>'; return; }
     finally {
       // Egal ob Erfolg oder Fehler: nach dem Neuzeichnen wieder an dieselbe Stelle scrollen
@@ -688,6 +706,7 @@ async function ladeOvTrades(){
     }
     if (!istNochAktuell()) return;
 
+    events = events.concat(todoEvents);
     aktuelleEvents = events;
     // Tage-Liste pro Termin einmal vorberechnen statt bei jedem Tag neu (siehe evTage()).
     const eventTage = new Map(events.map(ev => [ev, evTage(ev)]));
@@ -719,8 +738,13 @@ async function ladeOvTrades(){
         const ersterTag = mehrtaegig && tageDesTermins[0].toDateString() === tag.toDateString();
         const letzterTag = mehrtaegig && tageDesTermins[tageDesTermins.length-1].toDateString() === tag.toDateString();
         const multiKlasse = mehrtaegig ? ' cal-ev-multi'+(ersterTag?' cal-ev-start':'')+(letzterTag?' cal-ev-end':'') : '';
-        return '<div class="cal-ev'+multiKlasse+'" data-id="'+esc(ev.id)+'" title="'+esc(ev.title)+(zeit?' · '+zeit+' Uhr':'')+'">'+
-          (zeit ? '<span class="cal-ev-zeit">'+zeit+'</span> ' : '') + (mehrtaegig && !ersterTag ? '&nbsp;' : esc(ev.title)) + '</div>';
+        // To-Dos mit Faelligkeitsdatum bekommen eine eigene Klasse (andere Farbe, siehe
+        // styles.css) PLUS ein Kaestchen-Symbol vorangestellt - nicht nur Farbe allein,
+        // damit der Unterschied zu echten Terminen auch ohne Farbwahrnehmung klar ist.
+        const todoKlasse = ev.isTodo ? ' cal-ev-todo' : '';
+        const todoIcon = ev.isTodo ? '☑ ' : '';
+        return '<div class="cal-ev'+multiKlasse+todoKlasse+'" data-id="'+esc(ev.id)+'" title="'+(ev.isTodo?'To-Do: ':'')+esc(ev.title)+(zeit?' · '+zeit+' Uhr':'')+'">'+
+          (zeit ? '<span class="cal-ev-zeit">'+zeit+'</span> ' : '') + (mehrtaegig && !ersterTag ? '&nbsp;' : todoIcon+esc(ev.title)) + '</div>';
       }).join('') +
         (tagEvents.length > 3 ? '<div class="muted">+'+(tagEvents.length-3)+' mehr</div>' : '');
       return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+(istWochenende?' weekend':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
@@ -770,7 +794,22 @@ async function ladeOvTrades(){
     const el = ev.target.closest('.cal-ev');
     if (!el) return;
     const found = aktuelleEvents.find(e => e.id === el.dataset.id);
-    if (found) oeffneModal(found);
+    if (!found) return;
+    // To-Dos haben kein Bearbeiten-Modal hier (das gibt es nur fuer echte
+    // Google-Kalender-Termine) - der Kalender liegt ohnehin schon auf derselben
+    // To-Dos-Seite, ein Klick springt deshalb einfach zur passenden Zeile in der
+    // Liste darunter und hebt sie kurz hervor, statt irgendwas zu oeffnen.
+    if (found.isTodo) {
+      const todoId = el.dataset.id.replace(/^todo-/, '');
+      const zeile = document.querySelector('#todoBoard .row[data-id="'+CSS.escape(todoId)+'"]');
+      if (zeile) {
+        zeile.scrollIntoView({ behavior:'smooth', block:'center' });
+        zeile.classList.add('todo-jump-highlight');
+        setTimeout(() => zeile.classList.remove('todo-jump-highlight'), 2000);
+      }
+      return;
+    }
+    oeffneModal(found);
   });
 
   modal.addEventListener('click', ev => { if (ev.target === modal) schliesseModal(); });
