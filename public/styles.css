@@ -420,7 +420,7 @@ a { color:var(--accent); }
 .todo-panel button { font-family:inherit; font-size:12px; font-weight:500; border:none; border-radius:8px;
   padding:6px 12px; cursor:pointer; background:var(--accent); color:#fff; }
 .todo-panel button.ghost { background:var(--ghost-bg); color:var(--ghost-text); }
-.te-msg { font-size:12px; } .te-msg.bad { color:var(--red); }
+.te-msg { font-size:12px; } .te-msg.bad { color:var(--red); } .te-msg.ok { color:var(--green); }
 .todo-panel button.danger { background:var(--red); }
 .modal-overlay { position:fixed; inset:0; background:rgba(17,17,20,.45); display:flex;
   align-items:center; justify-content:center; z-index:200; padding:16px; }
@@ -632,6 +632,11 @@ a { color:var(--accent); }
    .tl-shot-upload weiter oben in dieser Datei). */
 .wl-trade-gesamt-wrap:empty { display:none; }
 .wl-trade-gesamt-kopf { font-weight:600; font-size:13px; margin-bottom:8px; }
+/* Gemeinsames Details-Feld fuer den ganzen Trade (alle Signale derselben Trade-ID) -
+   eigener Kasten, optisch leicht abgesetzt von der Bilder-Uebersicht darunter. */
+.wl-trade-gesamt-details-box { margin-bottom:14px; padding:10px 12px; border:1px solid var(--line);
+  border-radius:10px; background:var(--card); }
+.wl-trade-gesamt-details-box .wl-detail-aktionen { margin-top:4px; display:flex; align-items:center; gap:10px; }
 .wl-trade-gesamt-tage { display:flex; flex-direction:column; gap:16px; margin-bottom:14px;
   padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--hover-bg); }
 .wl-trade-gesamt-tagreihe { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }

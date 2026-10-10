@@ -2581,7 +2581,14 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-check" title="Kein eigenstaendiges, regelkonformes Setup (z.B. kein eindeutiges Pivot-Level, choppy Candles, Pattern zu kurz - keine/nur eine Kerze zwischen den Tiefpunkten) - bestaetigt nur eine groessere Bewegung. Ergebnis trotzdem eintragen, als haette man nach Standardregeln gehandelt, damit sichtbar bleibt, ob es funktioniert haette."><input type="checkbox" class="wle-nurbestaetigung"'+(s.nurBestaetigung?' checked':'')+'> Nur bestätigendes Signal (kein eigenständiges Setup)</label>' +
         '</div>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
-        '<label class="wl-detail-voll">Details<textarea class="wle-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>' +
+        // Das grosse "Details"-Feld gibt es pro Signal nur, wenn das Signal NICHT Teil
+        // eines Multi-Timeframe-Trades ist - bei einem gruppierten Trade (Trade-Gesamt-
+        // ansicht) teilen sich alle zugehoerigen Signale EIN gemeinsames Details-Feld
+        // (siehe wl-trade-gesamt-details oben in wlRenderTradeGesamt), damit Colin den
+        // ganzen Trade an einer Stelle Stueck fuer Stueck erklaeren kann, statt das
+        // Gleiche mehrfach pro Timeframe zu pflegen.
+        (wlTradeGesamtSignale(s).length ? '' :
+          '<label class="wl-detail-voll">Details<textarea class="wle-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>') +
         '<div class="wl-detail-aktionen">' +
           '<button type="button" class="wl-save">Speichern</button>' +
           '<button type="button" class="wl-cancel ghost">Schließen</button>' +
@@ -2954,8 +2961,24 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       tage.forEach(d => tageMap.get(d).sort((a,b) =>
         wlTfMinuten(a.tf) - wlTfMinuten(b.tf) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'')));
 
+      // Gemeinsames Details-Feld fuer den GESAMTEN Trade (alle Signale mit dieser
+      // Trade-ID) statt eines eigenen Feldes pro Signal - Colin will den Trade einmal
+      // zentral Stueck fuer Stueck erklaeren koennen. Vorbelegung: der erste (zeitlich
+      // frueheste) bereits vorhandene Text unter den zugehoerigen Signalen, falls schon
+      // etwas eingetragen war (z.B. von vor der Umstellung).
+      const chronologisch = verwandte.slice().sort((a,b) =>
+        a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
+      const gemeinsamerText = (chronologisch.find(s => (s.details||'').trim()) || {}).details || '';
+      const alleIds = verwandte.map(s => s.id).join(',');
+
       el.innerHTML =
         '<div class="wl-trade-gesamt-kopf">📎 Trade-Gesamtansicht – Trade-ID '+esc(tid)+' ('+verwandte.length+' Signale, alle Timeframes auf einen Blick)</div>' +
+        '<div class="wl-trade-gesamt-details-box" data-ids="'+esc(alleIds)+'">' +
+          '<label class="wl-detail-voll">Details (gemeinsam für den gesamten Trade)' +
+            '<textarea class="wle-trade-gesamt-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse für den GESAMTEN Trade über alle Timeframes: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(gemeinsamerText)+'</textarea>' +
+          '</label>' +
+          '<div class="wl-detail-aktionen"><button type="button" class="wl-trade-gesamt-save">Speichern</button><span class="te-msg wl-trade-gesamt-msg"></span></div>' +
+        '</div>' +
         '<div class="wl-trade-gesamt-tage">' +
         tage.map(d =>
           // Jede Gruppe bekommt HIER bewusst KEINE eigene Breite (weder 100% noch 50%)
@@ -2982,6 +3005,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         if (!zielEl) return;
         wlLiesShots(s.id).then(shots => renderWlShots(s.id, shots, zielEl));
       });
+
+      const gemeinsamesFeld = el.querySelector('.wle-trade-gesamt-details');
+      if (gemeinsamesFeld) {
+        tlAutoResize(gemeinsamesFeld);
+        gemeinsamesFeld.addEventListener('input', () => tlAutoResize(gemeinsamesFeld));
+      }
     }
 
     // Klick auf eine Zeile klappt die Detailansicht auf/zu
@@ -3034,6 +3063,32 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const cancelBtn = ev.target.closest('.wl-cancel');
       if (cancelBtn) { cancelBtn.closest('tr').hidden = true; wlOffenId = null; return; }
 
+      // Gemeinsames Details-Feld der Trade-Gesamtansicht speichern - schreibt denselben
+      // Text in die "details"-Spalte JEDES zugehoerigen Signals (Trade-ID), damit es
+      // sich wirklich wie EIN geteiltes Feld verhaelt statt pro Signal getrennt zu sein.
+      const gesamtSaveBtn = ev.target.closest('.wl-trade-gesamt-save');
+      if (gesamtSaveBtn) {
+        const box = gesamtSaveBtn.closest('.wl-trade-gesamt-details-box');
+        const feld = box.querySelector('.wle-trade-gesamt-details');
+        const msg = box.querySelector('.wl-trade-gesamt-msg');
+        const ids = box.dataset.ids.split(',').filter(Boolean);
+        const text = feld.value.trim() || null;
+        gesamtSaveBtn.disabled = true; gesamtSaveBtn.textContent = 'Speichert…';
+        msg.textContent = ''; msg.className = 'te-msg wl-trade-gesamt-msg';
+        try {
+          await Promise.all(ids.map(id => api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify({ details: text }) })));
+          ids.forEach(id => {
+            const sigRef = alleSignale.find(s => String(s.id) === String(id));
+            if (sigRef) sigRef.details = text;
+          });
+          msg.textContent = 'Gespeichert ✓'; msg.className = 'te-msg wl-trade-gesamt-msg ok';
+        } catch(e) {
+          msg.textContent = 'Fehler: ' + e.message; msg.className = 'te-msg wl-trade-gesamt-msg bad';
+        }
+        gesamtSaveBtn.disabled = false; gesamtSaveBtn.textContent = 'Speichern';
+        return;
+      }
+
       const saveBtn = ev.target.closest('.wl-save');
       if (saveBtn) {
         const row = saveBtn.closest('tr');
@@ -3052,7 +3107,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           form: row.querySelector('.wle-form').value,
           bodenTyp: row.querySelector('.wle-bodentyp').value,
           notiz: row.querySelector('.wle-notiz').value.trim() || null,
-          details: row.querySelector('.wle-details').value.trim() || null,
+          // Das Details-Feld fehlt im Formular, wenn dieses Signal Teil eines
+          // gruppierten Multi-Timeframe-Trades ist (siehe wlEditRowHtml) - dann wird
+          // "details" hier bewusst NICHT mitgeschickt, damit das PATCH den Wert nicht
+          // anfasst (er wird stattdessen gemeinsam ueber die Trade-Gesamtansicht
+          // gespeichert, siehe wl-trade-gesamt-save weiter unten).
+          ...(row.querySelector('.wle-details') ? { details: row.querySelector('.wle-details').value.trim() || null } : {}),
           tradeId: row.querySelector('.wle-tradeid').value.trim() || null,
           note: row.querySelector('.wle-note').value,
           marktphase: row.querySelector('.wle-phase').value,
