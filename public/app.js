@@ -3123,6 +3123,14 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         detailRow.hidden = false;
         const shotsEl = document.getElementById('wl-shots-'+wlOffenId);
         if (shotsEl) wlLiesShots(wlOffenId).then(shots => { if (wlOffenId != null) renderWlShots(wlOffenId, shots, shotsEl); });
+        // Trade-Gesamtansicht nach dem Neuzeichnen ebenfalls wiederherstellen (wurde
+        // zuvor vergessen - blieb nach jedem Speichern einer Zeile innerhalb eines
+        // Multi-Timeframe-Trades leer, bis man die Detailansicht neu aufgeklappt hat).
+        const gesamtEl = document.getElementById('wl-trade-gesamt-'+wlOffenId);
+        if (gesamtEl) {
+          const sigRef = alleSignale.find(s => String(s.id) === String(wlOffenId));
+          if (sigRef) wlRenderTradeGesamt(sigRef, gesamtEl);
+        }
         const detailsFeld = detailRow.querySelector('.wle-details');
         if (detailsFeld) tlAutoResize(detailsFeld);
       } else {
@@ -3926,20 +3934,32 @@ function seiteAuffrischen(id){
 // muessen: solange im Trading-Log ein Trade aufgeklappt ist, geht ein eingefuegtes Bild
 // direkt an dessen Screenshot-Bereich - ganz ohne vorherigen Klick auf die "+"-Kachel noetig.
 document.addEventListener('paste', ev => {
-  if (tlOffenId == null && wlOffenId == null) return;
   const items = (ev.clipboardData && ev.clipboardData.items) || [];
   const bildItem = [...items].find(it => it.type && it.type.startsWith('image/'));
   if (!bildItem) return;
   const datei = bildItem.getAsFile();
   if (!datei) return;
-  ev.preventDefault();
   if (tlOffenId != null) {
     const el = document.getElementById('tl-shots-'+tlOffenId);
-    if (el) tlLadeScreenshotHoch(tlOffenId, datei, el);
-  } else if (wlOffenId != null) {
-    const el = document.getElementById('wl-shots-'+wlOffenId);
-    if (el) wlLadeScreenshotHoch(wlOffenId, datei, el);
+    if (el) { ev.preventDefault(); tlLadeScreenshotHoch(tlOffenId, datei, el); return; }
   }
+  // Bottom Events: zuerst versuchen, ueber die gerade fokussierte Upload-Kachel
+  // herauszufinden, zu welchem Signal eingefuegt werden soll - wichtig seit der
+  // Trade-Gesamtansicht, wo pro Signal ein EIGENER Screenshot-Bereich mit der id
+  // "wl-trade-gesamt-shots-<id>" existiert statt nur dem alten "wl-shots-<id>" (sonst
+  // landete Strg+V dort einfach nirgends, weil dieses Element fuer gruppierte Signale
+  // gar nicht mehr existiert). Fallback: die zuletzt aufgeklappte Zeile (wlOffenId).
+  const fokusWrap = document.activeElement && document.activeElement.closest('.tl-shots-wrap[id^="wl-"]');
+  let zielId = null, zielEl = null;
+  if (fokusWrap) {
+    const treffer = fokusWrap.id.match(/^wl-(?:trade-gesamt-)?shots-(.+)$/);
+    if (treffer) { zielId = treffer[1]; zielEl = fokusWrap; }
+  }
+  if (!zielEl && wlOffenId != null) {
+    zielId = wlOffenId;
+    zielEl = document.getElementById('wl-shots-'+wlOffenId) || document.getElementById('wl-trade-gesamt-shots-'+wlOffenId);
+  }
+  if (zielEl) { ev.preventDefault(); wlLadeScreenshotHoch(zielId, datei, zielEl); }
 });
 
 document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vielleichtAuffrischen(); });
