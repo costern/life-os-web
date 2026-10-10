@@ -725,7 +725,7 @@ async function ladeOvTrades(){
           if (!!a.allDay !== !!b.allDay) return a.allDay ? -1 : 1;
           return evDatum(a) - evDatum(b);
         });
-      const evHtml = tagEvents.slice(0,3).map(ev => {
+      const evHtml = tagEvents.slice(0,2).map(ev => {
         // Uhrzeit mit anzeigen (Colins Wunsch: man sieht sonst nicht, wann z.B. "Jan Schmolling"
         // stattfindet) - ganztaegige Termine bekommen keine Uhrzeit vorangestellt.
         const zeit = ev.allDay ? '' : new Date(ev.start).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
@@ -746,7 +746,7 @@ async function ladeOvTrades(){
         return '<div class="cal-ev'+multiKlasse+todoKlasse+'" data-id="'+esc(ev.id)+'" title="'+(ev.isTodo?'To-Do: ':'')+esc(ev.title)+(zeit?' · '+zeit+' Uhr':'')+'">'+
           (zeit ? '<span class="cal-ev-zeit">'+zeit+'</span> ' : '') + (mehrtaegig && !ersterTag ? '&nbsp;' : todoIcon+esc(ev.title)) + '</div>';
       }).join('') +
-        (tagEvents.length > 3 ? '<div class="muted">+'+(tagEvents.length-3)+' mehr</div>' : '');
+        (tagEvents.length > 2 ? '<div class="muted">...</div>' : '');
       return '<div class="cal-day'+(inMonat?'':' other')+(istHeute?' today':'')+(istWochenende?' weekend':'')+'"><div class="dnum">'+tag.getDate()+'</div>'+evHtml+'</div>';
     }).join('');
   }
