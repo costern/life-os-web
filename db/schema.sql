@@ -258,6 +258,13 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS level_gebrochen_gehalten 
 -- eingetragen, als haette man nach Standardregeln gehandelt (Win/BE/Lose), damit man
 -- auch bei nicht genommenen Bestaetigungssignalen sieht, ob es am Ende funktioniert haette.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS nur_bestaetigung BOOLEAN NOT NULL DEFAULT false;
+-- mtf_gleiches_level: nur relevant bei MTF >= 2 - haben die beteiligten Timeframes
+-- (z.B. 12H und 1D) tatsaechlich dasselbe Pivot-Level getroffen, oder weicht es leicht
+-- ab (z.B. weil 12H und 1D wegen unterschiedlicher Candle-Closes nicht exakt denselben
+-- Tiefpunkt bilden)? NULL = noch nicht bewertet, true = ja, false = nein/abweichend.
+-- Von Colin anhand seines HBAR-Setups angefordert (12H+1D-Signal hatte kein identisches
+-- Level, siehe [[mtf-confluence-strategy]]).
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS mtf_gleiches_level BOOLEAN;
 -- strategie: welche Setup-Art das Signal ist - eigene Seite im Dashboard je Strategie
 -- (Bottom Events / 50er-EMA-Retests / Multi-Timeframe-Bottoms / FVG), aber dieselbe Tabelle
 -- und dieselben Felder, da sich Tracking-Logik (Status, Note, Screenshots, Trade-Gruppierung)
