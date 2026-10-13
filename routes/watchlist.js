@@ -53,9 +53,11 @@ function regelkonformOrNull(v) {
   if (v === 'nein') return false;
   return null;
 }
+// 2=2 TF ABER 12H+1D (Achtung, zaehlt nach Colins Regel nicht als echte MTF-Konfluenz),
+// 4=2 TF normal (zwei andere TFs) - siehe WL_MTF_LABEL/wlMtfWarnBadgeHtml in app.js.
 function mtfOrNull(v) {
   const n = Number(v);
-  return [1, 2, 3].includes(n) ? n : null;
+  return [1, 2, 3, 4].includes(n) ? n : null;
 }
 
 function rowOut(r) {

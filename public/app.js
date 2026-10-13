@@ -2226,11 +2226,16 @@ function wlTradeIdUebersicht(signale){
   return { nutzung, hoechste, naechsteFrei };
 }
 
+// MTF-Codes: 1=Only 1 TF, 2=2 TF ABER 12H+1D (Achtung, siehe wlMtfWarnBadgeHtml),
+// 4=2 TF normal (irgendwelche zwei TFs, keine 12H+1D-Kombi), 3=3 TF. Code 2 bekommt
+// absichtlich keinen Eintrag hier - der laeuft nur als rot/orange Warnbadge, nicht als
+// grauer Fliesstext (sonst stuende "2 TF (12H+1D)" doppelt in der Zeile).
+const WL_MTF_LABEL = { 3: 'MTF 3', 4: 'MTF 2' };
 // Kurzfassung des Setups fuer die Tabellenspalte, z.B. "Double · MTF 2 · Multi-Asset · Bogen"
 function wlSetupText(s){
   const teile = [];
   if (s.eventTyp) teile.push(WL_EVENT_LABEL[s.eventTyp] || s.eventTyp);
-  if (s.mtf > 1) teile.push('MTF ' + s.mtf);
+  if (WL_MTF_LABEL[s.mtf]) teile.push(WL_MTF_LABEL[s.mtf]);
   if (s.multiAsset) teile.push('Multi-Asset');
   if (s.form) teile.push(WL_FORM_LABEL[s.form] || s.form);
   if (s.bodenTyp) teile.push(WL_BODENTYP_LABEL[s.bodenTyp] || s.bodenTyp);
@@ -2240,7 +2245,7 @@ function wlSetupText(s){
 // farbiges Badge statt im grauen Fliesstext unterzugehen (siehe WL_EVENT_FARBEN).
 function wlSetupRestText(s){
   const teile = [];
-  if (s.mtf > 1) teile.push('MTF ' + s.mtf);
+  if (WL_MTF_LABEL[s.mtf]) teile.push(WL_MTF_LABEL[s.mtf]);
   if (s.multiAsset) teile.push('Multi-Asset');
   if (s.form) teile.push(WL_FORM_LABEL[s.form] || s.form);
   if (s.bodenTyp) teile.push(WL_BODENTYP_LABEL[s.bodenTyp] || s.bodenTyp);
@@ -2251,13 +2256,17 @@ function wlEventBadgeHtml(s){
   const farbe = WL_EVENT_FARBEN[s.eventTyp];
   return '<span class="badge" style="background:transparent;border:1.5px solid '+farbe+';color:'+farbe+'">'+WL_EVENT_LABEL[s.eventTyp]+'</span>';
 }
-// Warnbadge fuer "Only One Time Frame": ein Signal, das nur auf einem einzigen Timeframe
-// aufgetaucht ist und von keinem weiteren bestaetigt wurde, ist deutlich schwaecher als ein
-// MTF-2/3-Signal - deshalb bekommt es (anders als MTF 2/3, die nur als grauer Text
-// mitlaufen) ein eigenes, rot/orange hervorgehobenes Badge statt unterzugehen.
+// Warnbadge fuer "Only One Time Frame" (mtf=1) und fuer die 12H+1D-Kombi (mtf=2) - beides
+// Faelle, die zwar wie MTF-Konfluenz aussehen, aber nach Colins Regel nicht als echte
+// Multi-Timeframe-Bestaetigung zaehlen, deshalb rot/orange statt im grauen Fliesstext.
 function wlMtfWarnBadgeHtml(s){
-  if (+s.mtf !== 1) return '';
-  return '<span class="badge" style="background:transparent;border:1.5px solid var(--orange);color:var(--orange)" title="Nur auf einem Timeframe aufgetaucht, von keinem weiteren bestätigt">Only 1 TF</span>';
+  if (+s.mtf === 1) {
+    return '<span class="badge" style="background:transparent;border:1.5px solid var(--orange);color:var(--orange)" title="Nur auf einem Timeframe aufgetaucht, von keinem weiteren bestätigt">Only 1 TF</span>';
+  }
+  if (+s.mtf === 2) {
+    return '<span class="badge" style="background:transparent;border:1.5px solid var(--orange);color:var(--orange)" title="12H + 1D allein zählen nicht als echte Multi-Timeframe-Konfluenz, da beide zu eng korreliert sind">2 TF (12H+1D)</span>';
+  }
+  return '';
 }
 
 /* Tägliche BTC/USD-Schlusskurse (Binance BTCUSDT, ab 17.08.2017 = Handelsstart des Paares). */
@@ -2579,7 +2588,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : ''))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
           '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
-          '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
+          '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
           '<label class="wl-detail-kurz" style="width:74px">Pattern'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
@@ -2611,10 +2620,16 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             ['sl_zu_weit','Stop-Loss zu weit entfernt'],['ziel_zu_nah','Ziel zu nah'],
             ['keine_htf_bestaetigung','Keine höhere Timeframe-Bestätigung'],['pattern_nicht_sauber','Pattern nicht sauber'],
             ['divergenz_fehlte','Divergenz/Bestätigung fehlte'],['sonstiger_grund','Sonstiger Grund']], s.keinTradeGrund)+'</label>' +
-          '<label class="wl-detail-voll" style="max-width:340px">Grund (falls nicht regelkonform)<input type="text" class="wle-regelkonformgrund" value="'+esc(s.regelkonformGrund||'')+'" placeholder="z.B. keine MTF-Konfluenz auf 30m/1h, kein Multi-Asset-Signal"></label>' +
+          '<label class="wl-detail-voll" style="grid-column:span 2">Grund (falls nicht regelkonform)<input type="text" class="wle-regelkonformgrund" value="'+esc(s.regelkonformGrund||'')+'" placeholder="z.B. keine MTF-Konfluenz auf 30m/1h, kein Multi-Asset-Signal"></label>' +
           '<label class="wl-detail-kurz" style="width:88px" title="gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'">Trade-ID' +
             '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="'+tradeIdInfo.naechsteFrei+'">' +
             '<span class="wl-tradeid-info muted" id="wl-tid-info-'+s.id+'"></span></label>' +
+        '</div>' +
+        // Eigene, kompakte Zeile fuer die drei Checkboxen statt im .wl-detail-grid mit den
+        // Dropdown-Feldern - sonst erbten sie die Zeilenhoehe ihrer (viel hoeheren)
+        // Nachbarn im selben Flex/Grid-Row und es blieb oben viel leerer grauer Platz
+        // (Colins Feedback: "warum ist da so ein riesiges freies graues Feld").
+        '<div class="wl-detail-checks">' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
           '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>' +
           '<label class="wl-check" title="Kein eigenstaendiges, regelkonformes Setup (z.B. kein eindeutiges Pivot-Level, choppy Candles, Pattern zu kurz - keine/nur eine Kerze zwischen den Tiefpunkten) - bestaetigt nur eine groessere Bewegung. Ergebnis trotzdem eintragen, als haette man nach Standardregeln gehandelt, damit sichtbar bleibt, ob es funktioniert haette."><input type="checkbox" class="wle-nurbestaetigung"'+(s.nurBestaetigung?' checked':'')+'> Nur bestätigendes Signal (kein eigenständiges Setup)</label>' +

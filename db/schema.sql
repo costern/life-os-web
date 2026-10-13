@@ -183,7 +183,9 @@ CREATE TABLE IF NOT EXISTS watchlist_signals (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- Detailfelder zum Setup: event_typ single|double, mtf = Anzahl Timeframes (1-3),
+-- Detailfelder zum Setup: event_typ single|double, mtf = Timeframe-Code
+-- (1=Only 1 TF, 2=2 TF ABER 12H+1D/Achtung, 4=2 TF normal, 3=3 TF - siehe
+-- WL_MTF_LABEL/wlMtfWarnBadgeHtml in public/app.js und mtfOrNull in routes/watchlist.js),
 -- multi_asset = Signal auf mehreren Assets gleichzeitig, form = bottom|bogen.
 ALTER TABLE watchlist_signals ALTER COLUMN status DROP NOT NULL;
 ALTER TABLE watchlist_signals ALTER COLUMN status DROP DEFAULT;
