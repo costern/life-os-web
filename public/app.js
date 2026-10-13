@@ -1948,8 +1948,8 @@ const TL_MAX_BILDGROESSE = 8 * 1024 * 1024; // 8 MB Rohgroesse vorm Base64-Encod
 
 function renderTradeLogShots(tradeId, shots, el){
   const kacheln = shots.map(s =>
-    '<div class="tl-shot-thumb" data-shot-id="'+s.id+'">' +
-      '<img src="/api/trades/'+tradeId+'/screenshots/'+s.id+'/image" loading="lazy" alt="Screenshot">' +
+    '<div class="tl-shot-thumb" data-shot-id="'+s.id+'" draggable="true" title="Ziehen zum Umsortieren">' +
+      '<img src="/api/trades/'+tradeId+'/screenshots/'+s.id+'/image" loading="lazy" alt="Screenshot" draggable="false">' +
       '<button type="button" class="tl-shot-del" title="Löschen (oder Rechtsklick)">✕</button>' +
     '</div>'
   ).join('');
@@ -1993,6 +1993,47 @@ function renderTradeLogShots(tradeId, shots, el){
   });
   const browse = el.querySelector('.tl-shot-browse');
   if (browse) browse.addEventListener('click', ev => { ev.stopPropagation(); input.click(); });
+  tlWireDragSort(el, async ids => {
+    try { await api('/trades/'+tradeId+'/screenshots/reorder', { method:'PATCH', body: JSON.stringify({ order: ids }) }); delete tlShotsCache[tradeId]; }
+    catch(e){ const msg = el.querySelector('.tl-shots-msg'); msg.textContent = 'Fehler beim Umsortieren: '+e.message; msg.className = 'te-msg tl-shots-msg bad'; }
+  });
+}
+
+// Drag&Drop-Umsortierung der Bildkacheln (Colins Wunsch: falsch hochgeladene Reihenfolge
+// korrigieren koennen, statt loeschen + neu hochladen zu muessen) - gemeinsam fuer
+// Trading-Log- und Watchlist-Screenshots, da beide dieselben .tl-shot-* CSS-Klassen und
+// dieselbe Grid-Struktur verwenden. Verschiebt die Kachel waehrend des Draggens live im
+// DOM (Standard-HTML5-DnD mit Positions-Erkennung links/rechts der Zielkachel) und ruft
+// beim Drop onReorder() mit der neuen Reihenfolge der Screenshot-IDs auf; der Aufrufer
+// schickt die ans Backend (siehe .../screenshots/reorder-Routen).
+function tlWireDragSort(el, onReorder){
+  const grid = el.querySelector('.tl-shots-grid');
+  if (!grid) return;
+  let dragEl = null;
+  grid.querySelectorAll('.tl-shot-thumb').forEach(kachel => {
+    kachel.addEventListener('dragstart', ev => {
+      dragEl = kachel;
+      kachel.classList.add('tl-shot-dragging');
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', kachel.dataset.shotId || '');
+    });
+    kachel.addEventListener('dragend', () => {
+      kachel.classList.remove('tl-shot-dragging');
+      dragEl = null;
+    });
+    kachel.addEventListener('dragover', ev => {
+      if (!dragEl || dragEl === kachel) return;
+      ev.preventDefault();
+      const rect = kachel.getBoundingClientRect();
+      const vorHaelfte = (ev.clientX - rect.left) < rect.width / 2;
+      grid.insertBefore(dragEl, vorHaelfte ? kachel : kachel.nextSibling);
+    });
+    kachel.addEventListener('drop', ev => {
+      ev.preventDefault();
+      const ids = [...grid.querySelectorAll('.tl-shot-thumb')].map(k => +k.dataset.shotId);
+      onReorder(ids);
+    });
+  });
 }
 
 function tlZeigeLightbox(src){
@@ -2067,8 +2108,8 @@ function wlLiesShots(id){
 
 function renderWlShots(signalId, shots, el){
   const kacheln = shots.map(s =>
-    '<div class="tl-shot-thumb" data-shot-id="'+s.id+'">' +
-      '<img src="/api/watchlist/'+signalId+'/screenshots/'+s.id+'/image" loading="lazy" alt="Screenshot">' +
+    '<div class="tl-shot-thumb" data-shot-id="'+s.id+'" draggable="true" title="Ziehen zum Umsortieren">' +
+      '<img src="/api/watchlist/'+signalId+'/screenshots/'+s.id+'/image" loading="lazy" alt="Screenshot" draggable="false">' +
       '<button type="button" class="tl-shot-del" title="Löschen (oder Rechtsklick)">✕</button>' +
     '</div>'
   ).join('');
@@ -2107,6 +2148,10 @@ function renderWlShots(signalId, shots, el){
   });
   const browse = el.querySelector('.tl-shot-browse');
   if (browse) browse.addEventListener('click', ev => { ev.stopPropagation(); input.click(); });
+  tlWireDragSort(el, async ids => {
+    try { await api('/watchlist/'+signalId+'/screenshots/reorder', { method:'PATCH', body: JSON.stringify({ order: ids }) }); delete wlShotsCache[signalId]; }
+    catch(e){ const msg = el.querySelector('.tl-shots-msg'); msg.textContent = 'Fehler beim Umsortieren: '+e.message; msg.className = 'te-msg tl-shots-msg bad'; }
+  });
 }
 
 async function wlLadeScreenshotHoch(signalId, file, el){

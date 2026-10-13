@@ -110,7 +110,7 @@ const ERLAUBTE_BILDTYPEN = new Set(['image/png', 'image/jpeg', 'image/webp', 'im
 router.get('/:id/screenshots', async (req, res) => {
   const id = +req.params.id;
   const { rows } = await pool.query(
-    'SELECT id, content_type, uploaded_at FROM trade_screenshots WHERE trade_id=$1 AND deleted_at IS NULL ORDER BY uploaded_at ASC, id ASC',
+    'SELECT id, content_type, uploaded_at FROM trade_screenshots WHERE trade_id=$1 AND deleted_at IS NULL ORDER BY sort_order ASC NULLS LAST, uploaded_at ASC, id ASC',
     [id]
   );
   res.json(rows.map(r => ({ id: r.id, contentType: r.content_type, uploadedAt: r.uploaded_at })));
@@ -131,6 +131,22 @@ router.post('/:id/screenshots', async (req, res) => {
   );
   const r = rows[0];
   res.status(201).json({ id: r.id, contentType: r.content_type, uploadedAt: r.uploaded_at });
+});
+
+// Drag&Drop-Umsortierung: Frontend schickt die Screenshot-IDs in der gewuenschten
+// Reihenfolge, jede bekommt ihren Index als sort_order (per unnest() in einer Query
+// statt einer Schleife aus Einzel-UPDATEs).
+router.patch('/:id/screenshots/reorder', async (req, res) => {
+  const id = +req.params.id;
+  const order = Array.isArray(req.body && req.body.order) ? req.body.order.map(Number).filter(Number.isFinite) : [];
+  if (!order.length) return res.status(400).json({ error: 'order fehlt oder leer' });
+  await pool.query(
+    `UPDATE trade_screenshots t SET sort_order = v.ord
+     FROM (SELECT unnest($1::int[]) AS id, unnest($2::int[]) AS ord) v
+     WHERE t.id = v.id AND t.trade_id = $3`,
+    [order, order.map((_, i) => i), id]
+  );
+  res.json({ ok: true });
 });
 
 router.get('/:id/screenshots/:sid/image', async (req, res) => {

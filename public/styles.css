@@ -609,9 +609,12 @@ a { color:var(--accent); }
    griff und Einzelbilder auf volle Breite wuchsen). Colin will IMMER dieselbe Maximalgroesse,
    egal in welcher Ansicht/Strategie - deshalb ein hartes max-width statt einer Bedingung. */
 .tl-shot-thumb { position:relative; border-radius:8px; overflow:hidden;
-  border:1px solid var(--line); cursor:zoom-in; background:var(--hover-bg); line-height:0;
+  border:1px solid var(--line); cursor:grab; background:var(--hover-bg); line-height:0;
   flex:1 1 380px; min-width:290px; max-width:380px; }
-.tl-shot-thumb img { display:block; width:100%; height:auto; }
+.tl-shot-thumb img { display:block; width:100%; height:auto; cursor:zoom-in; -webkit-user-drag:none; }
+/* Drag&Drop-Umsortierung (siehe tlWireDragSort in app.js): die gezogene Kachel wird
+   halbtransparent, damit klar ist, welche gerade bewegt wird. */
+.tl-shot-thumb.tl-shot-dragging { opacity:.4; cursor:grabbing; }
 .tl-shot-del { position:absolute; top:5px; right:5px; font-size:12px; line-height:1; padding:4px 7px;
   border-radius:5px; border:none; background:rgba(0,0,0,.6); color:#fff; cursor:pointer; }
 .tl-shot-upload { position:relative; display:flex; flex-direction:column; align-items:center;

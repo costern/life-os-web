@@ -343,6 +343,11 @@ CREATE INDEX IF NOT EXISTS idx_trade_screenshots_trade ON trade_screenshots (tra
 -- deleted_at: weiches Loeschen wie bei den anderen Tabellen (Rueckgaengig-Toast), damit ein
 -- versehentlich geloeschter Screenshot nicht sofort unwiderruflich weg ist.
 ALTER TABLE trade_screenshots ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+-- sort_order: Drag&Drop-Reihenfolge der Bilder (Colin will eine falsche Upload-
+-- Reihenfolge korrigieren koennen, ohne Bilder loeschen+neu hochladen zu muessen).
+-- NULL = noch nie umsortiert, faellt per "NULLS LAST" ans Ende hinter die bereits
+-- einsortierten Bilder und faellt dann auf uploaded_at/id zurueck (altes Verhalten).
+ALTER TABLE trade_screenshots ADD COLUMN IF NOT EXISTS sort_order INTEGER;
 
 -- Bottom-Events-Screenshots: analog zu trade_screenshots, damit man bei einem Watchlist-
 -- Signal ebenfalls eigene TradingView-Screenshots ablegen kann (zu viele/falsche lassen
@@ -356,3 +361,5 @@ CREATE TABLE IF NOT EXISTS watchlist_screenshots (
 );
 CREATE INDEX IF NOT EXISTS idx_watchlist_screenshots_signal ON watchlist_screenshots (signal_id, uploaded_at);
 ALTER TABLE watchlist_screenshots ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+-- sort_order: siehe trade_screenshots weiter oben, gleiches Prinzip.
+ALTER TABLE watchlist_screenshots ADD COLUMN IF NOT EXISTS sort_order INTEGER;
