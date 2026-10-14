@@ -3089,13 +3089,21 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           // .tl-shot-thumb" (styles.css) - wie viele Bilder pro Zeile nebeneinander
           // passen, ergibt sich dann ganz von selbst aus dem verfuegbaren Platz
           // (flex-wrap), nicht aus einer pro-Tag berechneten Breite.
-          '<div class="wl-trade-gesamt-tagreihe">' +
-            tageMap.get(d).map(s =>
-              '<div class="wl-trade-gesamt-gruppe">' +
-                '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+' · '+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
-                '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
-              '</div>'
-            ).join('') +
+          // Eigene umrandete Box pro Tag (.wl-trade-gesamt-tag) MIT gut sichtbarer
+          // Datums-Ueberschrift - vorher gab es nur das kleingedruckte Datum in jeder
+          // einzelnen Gruppe, das beim Umbruch (mehr Bilder als in eine Zeile passen)
+          // optisch unterging und man nicht mehr auf den ersten Blick sah, welche
+          // Bilder zum selben Tag gehoeren (Colins Feedback am Gold-Trade 03.11.22).
+          '<div class="wl-trade-gesamt-tag">' +
+            '<div class="wl-trade-gesamt-tag-datum">📅 '+esc(wlDatumLabel(tageMap.get(d)[0]))+'</div>' +
+            '<div class="wl-trade-gesamt-tagreihe">' +
+              tageMap.get(d).map(s =>
+                '<div class="wl-trade-gesamt-gruppe">' +
+                  '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
+                  '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
+                '</div>'
+              ).join('') +
+            '</div>' +
           '</div>'
         ).join('') +
         '</div>';

@@ -659,6 +659,13 @@ a { color:var(--accent); }
 .wl-trade-gesamt-details-box .wl-detail-aktionen { margin-top:4px; display:flex; align-items:center; gap:10px; }
 .wl-trade-gesamt-tage { display:flex; flex-direction:column; gap:16px; margin-bottom:14px;
   padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--hover-bg); }
+/* Eigene, sichtbar umrandete Box pro Tag - haelt alle Bilder dieses Tages optisch
+   zusammen, auch wenn sie (weil mehr sind, als in eine Zeile passen) auf mehrere Zeilen
+   umbrechen. Eigene Hintergrundfarbe (var(--card)) als Kontrast zum umgebenden
+   .wl-trade-gesamt-tage-Kasten, damit die Tag-Grenze auf den ersten Blick erkennbar ist. */
+.wl-trade-gesamt-tag { border:1px solid var(--line); border-radius:8px; padding:10px;
+  background:var(--card); }
+.wl-trade-gesamt-tag-datum { font-size:13px; font-weight:700; color:var(--ink); margin-bottom:8px; }
 .wl-trade-gesamt-tagreihe { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
 .wl-trade-gesamt-label { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:6px; }
 /* Das EINE feste Bild-Mass fuer diese gesamte Detailansicht - Trade-Gesamtansicht UND
