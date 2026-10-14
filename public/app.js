@@ -2652,10 +2652,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             ['measured_move','Measured Move / Bodenhöhe'],['ema50','Daily 50 EMA'],
             ['doji_level','Doji-/Kerzenlevel'],['horizontaler_widerstand','Horizontaler Widerstand'],
             ['manuelles_ziel','Manuelles Ziel'],['kein_ziel','Kein sinnvolles Ziel']], s.zielmethode)+'</label>' +
-          '<label>Entry-Simulation'+auswahlHtml('wle-entrysim', [['','–'],
+          '<label title="Preis zum Signal-Zeitpunkt schon so weit vom Pivot-Level weg, dass sich kein eigenstaendiger Entry mit sauberem R:R mehr lohnt - realistisch bleibt nur Nachkauf auf eine bestehende Position (direkt oder nach minimalem Ruecksetzer). Ob ein tieferes Limit trotzdem gefuellt worden waere, separat im Feld „Limit möglich“ eintragen.">Entry-Simulation'+auswahlHtml('wle-entrysim', [['','–'],
             ['direkter_entry','Direkter Entry möglich'],['limit_theoretisch_gefuellt','Limit theoretisch gefüllt'],
             ['limit_nicht_gefuellt','Limit nicht gefüllt'],['entry_schlechtes_rr','Entry möglich, aber R:R zu schlecht'],
+            ['nachkauf_moeglich','Nachkauf möglich (kein eigenständiger Entry)'],
             ['kein_regelkonformer_entry','Kein regelkonformer Entry'],['nicht_eindeutig','Nicht eindeutig']], s.entrySimulation)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:90px" title="Unabhaengig von der Entry-Simulation oben: waere ein Limit deutlich weiter unten/oben trotzdem gefuellt worden? Kann z.B. bei „Nachkauf möglich“ trotzdem Nein sein (Preis ging nur minimal zurück und zog dann schnell weiter).">Limit möglich'+auswahlHtml('wle-limitmoeglich', [['','–'],['ja','Ja'],['nein','Nein']], s.limitMoeglich === true ? 'ja' : (s.limitMoeglich === false ? 'nein' : ''))+'</label>' +
           '<label>Kursverlauf'+auswahlHtml('wle-kursverlauf', [['','–'],
             ['direkt_target','Direkt zum Target'],['unter_entry_dann_target','Unter Entry, Stop gehalten, danach Target'],
             ['2r_dann_zurueck','2R erreicht, danach zurück zum Entry'],['direkt_stop','Direkt zum Stop-Loss'],
@@ -3233,6 +3235,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           ergebnisDetail: row.querySelector('.wle-ergebnisdetail').value,
           zielmethode: row.querySelector('.wle-zielmethode').value,
           entrySimulation: row.querySelector('.wle-entrysim').value,
+          limitMoeglich: row.querySelector('.wle-limitmoeglich').value,
           kursverlauf: row.querySelector('.wle-kursverlauf').value,
           keinTradeGrund: row.querySelector('.wle-keintradegrund').value,
           uhrzeit: row.querySelector('.wle-uhrzeit').value,

@@ -265,6 +265,13 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS nur_bestaetigung BOOLEAN 
 -- Von Colin anhand seines HBAR-Setups angefordert (12H+1D-Signal hatte kein identisches
 -- Level, siehe [[mtf-confluence-strategy]]).
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS mtf_gleiches_level BOOLEAN;
+-- limit_moeglich: unabhaengig von entry_simulation (siehe ENTRY_SIMULATION in
+-- routes/watchlist.js) - waere ein Limit-Order WEITER UNTEN/OBEN als der direkte Preis
+-- trotzdem gefuellt worden? Bewusst ein eigenes Feld statt Teil von entry_simulation,
+-- weil z.B. "Nachkauf moeglich" (kein eigenstaendiger Entry mehr sinnvoll) UND "Limit
+-- waere nicht gefuellt worden" gleichzeitig zutreffen koennen (Colins Gold-Trade: ging
+-- nur minimal runter, dann schnell hoch - Nachkauf ja, tieferes Limit nein).
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS limit_moeglich BOOLEAN;
 -- strategie: welche Setup-Art das Signal ist - eigene Seite im Dashboard je Strategie
 -- (Bottom Events / 50er-EMA-Retests / Multi-Timeframe-Bottoms / FVG), aber dieselbe Tabelle
 -- und dieselben Felder, da sich Tracking-Logik (Status, Note, Screenshots, Trade-Gruppierung)

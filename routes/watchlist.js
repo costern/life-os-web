@@ -26,8 +26,14 @@ const ERGEBNIS_DETAIL = new Set(['noch_nicht_bewertet', 'target_erreicht', 'be_2
   'kein_entry', 'kein_trade_rr', 'setup_invalidiert', 'verlauf_unklar']);
 const ZIELMETHODE = new Set(['measured_move', 'ema50', 'doji_level', 'horizontaler_widerstand',
   'manuelles_ziel', 'kein_ziel']);
+// nachkauf_moeglich: Preis ist vom (z.B. Daily-)Pivot-Level schon so weit weg, dass sich
+// kein eigenstaendiger Entry mit sauberem R:R mehr lohnt - realistisch bleibt nur Nachkauf
+// auf eine bestehende Position (direkt oder nach minimalem Ruecksetzer). Ob ein Limit
+// WEITER UNTEN trotzdem gefuellt worden waere, ist davon unabhaengig - siehe eigenes
+// Feld limit_moeglich (Colins Gold-Trade: Nachkauf waere moeglich gewesen, das tiefere
+// Limit aber nicht, weil es nur minimal runterging und dann schnell hochzog).
 const ENTRY_SIMULATION = new Set(['direkter_entry', 'limit_theoretisch_gefuellt', 'limit_nicht_gefuellt',
-  'entry_schlechtes_rr', 'kein_regelkonformer_entry', 'nicht_eindeutig']);
+  'entry_schlechtes_rr', 'kein_regelkonformer_entry', 'nicht_eindeutig', 'nachkauf_moeglich']);
 const KURSVERLAUF = new Set(['direkt_target', 'unter_entry_dann_target', '2r_dann_zurueck',
   'direkt_stop', 'laenger_seitwaerts', 'entry_nie_erreicht', 'stop_target_gleiche_kerze', 'sonstiger_verlauf']);
 const KEIN_TRADE_GRUND = new Set(['rr_schlecht', 'langer_docht', 'sl_zu_weit', 'ziel_zu_nah',
@@ -95,7 +101,8 @@ function rowOut(r) {
     nurBestaetigung: !!r.nur_bestaetigung,
     strategie: r.strategie,
     bodenTyp: r.boden_typ,
-    mtfGleichesLevel: r.mtf_gleiches_level === null || r.mtf_gleiches_level === undefined ? null : !!r.mtf_gleiches_level
+    mtfGleichesLevel: r.mtf_gleiches_level === null || r.mtf_gleiches_level === undefined ? null : !!r.mtf_gleiches_level,
+    limitMoeglich: r.limit_moeglich === null || r.limit_moeglich === undefined ? null : !!r.limit_moeglich
   };
 }
 
@@ -118,8 +125,8 @@ router.post('/', async (req, res) => {
   const status = STATI.has(b.status) ? b.status : null;
   const strategie = STRATEGIEN.has(b.strategie) ? b.strategie : 'double_bottom';
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten, nur_bestaetigung, strategie, boden_typ, mtf_gleiches_level)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten, nur_bestaetigung, strategie, boden_typ, mtf_gleiches_level, limit_moeglich)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
@@ -137,7 +144,8 @@ router.post('/', async (req, res) => {
      KEIN_TRADE_GRUND.has(b.keinTradeGrund) ? b.keinTradeGrund : null,
      zeitOrNull(b.uhrzeit),
      regelkonformOrNull(b.regelkonform), orNull(b.regelkonformGrund), !!b.levelGebrochenGehalten, !!b.nurBestaetigung,
-     strategie, BODEN_TYPEN.has(b.bodenTyp) ? b.bodenTyp : null, regelkonformOrNull(b.mtfGleichesLevel)]
+     strategie, BODEN_TYPEN.has(b.bodenTyp) ? b.bodenTyp : null, regelkonformOrNull(b.mtfGleichesLevel),
+     regelkonformOrNull(b.limitMoeglich)]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -163,7 +171,8 @@ router.patch('/:id', async (req, res) => {
                             ['nurBestaetigung','nur_bestaetigung'],
                             ['strategie','strategie'],
                             ['bodenTyp','boden_typ'],
-                            ['mtfGleichesLevel','mtf_gleiches_level']]) {
+                            ['mtfGleichesLevel','mtf_gleiches_level'],
+                            ['limitMoeglich','limit_moeglich']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -179,7 +188,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'kursverlauf') wert = KURSVERLAUF.has(wert) ? wert : null;
     else if (key === 'keinTradeGrund') wert = KEIN_TRADE_GRUND.has(wert) ? wert : null;
     else if (key === 'uhrzeit') wert = zeitOrNull(wert);
-    else if (key === 'regelkonform' || key === 'mtfGleichesLevel') wert = regelkonformOrNull(wert);
+    else if (key === 'regelkonform' || key === 'mtfGleichesLevel' || key === 'limitMoeglich') wert = regelkonformOrNull(wert);
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);
