@@ -218,7 +218,7 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS pivot_level TEXT;
 -- ergebnis_detail    noch_nicht_bewertet | target_erreicht | be_2r | stop_loss |
 --                    kein_entry | kein_trade_rr | setup_invalidiert | verlauf_unklar
 -- zielmethode        measured_move | ema50 | doji_level | horizontaler_widerstand |
---                    manuelles_ziel | kein_ziel
+--                    rr_3r | manuelles_ziel | kein_ziel
 -- entry_simulation   direkter_entry | limit_theoretisch_gefuellt | limit_nicht_gefuellt |
 --                    entry_schlechtes_rr | kein_regelkonformer_entry | nicht_eindeutig
 -- kursverlauf        direkt_target | unter_entry_dann_target | 2r_dann_zurueck |

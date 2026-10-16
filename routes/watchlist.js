@@ -25,7 +25,7 @@ const PIVOT_LEVEL = new Set(['perfekt', 'nicht_perfekt']);
 const ERGEBNIS_DETAIL = new Set(['noch_nicht_bewertet', 'target_erreicht', 'be_2r', 'stop_loss',
   'kein_entry', 'kein_trade_rr', 'setup_invalidiert', 'verlauf_unklar']);
 const ZIELMETHODE = new Set(['measured_move', 'ema50', 'doji_level', 'horizontaler_widerstand',
-  'manuelles_ziel', 'kein_ziel']);
+  'rr_3r', 'manuelles_ziel', 'kein_ziel']);
 // nachkauf_moeglich: Preis ist vom (z.B. Daily-)Pivot-Level schon so weit weg, dass sich
 // kein eigenstaendiger Entry mit sauberem R:R mehr lohnt - realistisch bleibt nur Nachkauf
 // auf eine bestehende Position (direkt oder nach minimalem Ruecksetzer). Ob ein Limit

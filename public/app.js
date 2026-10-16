@@ -2651,6 +2651,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label>Zielmethode'+auswahlHtml('wle-zielmethode', [['','–'],
             ['measured_move','Measured Move / Bodenhöhe'],['ema50','Daily 50 EMA'],
             ['doji_level','Doji-/Kerzenlevel'],['horizontaler_widerstand','Horizontaler Widerstand'],
+            ['rr_3r','3R (Risk:Reward)'],
             ['manuelles_ziel','Manuelles Ziel'],['kein_ziel','Kein sinnvolles Ziel']], s.zielmethode)+'</label>' +
           '<label title="Preis zum Signal-Zeitpunkt schon so weit vom Pivot-Level weg, dass sich kein eigenstaendiger Entry mit sauberem R:R mehr lohnt - realistisch bleibt nur Nachkauf auf eine bestehende Position (direkt oder nach minimalem Ruecksetzer). Ob ein tieferes Limit trotzdem gefuellt worden waere, separat im Feld „Limit möglich“ eintragen.">Entry-Simulation'+auswahlHtml('wle-entrysim', [['','–'],
             ['direkter_entry','Direkter Entry möglich'],['limit_theoretisch_gefuellt','Limit theoretisch gefüllt'],
