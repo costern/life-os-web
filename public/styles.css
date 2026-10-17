@@ -1,7 +1,7 @@
 :root { color-scheme: light;
   --bg:#f6f7f9; --card:#ffffff; --ink:#1a1d23; --muted:#6b7280; --line:#e5e7eb;
   --accent:#4f46e5; --green:#059669; --red:#dc2626; --amber:#d97706; --orange:#ea580c;
-  --green-light:#22c55e; --green-strong:#065f46;
+  --green-light:#22c55e; --green-strong:#065f46; --lightblue:#0ea5e9; --purple:#9333ea;
   --input-bg:#fbfbfc; --hover-bg:#eceef2; --ghost-bg:#e7e9ee; --ghost-text:#4b5563;
   --badge-blue-bg:#eef2ff; --badge-red-bg:#fef2f2; --badge-green-bg:#ecfdf5; --badge-amber-bg:#fffbeb;
   --disabled-bg:#c7c9d1; --dot-niedrig:#cbd0d8; --dashed:#c7d2fe; --text2:#374151;
@@ -9,7 +9,7 @@
 [data-theme="dark"] { color-scheme: dark;
   --bg:#14161a; --card:#1c1f26; --ink:#e8eaed; --muted:#9aa0ab; --line:#2c3038;
   --accent:#6366f1; --green:#34d399; --red:#f87171; --amber:#fbbf24; --orange:#fb923c;
-  --green-light:#86efac; --green-strong:#22c55e;
+  --green-light:#86efac; --green-strong:#22c55e; --lightblue:#38bdf8; --purple:#c084fc;
   --input-bg:#23262e; --hover-bg:#262a33; --ghost-bg:#2a2e37; --ghost-text:#c7cbd3;
   --badge-blue-bg:rgba(99,102,241,.18); --badge-red-bg:rgba(248,113,113,.15);
   --badge-green-bg:rgba(52,211,153,.15); --badge-amber-bg:rgba(251,191,36,.15);

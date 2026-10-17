@@ -2271,12 +2271,12 @@ function wlTradeIdUebersicht(signale){
   return { nutzung, hoechste, naechsteFrei };
 }
 
-// MTF-Codes: 1=Only 1 TF, 2=2 TF ABER 12H+1D (Achtung, siehe wlMtfWarnBadgeHtml),
-// 4=2 TF normal (irgendwelche zwei TFs, keine 12H+1D-Kombi), 3=3 TF. Code 2 bekommt
-// absichtlich keinen Eintrag hier - der laeuft nur als rot/orange Warnbadge, nicht als
-// grauer Fliesstext (sonst stuende "2 TF (12H+1D)" doppelt in der Zeile).
-const WL_MTF_LABEL = { 3: 'MTF 3', 4: 'MTF 2' };
-// Kurzfassung des Setups fuer die Tabellenspalte, z.B. "Double · MTF 2 · Multi-Asset · Bogen"
+// MTF-Codes: 1=Only 1 TF, 2=2 TF ABER 12H+1D (Achtung), 4=2 TF normal (irgendwelche
+// zwei TFs, keine 12H+1D-Kombi), 3=3 TF. Alle vier laufen inzwischen als eigene farbige
+// Box ueber wlMtfWarnBadgeHtml statt als grauer Fliesstext (siehe dort) - WL_MTF_LABEL
+// bleibt daher leer, wlSetupText/wlSetupRestText zeigen fuer mtf nichts mehr an.
+const WL_MTF_LABEL = {};
+// Kurzfassung des Setups fuer die Tabellenspalte, z.B. "Double · Multi-Asset · Bogen"
 function wlSetupText(s){
   const teile = [];
   if (s.eventTyp) teile.push(WL_EVENT_LABEL[s.eventTyp] || s.eventTyp);
@@ -2306,10 +2306,16 @@ function wlEventBadgeHtml(s){
 // Multi-Timeframe-Bestaetigung zaehlen, deshalb rot/orange statt im grauen Fliesstext.
 function wlMtfWarnBadgeHtml(s){
   if (+s.mtf === 1) {
-    return '<span class="badge" style="background:transparent;border:1.5px solid var(--orange);color:var(--orange)" title="Nur auf einem Timeframe aufgetaucht, von keinem weiteren bestätigt">Only 1 TF</span>';
+    return '<span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="Nur auf einem Timeframe aufgetaucht, von keinem weiteren bestätigt">Only 1 TF</span>';
   }
   if (+s.mtf === 2) {
     return '<span class="badge" style="background:transparent;border:1.5px solid var(--orange);color:var(--orange)" title="12H + 1D allein zählen nicht als echte Multi-Timeframe-Konfluenz, da beide zu eng korreliert sind">2 TF (12H+1D)</span>';
+  }
+  if (+s.mtf === 4) {
+    return '<span class="badge" style="background:transparent;border:1.5px solid var(--lightblue);color:var(--lightblue)" title="Zwei Timeframes bestaetigen das gleiche Level (keine 12H+1D-Kombi)">MTF 2</span>';
+  }
+  if (+s.mtf === 3) {
+    return '<span class="badge" style="background:transparent;border:1.5px solid var(--purple);color:var(--purple)" title="Drei Timeframes bestaetigen das gleiche Level">MTF 3</span>';
   }
   return '';
 }
