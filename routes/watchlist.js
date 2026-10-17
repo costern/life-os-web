@@ -106,6 +106,25 @@ function rowOut(r) {
   };
 }
 
+// Multi-Asset-Abgleich: wenn an einem Tag mehrere Assets (nicht geloescht) ein Signal
+// haben, soll das Haekchen "Multi-Asset" automatisch gesetzt werden - bei allen
+// betroffenen Signalen dieses Tages, nicht nur beim gerade gespeicherten. Setzt nur
+// false -> true, nie automatisch wieder zurueck (falls z.B. ein Signal geloescht wird
+// oder das Datum/Asset geaendert wird, bleibt ein schon gesetztes Haekchen stehen -
+// Colin kann es jederzeit manuell wieder entfernen).
+async function syncMultiAssetForDate(date) {
+  await pool.query(
+    `UPDATE watchlist_signals t
+     SET multi_asset = true, updated_at = now()
+     WHERE t.date = $1 AND t.deleted_at IS NULL AND t.multi_asset = false
+       AND EXISTS (
+         SELECT 1 FROM watchlist_signals o
+         WHERE o.date = t.date AND o.deleted_at IS NULL AND o.asset <> t.asset
+       )`,
+    [date]
+  );
+}
+
 router.get('/', async (req, res) => {
   const { strategie } = req.query;
   const where = ['deleted_at IS NULL'];
@@ -147,7 +166,9 @@ router.post('/', async (req, res) => {
      strategie, BODEN_TYPEN.has(b.bodenTyp) ? b.bodenTyp : null, regelkonformOrNull(b.mtfGleichesLevel),
      regelkonformOrNull(b.limitMoeglich)]
   );
-  res.status(201).json(rowOut(rows[0]));
+  await syncMultiAssetForDate(rows[0].date);
+  const { rows: frisch } = await pool.query('SELECT * FROM watchlist_signals WHERE id=$1', [rows[0].id]);
+  res.status(201).json(rowOut(frisch[0]));
 });
 
 router.patch('/:id', async (req, res) => {
@@ -203,7 +224,9 @@ router.patch('/:id', async (req, res) => {
   vals.push(id);
   const { rows } = await pool.query(`UPDATE watchlist_signals SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`, vals);
   if (!rows.length) return res.status(404).json({ error: 'Signal nicht gefunden' });
-  res.json(rowOut(rows[0]));
+  await syncMultiAssetForDate(rows[0].date);
+  const { rows: frisch } = await pool.query('SELECT * FROM watchlist_signals WHERE id=$1', [id]);
+  res.json(rowOut(frisch[0]));
 });
 
 // Bottom-Events-Screenshots: gleiches Prinzip wie beim Trading-Log (routes/trades.js) -
