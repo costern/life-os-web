@@ -11,24 +11,26 @@ const METALL_ICONS = {
   XAU: { bgVon: '#fff3cf', bgBis: '#d7a92e', barHell: '#ffe9a8', barMittel: '#e8bb3f', barDunkel: '#b4891a' }
 };
 // Ein Barren als einfaches Trapez (Vorderseite heller, Deckel dunkler) - dreimal
-// versetzt gestapelt ergibt die typische "Barren-Stapel"-Silhouette.
+// pyramidenfoermig gestapelt (zwei unten, einer oben in der Mitte) ergibt die
+// uebliche "Barren-Stapel"-Silhouette.
 function barrenSvg(x, y, { barHell, barMittel, barDunkel }) {
-  const breiteOben = 13, breiteUnten = 17, hoehe = 5.5;
+  const breiteOben = 8, breiteUnten = 10.5, hoehe = 5.5;
   const x1 = x - breiteOben / 2, x2 = x + breiteOben / 2;
   const x3 = x + breiteUnten / 2, x4 = x - breiteUnten / 2;
-  return '<polygon points="'+x1+','+y+' '+x2+','+y+' '+x3+','+(y+hoehe)+' '+x4+','+(y+hoehe)+'" fill="'+barMittel+'" stroke="'+barDunkel+'" stroke-width="0.6"/>' +
-    '<polygon points="'+x1+','+y+' '+x2+','+y+' '+(x2-1.2)+','+(y+1.3)+' '+(x1+1.2)+','+(y+1.3)+'" fill="'+barHell+'"/>';
+  return '<polygon points="'+x1+','+y+' '+x2+','+y+' '+x3+','+(y+hoehe)+' '+x4+','+(y+hoehe)+'" fill="'+barMittel+'" stroke="'+barDunkel+'" stroke-width="0.5"/>' +
+    '<polygon points="'+x1+','+y+' '+x2+','+y+' '+(x2-0.9)+','+(y+1)+' '+(x1+0.9)+','+(y+1)+'" fill="'+barHell+'"/>';
 }
 function metallSvg({ bgVon, bgBis, barHell, barMittel, barDunkel }) {
   const grad = 'g' + bgVon.replace('#', '');
+  const farben = { barHell, barMittel, barDunkel };
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
     '<defs><linearGradient id="'+grad+'" x1="0" y1="0" x2="0" y2="1">' +
       '<stop offset="0" stop-color="'+bgVon+'"/><stop offset="1" stop-color="'+bgBis+'"/>' +
     '</linearGradient></defs>' +
     '<circle cx="16" cy="16" r="16" fill="url(#'+grad+')"/>' +
-    barrenSvg(16, 20.5, { barHell, barMittel, barDunkel }) +
-    barrenSvg(16, 15.5, { barHell, barMittel, barDunkel }) +
-    barrenSvg(16, 10.5, { barHell, barMittel, barDunkel }) +
+    barrenSvg(10.5, 18, farben) +
+    barrenSvg(21.5, 18, farben) +
+    barrenSvg(16, 11.5, farben) +
   '</svg>';
 }
 
@@ -39,7 +41,10 @@ function metallSvg({ bgVon, bgBis, barHell, barMittel, barDunkel }) {
 router.get('/:ticker', async (req, res) => {
   const ticker = String(req.params.ticker || '').trim();
   if (!ticker) return res.status(404).end();
-  const metall = METALL_ICONS[ticker.toUpperCase()];
+  // Praefix-Erkennung, nicht exaktes Match - im Frontend wird oft r.ticker verwendet,
+  // und der ist bei den Live-Trades z.B. "XAGUSDT", nicht nur "XAG".
+  const u = ticker.toUpperCase();
+  const metall = u.startsWith('XAG') ? METALL_ICONS.XAG : u.startsWith('XAU') ? METALL_ICONS.XAU : null;
   if (metall) {
     res.set('Cache-Control', 'public, max-age=86400');
     res.type('image/svg+xml').send(metallSvg(metall));
