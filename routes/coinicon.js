@@ -42,9 +42,11 @@ router.get('/:ticker', async (req, res) => {
   const ticker = String(req.params.ticker || '').trim();
   if (!ticker) return res.status(404).end();
   // Praefix-Erkennung, nicht exaktes Match - im Frontend wird oft r.ticker verwendet,
-  // und der ist bei den Live-Trades z.B. "XAGUSDT", nicht nur "XAG".
+  // und der ist bei den Live-Trades z.B. "XAGUSDT" oder nach eigener Umbenennung im
+  // Dashboard auch "Silber"/"Gold", nicht nur "XAG"/"XAU".
   const u = ticker.toUpperCase();
-  const metall = u.startsWith('XAG') ? METALL_ICONS.XAG : u.startsWith('XAU') ? METALL_ICONS.XAU : null;
+  const metall = (u.startsWith('XAG') || u.startsWith('SILBER') || u.startsWith('SILVER')) ? METALL_ICONS.XAG
+    : (u.startsWith('XAU') || u.startsWith('GOLD')) ? METALL_ICONS.XAU : null;
   if (metall) {
     res.set('Cache-Control', 'public, max-age=86400');
     res.type('image/svg+xml').send(metallSvg(metall));

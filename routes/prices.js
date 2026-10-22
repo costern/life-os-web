@@ -4,7 +4,8 @@ const router = express.Router();
 // Edelmetalle (XAG = Silber, XAU = Gold) handelt Colin zwar live, aber Crypto.com
 // kennt sie nicht - eigener Zweig ueber gold-api.com (kostenlos, kein API-Key noetig)
 // statt des Crypto.com-Proxys weiter unten. Erkennung ueber Praefix, damit sowohl der
-// reine Ticker ("XAG") als auch Bitget-Schreibweisen wie "XAGUSDT" greifen.
+// reine Ticker ("XAG"), Bitget-Schreibweisen wie "XAGUSDT" als auch eigene Umbenennungen
+// im Dashboard (Ticker-Feld = "Silber"/"Gold") greifen.
 async function metallPreis(metall) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);
@@ -26,7 +27,8 @@ router.get('/:symbol', async (req, res) => {
   const symbol = String(req.params.symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!symbol) return res.status(400).json({ error: 'Kein Symbol' });
 
-  const metall = symbol.startsWith('XAG') ? 'XAG' : symbol.startsWith('XAU') ? 'XAU' : null;
+  const metall = (symbol.startsWith('XAG') || symbol.startsWith('SILBER') || symbol.startsWith('SILVER')) ? 'XAG'
+    : (symbol.startsWith('XAU') || symbol.startsWith('GOLD')) ? 'XAU' : null;
   if (metall) {
     try { return res.json(await metallPreis(metall)); }
     catch (e) { return res.status(502).json({ error: 'Kurs nicht erreichbar: ' + e.message }); }
