@@ -1195,6 +1195,14 @@ async function ladeHistorie(){
    (mit seinen Einzeichnungen) statt eines im Dashboard nachgebauten Charts. */
 let tlTrades = [];
 let tlOffenId = null;
+let tlAssetFilter = '';
+// Mehrfachsuche wie beim Bottom-Events-Filter: kommagetrennte Begriffe ("Gold, Silber"),
+// ein Treffer reicht (ODER-Logik). Wirkt auf Tabelle, Galerie und P&L/Kalender gleichermassen.
+function tlGefiltert(){
+  const begriffe = (tlAssetFilter||'').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  if (!begriffe.length) return tlTrades;
+  return tlTrades.filter(r => begriffe.some(b => (r.asset||'').toLowerCase().includes(b)));
+}
 
 function tlDatKurz(iso){
   return new Date(iso).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
@@ -1281,10 +1289,11 @@ function tlUebersichtZeileHtml(r){
 function renderTradeLogTabelle(){
   const el = document.getElementById('tradeLogTabelle');
   if (!el) return;
-  if (!tlTrades.length){ el.innerHTML = '<div class="empty">Noch keine Trades</div>'; return; }
+  const liste = tlGefiltert();
+  if (!liste.length){ el.innerHTML = '<div class="empty">'+(tlAssetFilter ? 'Keine Trades für diesen Filter' : 'Noch keine Trades')+'</div>'; return; }
   const gruppen = [];
   let letzterSchluessel = null;
-  tlTrades.forEach(r => {
+  liste.forEach(r => {
     const schluessel = tlMonatSchluessel(r.openedAt);
     if (schluessel !== letzterSchluessel) {
       gruppen.push({ label: tlMonatLabel(r.openedAt), rows: [] });
@@ -1320,8 +1329,8 @@ function renderTradeLogTabelle(){
     '</table>';
   el.querySelectorAll('.tl-row2').forEach(tr => tr.addEventListener('click', () => tlToggleDetail(+tr.dataset.id)));
   // Falls gerade ein Detail offen war, nach dem Neuaufbau der Tabelle wieder aufklappen.
-  if (tlOffenId != null && tlTrades.some(r => r.id === tlOffenId)) tlOeffneDetail(tlOffenId);
-  schlausSprungfeld(document.getElementById('tlJumpDate'), () => el, () => tlTrades.map(r => tlDatumIso(r.openedAt)));
+  if (tlOffenId != null && liste.some(r => r.id === tlOffenId)) tlOeffneDetail(tlOffenId);
+  schlausSprungfeld(document.getElementById('tlJumpDate'), () => el, () => liste.map(r => tlDatumIso(r.openedAt)));
 }
 
 function tlToggleDetail(id){
@@ -1367,13 +1376,14 @@ function tlGalerieKarteHtml(r, shots){
 async function renderTradeLogGalerie(){
   const el = document.getElementById('tradeLogGalerie');
   if (!el) return;
-  if (!tlTrades.length){ el.innerHTML = '<div class="empty">Noch keine Trades</div>'; return; }
-  const shotsListen = await Promise.all(tlTrades.map(r => tlLiesShotsGecacht(r.id)));
+  const liste = tlGefiltert();
+  if (!liste.length){ el.innerHTML = '<div class="empty">'+(tlAssetFilter ? 'Keine Trades für diesen Filter' : 'Noch keine Trades')+'</div>'; return; }
+  const shotsListen = await Promise.all(liste.map(r => tlLiesShotsGecacht(r.id)));
   const shotsVon = {};
-  tlTrades.forEach((r, i) => { shotsVon[r.id] = shotsListen[i] || []; });
+  liste.forEach((r, i) => { shotsVon[r.id] = shotsListen[i] || []; });
 
-  const offene = tlTrades.filter(r => r.exit == null);
-  const geschlossen = tlTrades.filter(r => r.exit != null);
+  const offene = liste.filter(r => r.exit == null);
+  const geschlossen = liste.filter(r => r.exit != null);
   const gruppen = [];
   let letzterSchluessel = null;
   geschlossen.forEach(r => {
@@ -1440,7 +1450,7 @@ function tlPnlProMonat(trades){
 function renderTlPnlMonat(){
   const el = document.getElementById('tlPnlMonat');
   if (!el) return;
-  const monate = tlPnlProMonat(tlTrades);
+  const monate = tlPnlProMonat(tlGefiltert());
   if (!monate.length){ el.innerHTML = '<div class="empty">Noch keine abgeschlossenen Trades</div>'; return; }
   // Alle Balken wachsen von der Grundlinie nach oben (Farbe zeigt Gewinn/Verlust statt Richtung) -
   // einfacher zu lesen als ein divergierendes Diagramm um eine Nulllinie.
@@ -1530,7 +1540,7 @@ function tlZeitstrahlHtml(trades, opts){
 function renderTlZeitstrahl(){
   const el = document.getElementById('tlZeitstrahl');
   if (!el) return;
-  el.innerHTML = tlZeitstrahlHtml(tlTrades, { leerText:'Noch keine Trades' });
+  el.innerHTML = tlZeitstrahlHtml(tlGefiltert(), { leerText: tlAssetFilter ? 'Keine Trades für diesen Filter' : 'Noch keine Trades' });
 }
 
 // Zeitstrahl der aktuell offenen Live-Trades, direkt im Live-Positionen-Fenster unter der
@@ -1579,7 +1589,7 @@ function renderTlKalender(){
     const inMonat = tag.getMonth() === tlCalMonat.getMonth();
     const istHeute = tag.toDateString() === heute.toDateString();
     const istWochenende = tag.getDay() === 0 || tag.getDay() === 6;
-    const tagTrades = tlTrades.filter(r => tlCalTagVon(r).toDateString() === tag.toDateString());
+    const tagTrades = tlGefiltert().filter(r => tlCalTagVon(r).toDateString() === tag.toDateString());
     const tagSumme = tagTrades.reduce((a,r) => a + (r.exit != null && r.pnl != null ? Number(r.pnl) : (r.realizedPnl ? Number(r.realizedPnl) : 0)), 0);
     const evHtml = tagTrades.slice(0,3).map(r => {
       const status = r.exit == null ? 'live' : (Number(r.pnl) >= 0 ? 'win' : 'loss');
@@ -1632,6 +1642,20 @@ function tlSetupViewTabs(){
   });
 }
 tlSetupViewTabs();
+
+(function(){
+  const input = document.getElementById('tlAssetFilter');
+  const clear = document.getElementById('tlAssetFilterClear');
+  if (!input) return;
+  function rerender(){
+    if (clear) clear.hidden = !tlAssetFilter;
+    renderTradeLogTabelle();
+    if (tlAnsicht === 'galerie') renderTradeLogGalerie();
+    if (tlAnsicht === 'kalender') renderTlAnalyse();
+  }
+  input.addEventListener('input', () => { tlAssetFilter = input.value; rerender(); });
+  if (clear) clear.addEventListener('click', () => { tlAssetFilter = ''; input.value = ''; rerender(); input.focus(); });
+})();
 
 async function tlOeffneDetail(id){
   const zeile = document.querySelector('.tl-detail-row[data-detail-id="'+id+'"]');
@@ -2409,9 +2433,10 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // "X druecken zeigt gar keine Trades mehr"). Stattdessen ab hier ausschliesslich mit der
     // eigenen Variable "signaleGefiltert" weiterarbeiten.
     const alleSignale = signale;
-    const wlFilterText = (wlAssetFilter || '').trim().toLowerCase();
+    // Mehrfachsuche: kommagetrennte Begriffe ("Gold, Silber") - ein Treffer reicht (ODER-Logik).
+    const wlFilterBegriffe = (wlAssetFilter || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
     const signaleGefiltert = alleSignale.filter(s =>
-      (!wlFilterText || (s.asset||'').toLowerCase().includes(wlFilterText)) &&
+      (!wlFilterBegriffe.length || wlFilterBegriffe.some(b => (s.asset||'').toLowerCase().includes(b))) &&
       (!wlNurRegelkonform || s.regelkonform !== false)
     );
 
@@ -2820,7 +2845,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<input type="text" id="wlJumpDate'+SFX+'" placeholder="z.B. 26.03.25, 09/25, 2025 …" autocomplete="off">' +
         '<span class="wl-asset-filter-wrap">' +
           '<label for="wlAssetFilter" class="wl-asset-filter-label">Asset filtern</label>' +
-          '<input type="text" id="wlAssetFilter'+SFX+'" class="wl-asset-filter" placeholder="z. B. Arbitrum" autocomplete="off" value="'+esc(wlAssetFilter)+'">' +
+          '<input type="text" id="wlAssetFilter'+SFX+'" class="wl-asset-filter" placeholder="z. B. Gold, Silber" autocomplete="off" value="'+esc(wlAssetFilter)+'">' +
           (wlAssetFilter ? '<button type="button" id="wlAssetFilterClear'+SFX+'" class="icon-btn" title="Filter zurücksetzen">✕</button>' : '') +
         '</span>' +
         '<label class="wl-check" style="margin-left:14px" title="Signale, die als nicht regelkonform markiert sind, aus Tabelle/Chart/Statistiken ausblenden">' +
