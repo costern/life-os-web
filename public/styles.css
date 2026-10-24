@@ -675,6 +675,17 @@ a { color:var(--accent); }
 .wl-trade-gesamt-gruppe .tl-shot-upload { flex:0 0 42px; min-height:42px; padding:3px; }
 .wl-trade-gesamt-gruppe .tl-shot-upload-hint { display:none; }
 .wl-trade-gesamt-gruppe .tl-shot-upload-plus { font-size:15px; }
+/* Eingeklappte Felder-Uebersicht EINES Signals direkt unter dessen Bildern in der
+   Trade-Gesamtansicht (wlSignalFelderHtml) - standardmaessig zu, jedes Signal einzeln
+   auf-/zuklappbar, damit Colin nicht mehr zur Tabellenzeile dieses Signals scrollen muss. */
+.wl-signal-felder { margin-top:10px; width:100%; }
+.wl-signal-felder-toggle { font-family:inherit; font-size:12px; font-weight:500; background:none;
+  border:1px solid var(--line); color:var(--muted); padding:5px 10px; border-radius:7px; cursor:pointer; }
+.wl-signal-felder-toggle:hover { background:var(--hover-bg); }
+.wl-signal-felder-arrow { display:inline-block; transition:transform .15s; }
+.wl-signal-felder-toggle.wl-signal-felder-open .wl-signal-felder-arrow { transform:rotate(90deg); }
+.wl-signal-felder-body { margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
+  display:flex; flex-direction:column; gap:7px; width:640px; max-width:100%; }
 
 .tl-lightbox { position:fixed; inset:0; background:rgba(0,0,0,.85); display:flex;
   align-items:center; justify-content:center; z-index:999; cursor:zoom-out; padding:24px; }

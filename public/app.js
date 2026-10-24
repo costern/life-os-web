@@ -2655,14 +2655,63 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // erkennbar sind, und das "Nx"-Badge neben dem Datum zeigt weiterhin an, wenn mehrere
     // Signale auf denselben Tag fallen (siehe gleicherTag()/tagBadge in wlZeileHtml).
 
+    // Liest alle Signal-Felder (Datum bis Notiz) aus dem gegebenen Scope-Element aus -
+    // gemeinsam genutzt vom normalen Speichern-Button (ganze Tabellenzeile) UND vom
+    // Speichern-Button je Einzelsignal innerhalb einer aufgeklappten Trade-Gesamtansicht
+    // (gleiche Feld-Klassen .wle-*, nur unterschiedlicher Scope - siehe .wl-felder-scope).
+    // Gibt bei ungueltigem Datum null zurueck (Fehlermeldung ist dabei schon angezeigt).
+    function wlFelderAuslesen(scope){
+      const dateFeld = scope.querySelector('.wle-date');
+      const date = schlauesDatumZuIso(parseSchlauesDatum(dateFeld.value));
+      if (!date) { dateFeld.classList.add('datum-feld-ungueltig'); alert('Bitte ein vollständiges Datum eingeben, z.B. 26.03.2025.'); return null; }
+      return {
+        date,
+        asset: scope.querySelector('.wle-asset').value.trim(),
+        tf: scope.querySelector('.wle-tf').value.trim() || null,
+        status: scope.querySelector('.wle-status').value,
+        eventTyp: scope.querySelector('.wle-event').value,
+        mtf: scope.querySelector('.wle-mtf').value,
+        mtfGleichesLevel: scope.querySelector('.wle-mtflevel').value,
+        multiAsset: scope.querySelector('.wle-multiasset').checked,
+        form: scope.querySelector('.wle-form').value,
+        bodenTyp: scope.querySelector('.wle-bodentyp').value,
+        notiz: scope.querySelector('.wle-notiz').value.trim() || null,
+        // Das Details-Feld fehlt im Scope, wenn dieses Signal Teil eines gruppierten
+        // Multi-Timeframe-Trades ist (siehe wlEditRowHtml) - dann wird "details" hier
+        // bewusst NICHT mitgeschickt, damit das PATCH den Wert nicht anfasst (er wird
+        // stattdessen gemeinsam ueber die Trade-Gesamtansicht gespeichert, siehe
+        // wl-trade-gesamt-save).
+        ...(scope.querySelector('.wle-details') ? { details: scope.querySelector('.wle-details').value.trim() || null } : {}),
+        tradeId: scope.querySelector('.wle-tradeid').value.trim() || null,
+        note: scope.querySelector('.wle-note').value,
+        marktphase: scope.querySelector('.wle-phase').value,
+        pattern: scope.querySelector('.wle-pattern').value,
+        candles: scope.querySelector('.wle-candles').value,
+        divLokal: scope.querySelector('.wle-divlokal').value,
+        divStruktur: scope.querySelector('.wle-divstruktur').value,
+        pivotLevel: scope.querySelector('.wle-pivot').value,
+        ergebnisDetail: scope.querySelector('.wle-ergebnisdetail').value,
+        zielmethode: scope.querySelector('.wle-zielmethode').value,
+        entrySimulation: scope.querySelector('.wle-entrysim').value,
+        limitMoeglich: scope.querySelector('.wle-limitmoeglich').value,
+        kursverlauf: scope.querySelector('.wle-kursverlauf').value,
+        keinTradeGrund: scope.querySelector('.wle-keintradegrund').value,
+        uhrzeit: scope.querySelector('.wle-uhrzeit').value,
+        regelkonform: scope.querySelector('.wle-regelkonform').value,
+        regelkonformGrund: scope.querySelector('.wle-regelkonformgrund').value.trim() || null,
+        levelGebrochenGehalten: scope.querySelector('.wle-levelgebrochen').checked,
+        nurBestaetigung: scope.querySelector('.wle-nurbestaetigung').checked
+      };
+    }
+
     // Die aufklappbare Detailansicht (Bearbeiten-Panel) eines einzelnen Signals.
-    function wlEditRowHtml(s){
+    // Nur das Formular (Felder-Grid + Checkboxen + Notiz) eines einzelnen Signals, OHNE
+    // Kopf/Screenshots/Details-Textfeld/Speichern-Button drumherum - wird sowohl fuer ein
+    // einzelnes (nicht gruppiertes) Signal genutzt als auch, eingeklappt, pro Einzelsignal
+    // innerhalb einer aufgeklappten Trade-Gesamtansicht (siehe wlRenderTradeGesamt).
+    function wlFelderGridHtml(s){
       const st = wlStatus(s);
-      return '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="13"><div class="wl-detail">' +
-        '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
-        '<div class="wl-trade-gesamt-wrap" id="wl-trade-gesamt-'+s.id+'"></div>' +
-        (wlTradeGesamtSignale(s).length ? '' : '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>') +
-        '<div class="wl-detail-grid">' +
+      return '<div class="wl-detail-grid">' +
           '<label class="wl-detail-kurz" style="width:82px">Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
           '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = 02:00 (Tageschart)">Uhrzeit' +
             '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
@@ -2722,17 +2771,39 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>' +
           '<label class="wl-check" title="Kein eigenstaendiges, regelkonformes Setup (z.B. kein eindeutiges Pivot-Level, choppy Candles, Pattern zu kurz - keine/nur eine Kerze zwischen den Tiefpunkten) - bestaetigt nur eine groessere Bewegung. Ergebnis trotzdem eintragen, als haette man nach Standardregeln gehandelt, damit sichtbar bleibt, ob es funktioniert haette."><input type="checkbox" class="wle-nurbestaetigung"'+(s.nurBestaetigung?' checked':'')+'> Nur bestätigendes Signal (kein eigenständiges Setup)</label>' +
         '</div>' +
-        '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
-        // Das grosse "Details"-Feld gibt es pro Signal nur, wenn das Signal NICHT Teil
-        // eines Multi-Timeframe-Trades ist - bei einem gruppierten Trade (Trade-Gesamt-
-        // ansicht) teilen sich alle zugehoerigen Signale EIN gemeinsames Details-Feld
-        // (siehe wl-trade-gesamt-details oben in wlRenderTradeGesamt), damit Colin den
-        // ganzen Trade an einer Stelle Stueck fuer Stueck erklaeren kann, statt das
-        // Gleiche mehrfach pro Timeframe zu pflegen.
-        (wlTradeGesamtSignale(s).length ? '' :
+        '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>';
+    }
+
+    // Eingeklappter Umschalter + Formular fuer EIN Signal innerhalb der Trade-Gesamtansicht
+    // (siehe wlRenderTradeGesamt) - steht direkt unter den Screenshots dieses Signals,
+    // standardmaessig zu, jedes Signal einzeln auf-/zuklappbar. Eigener Speichern-Button
+    // pro Signal, damit Colin nicht mehr zur Tabellenzeile dieses Signals scrollen muss,
+    // um dessen Felder (Marktphase, Divergenz, Pivot-Level, ...) einzusehen oder zu pflegen.
+    function wlSignalFelderHtml(s){
+      return '<div class="wl-signal-felder">' +
+        '<button type="button" class="wl-signal-felder-toggle">Details zu diesem Signal <span class="wl-signal-felder-arrow">▸</span></button>' +
+        '<div class="wl-signal-felder-body" hidden>' +
+          '<div class="wl-felder-scope" data-felder-id="'+s.id+'">' + wlFelderGridHtml(s) + '</div>' +
+          '<div class="wl-detail-aktionen"><button type="button" class="wl-signal-felder-save" data-felder-id="'+s.id+'">Speichern</button><span class="te-msg"></span></div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function wlEditRowHtml(s){
+      const gruppiert = wlTradeGesamtSignale(s).length > 0;
+      return '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="13"><div class="wl-detail">' +
+        '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
+        '<div class="wl-trade-gesamt-wrap" id="wl-trade-gesamt-'+s.id+'"></div>' +
+        // Bei einem gruppierten Multi-Timeframe-Trade stehen die Screenshots UND das
+        // Felder-Formular jedes Einzelsignals (eingeklappt) direkt in der Trade-Gesamt-
+        // ansicht oben (siehe wlRenderTradeGesamt/wlSignalFelderHtml) - hier also nichts
+        // davon noch ein zweites Mal.
+        (gruppiert ? '' :
+          '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>' +
+          '<div class="wl-felder-scope" data-felder-id="'+s.id+'">' + wlFelderGridHtml(s) + '</div>' +
           '<label class="wl-detail-voll">Details<textarea class="wle-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>') +
         '<div class="wl-detail-aktionen">' +
-          '<button type="button" class="wl-save">Speichern</button>' +
+          (gruppiert ? '' : '<button type="button" class="wl-save" data-felder-id="'+s.id+'">Speichern</button>') +
           '<button type="button" class="wl-cancel ghost">Schließen</button>' +
         '</div>' +
       '</div></td></tr>';
@@ -3143,6 +3214,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
                 '<div class="wl-trade-gesamt-gruppe">' +
                   '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
                   '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
+                  // Direkt unter den Bildern DIESES Signals: eingeklappte eigene Feldübersicht
+                  // (Marktphase, Divergenz, Pivot-Level, ...) statt wie frueher nur fuer das
+                  // Signal sichtbar, auf das zuerst geklickt wurde - jedes Signal einzeln und
+                  // unabhaengig von den anderen auf-/zuklappbar (Colins Feedback).
+                  wlSignalFelderHtml(s) +
                 '</div>'
               ).join('') +
             '</div>' +
@@ -3161,6 +3237,34 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         tlAutoResize(gemeinsamesFeld);
         gemeinsamesFeld.addEventListener('input', () => tlAutoResize(gemeinsamesFeld));
       }
+
+      // Die eingeklappten Felder-Formulare pro Signal (wlSignalFelderHtml) kommen erst
+      // jetzt per innerHTML in die Seite - die normale Verdrahtung in render() lief schon
+      // vorher und erfasst sie deshalb nicht; hier dasselbe nachholen (Datumsfeld-Erkennung,
+      // Trade-ID-Live-Info) sowie den Auf-/Zuklapp-Umschalter je Signal.
+      el.querySelectorAll('.wle-date').forEach(schlausDatumsfeld);
+      el.querySelectorAll('.wle-tradeid').forEach(inp => {
+        const scope = inp.closest('.wl-felder-scope');
+        const infoEl = scope ? document.getElementById('wl-tid-info-'+scope.dataset.felderId) : null;
+        if (!infoEl) return;
+        const aktualisieren = () => {
+          const tid = inp.value.trim();
+          if (!tid) { infoEl.textContent = ''; return; }
+          const nutzung = tradeIdInfo.nutzung.get(tid);
+          if (!nutzung) { infoEl.textContent = 'Nummer '+tid+' ist noch frei.'; return; }
+          const teile = [...nutzung.entries()].map(([asset, n]) => asset+' ('+n+'×)');
+          infoEl.textContent = 'Nummer '+tid+' bereits vergeben – '+teile.join(', ')+'.';
+        };
+        inp.addEventListener('input', aktualisieren);
+        aktualisieren();
+      });
+      el.querySelectorAll('.wl-signal-felder-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const body = btn.nextElementSibling;
+          body.hidden = !body.hidden;
+          btn.classList.toggle('wl-signal-felder-open', !body.hidden);
+        });
+      });
     }
 
     // Klick auf eine Zeile klappt die Detailansicht auf/zu
@@ -3243,47 +3347,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       if (saveBtn) {
         const row = saveBtn.closest('tr');
         const id = row.dataset.id;
-        const dateFeld = row.querySelector('.wle-date');
-        const date = schlauesDatumZuIso(parseSchlauesDatum(dateFeld.value));
-        if (!date) { dateFeld.classList.add('datum-feld-ungueltig'); alert('Bitte ein vollständiges Datum eingeben, z.B. 26.03.2025.'); return; }
-        const body = {
-          date,
-          asset: row.querySelector('.wle-asset').value.trim(),
-          tf: row.querySelector('.wle-tf').value.trim() || null,
-          status: row.querySelector('.wle-status').value,
-          eventTyp: row.querySelector('.wle-event').value,
-          mtf: row.querySelector('.wle-mtf').value,
-          mtfGleichesLevel: row.querySelector('.wle-mtflevel').value,
-          multiAsset: row.querySelector('.wle-multiasset').checked,
-          form: row.querySelector('.wle-form').value,
-          bodenTyp: row.querySelector('.wle-bodentyp').value,
-          notiz: row.querySelector('.wle-notiz').value.trim() || null,
-          // Das Details-Feld fehlt im Formular, wenn dieses Signal Teil eines
-          // gruppierten Multi-Timeframe-Trades ist (siehe wlEditRowHtml) - dann wird
-          // "details" hier bewusst NICHT mitgeschickt, damit das PATCH den Wert nicht
-          // anfasst (er wird stattdessen gemeinsam ueber die Trade-Gesamtansicht
-          // gespeichert, siehe wl-trade-gesamt-save weiter unten).
-          ...(row.querySelector('.wle-details') ? { details: row.querySelector('.wle-details').value.trim() || null } : {}),
-          tradeId: row.querySelector('.wle-tradeid').value.trim() || null,
-          note: row.querySelector('.wle-note').value,
-          marktphase: row.querySelector('.wle-phase').value,
-          pattern: row.querySelector('.wle-pattern').value,
-          candles: row.querySelector('.wle-candles').value,
-          divLokal: row.querySelector('.wle-divlokal').value,
-          divStruktur: row.querySelector('.wle-divstruktur').value,
-          pivotLevel: row.querySelector('.wle-pivot').value,
-          ergebnisDetail: row.querySelector('.wle-ergebnisdetail').value,
-          zielmethode: row.querySelector('.wle-zielmethode').value,
-          entrySimulation: row.querySelector('.wle-entrysim').value,
-          limitMoeglich: row.querySelector('.wle-limitmoeglich').value,
-          kursverlauf: row.querySelector('.wle-kursverlauf').value,
-          keinTradeGrund: row.querySelector('.wle-keintradegrund').value,
-          uhrzeit: row.querySelector('.wle-uhrzeit').value,
-          regelkonform: row.querySelector('.wle-regelkonform').value,
-          regelkonformGrund: row.querySelector('.wle-regelkonformgrund').value.trim() || null,
-          levelGebrochenGehalten: row.querySelector('.wle-levelgebrochen').checked,
-          nurBestaetigung: row.querySelector('.wle-nurbestaetigung').checked
-        };
+        const body = wlFelderAuslesen(row);
+        if (!body) return;
         saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
         try {
           await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) });
@@ -3294,6 +3359,34 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           await ladeUndZeichne();
         }
         catch(e) { saveBtn.disabled = false; saveBtn.textContent = 'Speichern'; alert('Fehler: ' + e.message); }
+        return;
+      }
+
+      // Speichern-Button EINES Signals innerhalb der eingeklappten Trade-Gesamtansicht
+      // (wlSignalFelderHtml) - im Unterschied zu .wl-save oben klappt hier NICHTS zu und
+      // es wird NICHT die ganze Seite neu geladen, damit die gerade bearbeiteten/aufgeklappten
+      // Signale der Gruppe offen bleiben (Colin will mehrere Signale parallel durchgehen).
+      const gfSaveBtn = ev.target.closest('.wl-signal-felder-save');
+      if (gfSaveBtn) {
+        // .wl-felder-scope liegt NICHT um den Speichern-Button herum, sondern als
+        // vorheriges Geschwister-Element in derselben .wl-signal-felder-body (siehe
+        // wlSignalFelderHtml) - deshalb ueber den gemeinsamen Elternknoten suchen.
+        const scope = gfSaveBtn.closest('.wl-signal-felder-body').querySelector('.wl-felder-scope');
+        const id = scope.dataset.felderId;
+        const body = wlFelderAuslesen(scope);
+        if (!body) return;
+        const msg = gfSaveBtn.nextElementSibling;
+        gfSaveBtn.disabled = true; gfSaveBtn.textContent = 'Speichert…';
+        if (msg) { msg.textContent = ''; msg.className = 'te-msg'; }
+        try {
+          await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) });
+          const sigRef = alleSignale.find(sg => String(sg.id) === String(id));
+          if (sigRef) Object.assign(sigRef, body);
+          if (msg) { msg.textContent = 'Gespeichert ✓'; msg.className = 'te-msg ok'; }
+        } catch(e) {
+          if (msg) { msg.textContent = 'Fehler: ' + e.message; msg.className = 'te-msg bad'; }
+        }
+        gfSaveBtn.disabled = false; gfSaveBtn.textContent = 'Speichern';
         return;
       }
 
