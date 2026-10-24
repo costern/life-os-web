@@ -2779,14 +2779,19 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // standardmaessig zu, jedes Signal einzeln auf-/zuklappbar. Eigener Speichern-Button
     // pro Signal, damit Colin nicht mehr zur Tabellenzeile dieses Signals scrollen muss,
     // um dessen Felder (Marktphase, Divergenz, Pivot-Level, ...) einzusehen oder zu pflegen.
-    function wlSignalFelderHtml(s){
-      return '<div class="wl-signal-felder">' +
-        '<button type="button" class="wl-signal-felder-toggle">Details zu diesem Signal <span class="wl-signal-felder-arrow">▸</span></button>' +
-        '<div class="wl-signal-felder-body" hidden>' +
+    // Umschalter-Button, steht NEBEN den Screenshots/dem Ordner-Symbol (gleiche Zeile,
+    // siehe wlRenderTradeGesamt), statt wie zuvor als eigene Zeile darunter.
+    function wlSignalFelderToggleHtml(s){
+      return '<button type="button" class="wl-signal-felder-toggle">Details <span class="wl-signal-felder-arrow">▸</span></button>';
+    }
+    // Das eingeklappte Formular selbst - eigene, volle Zeile UNTER den Screenshots/dem
+    // Umschalter (nicht mehr in der Bild-Zeile selbst, damit es die volle verfuegbare
+    // Breite der Gruppe nutzen kann statt zusammengequetscht zu wirken).
+    function wlSignalFelderBodyHtml(s){
+      return '<div class="wl-signal-felder-body" hidden>' +
           '<div class="wl-felder-scope" data-felder-id="'+s.id+'">' + wlFelderGridHtml(s) + '</div>' +
           '<div class="wl-detail-aktionen"><button type="button" class="wl-signal-felder-save" data-felder-id="'+s.id+'">Speichern</button><span class="te-msg"></span></div>' +
-        '</div>' +
-      '</div>';
+        '</div>';
     }
 
     function wlEditRowHtml(s){
@@ -3213,12 +3218,20 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
               tageMap.get(d).map(s =>
                 '<div class="wl-trade-gesamt-gruppe">' +
                   '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
-                  '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
+                  // Bilder/Ordner-Symbol und der Umschalter-Button stehen in EINER Zeile
+                  // nebeneinander (Colin: "Pack diesen Button bitte rechts neben dieses
+                  // Ordner-Symbol") - das eingeklappte Formular selbst steht als eigener,
+                  // voller Block DARUNTER, damit es die ganze Breite der Gruppe nutzen kann
+                  // statt zusammengequetscht zu wirken.
+                  '<div class="wl-trade-gesamt-shots-row">' +
+                    '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
+                    wlSignalFelderToggleHtml(s) +
+                  '</div>' +
                   // Direkt unter den Bildern DIESES Signals: eingeklappte eigene Feldübersicht
                   // (Marktphase, Divergenz, Pivot-Level, ...) statt wie frueher nur fuer das
                   // Signal sichtbar, auf das zuerst geklickt wurde - jedes Signal einzeln und
                   // unabhaengig von den anderen auf-/zuklappbar (Colins Feedback).
-                  wlSignalFelderHtml(s) +
+                  wlSignalFelderBodyHtml(s) +
                 '</div>'
               ).join('') +
             '</div>' +
@@ -3260,7 +3273,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       });
       el.querySelectorAll('.wl-signal-felder-toggle').forEach(btn => {
         btn.addEventListener('click', () => {
-          const body = btn.nextElementSibling;
+          // Der Button steckt jetzt in der .wl-trade-gesamt-shots-row, der Formular-Block
+          // (.wl-signal-felder-body) ist ein nachfolgendes Geschwister DIESER Zeile, nicht
+          // mehr des Buttons selbst - deshalb ueber die gemeinsame .wl-trade-gesamt-gruppe suchen.
+          const body = btn.closest('.wl-trade-gesamt-gruppe').querySelector('.wl-signal-felder-body');
+          if (!body) return;
           body.hidden = !body.hidden;
           btn.classList.toggle('wl-signal-felder-open', !body.hidden);
         });
