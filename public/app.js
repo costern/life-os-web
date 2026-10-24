@@ -984,7 +984,9 @@ async function ladeOvTrades(){
         '<span class="icon-btn todo-edit-toggle" role="button" title="Bearbeiten">✎</span>' +
         '<span class="icon-btn del todo-del" role="button" title="Löschen">🗑</span>' +
       '</span>' +
-      (r.done ? '' : todoAlterBarHtml(r)) +
+      // "Beobachten"-Themen sind bewusst dauerhaft offen (kein "wird alt/liegt rum"-Signal
+      // noetig) - deshalb dort kein Alters-Balken, anders als bei normalen To-Dos.
+      (r.done || r.thema === 'Beobachten' ? '' : todoAlterBarHtml(r)) +
     '</div>' + panel(r);
   }
 
@@ -1004,10 +1006,16 @@ async function ladeOvTrades(){
 
     // ToDo-Seite: eigene Spalte pro Thema, nebeneinander
     if (elBoard){
-      const themen = Array.from(new Set(gefiltert.map(r => r.thema).filter(Boolean))).sort((a,b) => a.localeCompare(b,'de'));
+      const themenAlle = Array.from(new Set(gefiltert.map(r => r.thema).filter(Boolean))).sort((a,b) => a.localeCompare(b,'de'));
+      const themen = themenAlle.filter(th => th !== 'Beobachten');
       const ohneThema = sortiert(gefiltert.filter(r => !r.thema));
+      const beobachten = sortiert(gefiltert.filter(r => r.thema === 'Beobachten'));
       const spalten = [];
-      if (ohneThema.length || !themen.length) spalten.push({ label:'Ohne Thema', liste: ohneThema });
+      // "Beobachten" fest an erster Stelle, nicht alphabetisch einsortiert und immer sichtbar
+      // (auch leer) - Colin will die Spalte nicht suchen muessen, sie soll immer am gleichen
+      // Platz stehen.
+      spalten.push({ label:'Beobachten', liste: beobachten });
+      if (ohneThema.length || (!themen.length && !beobachten.length)) spalten.push({ label:'Ohne Thema', liste: ohneThema });
       themen.forEach(th => spalten.push({ label: th, liste: sortiert(gefiltert.filter(r => r.thema === th)) }));
 
       let farbIdx = 0;
