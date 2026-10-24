@@ -678,9 +678,11 @@ a { color:var(--accent); }
 /* Eingeklappte Felder-Uebersicht EINES Signals direkt unter dessen Bildern in der
    Trade-Gesamtansicht (wlSignalFelderToggleHtml/wlSignalFelderBodyHtml) - standardmaessig
    zu, jedes Signal einzeln auf-/zuklappbar, damit Colin nicht mehr zur Tabellenzeile
-   dieses Signals scrollen muss. Der Umschalter steht in einer Zeile neben den Bildern/
-   dem Ordner-Symbol; das Formular selbst ist ein eigener, voller Block darunter. */
-.wl-trade-gesamt-shots-row { display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; }
+   dieses Signals scrollen muss. Fuss-Zeile unter den Bildern dieser Gruppe: Details-
+   Umschalter fest ganz links, "Bilder hinzufuegen"-Ordner fest ganz rechts (Colins
+   Feedback) - space-between haelt beide an den Enden, egal wie breit die Gruppe ist. */
+.wl-trade-gesamt-footer-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; }
+.wl-trade-gesamt-upload-slot { flex:0 0 auto; }
 .wl-signal-felder-toggle { font-family:inherit; font-size:12px; font-weight:500; background:none;
   border:1px solid var(--line); color:var(--muted); padding:5px 10px; border-radius:7px; cursor:pointer; }
 .wl-signal-felder-toggle:hover { background:var(--hover-bg); }

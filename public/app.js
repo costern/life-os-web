@@ -2138,23 +2138,35 @@ function wlLiesShots(id){
   return wlShotsCache[id];
 }
 
-function renderWlShots(signalId, shots, el){
+function renderWlShots(signalId, shots, el, uploadZielEl){
+  // uploadZielEl: optionales Ziel-Element, in das die "+"-Upload-Kachel STATT ins
+  // Bilder-Raster gerendert wird (Trade-Gesamtansicht: Ordner-Symbol soll fest unten
+  // rechts in einer eigenen Fuss-Zeile stehen, nicht zwischen den Bildern). Wird hier
+  // am Element selbst gemerkt, damit interne Re-Renders (Upload/Loeschen/Umsortieren,
+  // die renderWlShots ohne diesen 4. Parameter erneut aufrufen) die Platzierung behalten.
+  uploadZielEl = uploadZielEl || el._wlUploadZiel || null;
+  el._wlUploadZiel = uploadZielEl;
+
   const kacheln = shots.map(s =>
     '<div class="tl-shot-thumb" data-shot-id="'+s.id+'" draggable="true" title="Ziehen zum Umsortieren">' +
       '<img src="/api/watchlist/'+signalId+'/screenshots/'+s.id+'/image" loading="lazy" alt="Screenshot" draggable="false">' +
       '<button type="button" class="tl-shot-del" title="Löschen (oder Rechtsklick)">✕</button>' +
     '</div>'
   ).join('');
+  // data-signal-id bleibt auf der Kachel, damit das Strg+V-Einfuegen sie auch dann noch
+  // findet, wenn sie (uploadZielEl) ausserhalb von .tl-shots-wrap haengt (siehe paste-Handler).
+  const uploadHtml =
+    '<div class="tl-shot-upload" tabindex="0" data-signal-id="'+signalId+'">' +
+      '<span class="tl-shot-upload-plus">+</span>' +
+      '<span class="tl-shot-upload-hint">Strg+V / Cmd+V<br>zum Einfügen</span>' +
+      '<button type="button" class="tl-shot-browse" title="Datei auswählen">📁</button>' +
+      '<input type="file" accept="image/*" hidden class="tl-shot-input">' +
+    '</div>';
   el.innerHTML =
-    '<div class="tl-shots-grid wl-shots-grid">' + kacheln +
-      '<div class="tl-shot-upload" tabindex="0">' +
-        '<span class="tl-shot-upload-plus">+</span>' +
-        '<span class="tl-shot-upload-hint">Strg+V / Cmd+V<br>zum Einfügen</span>' +
-        '<button type="button" class="tl-shot-browse" title="Datei auswählen">📁</button>' +
-        '<input type="file" accept="image/*" hidden class="tl-shot-input">' +
-      '</div>' +
-    '</div>' +
+    '<div class="tl-shots-grid wl-shots-grid">' + kacheln + (uploadZielEl ? '' : uploadHtml) + '</div>' +
     '<span class="te-msg tl-shots-msg"></span>';
+  if (uploadZielEl) uploadZielEl.innerHTML = uploadHtml;
+  const uploadScope = uploadZielEl || el;
 
   el.querySelectorAll('.tl-shot-thumb img').forEach(img => {
     img.addEventListener('click', () => tlZeigeLightbox(img.src));
@@ -2174,11 +2186,11 @@ function renderWlShots(signalId, shots, el){
       wlLoescheScreenshot(signalId, +kachel.dataset.shotId, el);
     });
   });
-  const input = el.querySelector('.tl-shot-input');
+  const input = uploadScope.querySelector('.tl-shot-input');
   input.addEventListener('change', () => {
     if (input.files && input.files[0]) wlLadeScreenshotHoch(signalId, input.files[0], el);
   });
-  const browse = el.querySelector('.tl-shot-browse');
+  const browse = uploadScope.querySelector('.tl-shot-browse');
   if (browse) browse.addEventListener('click', ev => { ev.stopPropagation(); input.click(); });
   tlWireDragSort(el, async ids => {
     try { await api('/watchlist/'+signalId+'/screenshots/reorder', { method:'PATCH', body: JSON.stringify({ order: ids }) }); delete wlShotsCache[signalId]; }
@@ -3218,14 +3230,16 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
               tageMap.get(d).map(s =>
                 '<div class="wl-trade-gesamt-gruppe">' +
                   '<div class="wl-trade-gesamt-label">'+esc(s.tf || '–')+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</div>' +
-                  // Bilder/Ordner-Symbol und der Umschalter-Button stehen in EINER Zeile
-                  // nebeneinander (Colin: "Pack diesen Button bitte rechts neben dieses
-                  // Ordner-Symbol") - das eingeklappte Formular selbst steht als eigener,
-                  // voller Block DARUNTER, damit es die ganze Breite der Gruppe nutzen kann
-                  // statt zusammengequetscht zu wirken.
-                  '<div class="wl-trade-gesamt-shots-row">' +
-                    '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
+                  // Bilder oben im eigenen Raster (ohne die Upload-Kachel - die zieht in
+                  // die Fuss-Zeile darunter um, siehe wl-trade-gesamt-footer-row).
+                  '<div class="tl-shots-wrap" id="wl-trade-gesamt-shots-'+s.id+'"></div>' +
+                  // Fuss-Zeile fest an den beiden Enden dieser Gruppe: Details-Umschalter
+                  // immer ganz unten links, "Bilder hinzufuegen"-Ordner immer ganz unten
+                  // rechts (Colins Feedback) - die Upload-Kachel wird per JS nach dem
+                  // Bilder-Laden hierher verschoben (siehe renderWlShots uploadZielEl).
+                  '<div class="wl-trade-gesamt-footer-row">' +
                     wlSignalFelderToggleHtml(s) +
+                    '<div class="wl-trade-gesamt-upload-slot" id="wl-trade-gesamt-uploadslot-'+s.id+'"></div>' +
                   '</div>' +
                   // Direkt unter den Bildern DIESES Signals: eingeklappte eigene Feldübersicht
                   // (Marktphase, Divergenz, Pivot-Level, ...) statt wie frueher nur fuer das
@@ -3242,7 +3256,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       verwandte.forEach(s => {
         const zielEl = el.querySelector('#wl-trade-gesamt-shots-'+s.id);
         if (!zielEl) return;
-        wlLiesShots(s.id).then(shots => renderWlShots(s.id, shots, zielEl));
+        const uploadZielEl = el.querySelector('#wl-trade-gesamt-uploadslot-'+s.id);
+        wlLiesShots(s.id).then(shots => renderWlShots(s.id, shots, zielEl, uploadZielEl));
       });
 
       const gemeinsamesFeld = el.querySelector('.wle-trade-gesamt-details');
@@ -3273,7 +3288,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       });
       el.querySelectorAll('.wl-signal-felder-toggle').forEach(btn => {
         btn.addEventListener('click', () => {
-          // Der Button steckt jetzt in der .wl-trade-gesamt-shots-row, der Formular-Block
+          // Der Button steckt jetzt in der .wl-trade-gesamt-footer-row, der Formular-Block
           // (.wl-signal-felder-body) ist ein nachfolgendes Geschwister DIESER Zeile, nicht
           // mehr des Buttons selbst - deshalb ueber die gemeinsame .wl-trade-gesamt-gruppe suchen.
           const body = btn.closest('.wl-trade-gesamt-gruppe').querySelector('.wl-signal-felder-body');
@@ -4276,6 +4291,16 @@ document.addEventListener('paste', ev => {
   if (fokusWrap) {
     const treffer = fokusWrap.id.match(/^wl-(?:trade-gesamt-)?shots-(.+)$/);
     if (treffer) { zielId = treffer[1]; zielEl = fokusWrap; }
+  }
+  // Die Upload-Kachel kann (Trade-Gesamtansicht: Ordner-Symbol in eigener Fuss-Zeile
+  // unten rechts statt im Bilder-Raster) ausserhalb von .tl-shots-wrap liegen - dann
+  // ueber ihre eigene data-signal-id statt ueber die Eltern-Kette finden.
+  if (!zielEl) {
+    const fokusUpload = document.activeElement && document.activeElement.closest('.tl-shot-upload[data-signal-id]');
+    if (fokusUpload) {
+      zielId = fokusUpload.dataset.signalId;
+      zielEl = document.getElementById('wl-trade-gesamt-shots-'+zielId) || document.getElementById('wl-shots-'+zielId);
+    }
   }
   if (!zielEl && wlOffenId != null) {
     zielId = wlOffenId;
