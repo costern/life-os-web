@@ -204,8 +204,8 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS note TEXT;
 -- marktphase   uptrend | downtrend | ranging
 -- pattern      valid | clean | choppy          (Qualitaet der Struktur)
 -- candles      choppy | decent | gap | mini    (Kerzenbild am Boden; mini = Doji/Hammer/Shooting Star)
--- div_lokal    rsi | none | hidden             (lokale RSI-Divergenz)
--- div_struktur rsi | none | hidden             (strukturelle RSI-Divergenz)
+-- div_lokal    leicht | rsi | stark | none | hidden  (lokale RSI-Divergenz)
+-- div_struktur leicht | rsi | stark | none | hidden  (strukturelle RSI-Divergenz)
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS marktphase TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS pattern TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS candles TEXT;

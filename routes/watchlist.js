@@ -17,7 +17,7 @@ const NOTEN = new Set(['A++', 'A+', 'A', 'B']);
 const MARKTPHASEN = new Set(['uptrend', 'downtrend', 'ranging']);
 const PATTERN = new Set(['valid', 'clean', 'choppy']);
 const CANDLES = new Set(['choppy', 'decent', 'gap', 'mini']);
-const DIVERGENZEN = new Set(['rsi', 'none', 'hidden']);
+const DIVERGENZEN = new Set(['leicht', 'rsi', 'stark', 'none', 'hidden']);
 // pivot_level = trifft das Signal ein bereits bestehendes Pivot-Level exakt (perfekt),
 // oder liegt es minimal hoeher/tiefer (nicht_perfekt)?
 const PIVOT_LEVEL = new Set(['perfekt', 'nicht_perfekt']);

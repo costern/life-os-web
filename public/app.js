@@ -2250,8 +2250,8 @@ const WL_BODENTYP_LABEL = { basisboden:'Basisboden', w_pattern:'W-Pattern', '':'
 const WL_PHASE_LABEL = { uptrend:'Uptrend', downtrend:'Downtrend', ranging:'Range', '':'–' };
 const WL_PATTERN_LABEL = { valid:'valid', clean:'clean', choppy:'choppy', '':'–' };
 const WL_CANDLE_LABEL = { choppy:'Choppy Candles', decent:'Decent Candles', gap:'Gap Candles', mini:'Mini Candles (Doji/Hammer/Shooting Star)', '':'–' };
-const WL_DIV_LABEL = { rsi:'RSI Div.', leicht:'Leichte RSI Div.', none:'No Div.', hidden:'RSI Hidden Div.', '':'–' };
-const WL_DIV_KURZ = { rsi:'RSI', leicht:'Leicht', none:'keine', hidden:'Hidden', '':'–' };
+const WL_DIV_LABEL = { rsi:'RSI Div.', leicht:'Leichte RSI Div.', stark:'Starke RSI Div.', none:'No Div.', hidden:'RSI Hidden Div.', '':'–' };
+const WL_DIV_KURZ = { rsi:'RSI', leicht:'Leicht', stark:'Stark', none:'keine', hidden:'Hidden', '':'–' };
 // Pivot-Level: trifft das Signal ein bereits bestehendes Level exakt, oder liegt es
 // nur minimal hoeher/tiefer (kein perfektes Match)?
 const WL_PIVOT_LABEL = { perfekt:'Perfektes Level', nicht_perfekt:'Leicht abweichendes Level', '':'–' };
@@ -2677,8 +2677,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
           '<label class="wl-detail-kurz" style="width:74px">Pattern'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
-          '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['rsi','RSI Div.'],['leicht','Leichte RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
-          '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['rsi','RSI Div.'],['leicht','Leichte RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
+          '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
+          '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
           '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level']], s.pivotLevel)+'</label>' +
           '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
           '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>' +
