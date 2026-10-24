@@ -667,6 +667,14 @@ a { color:var(--accent); }
   background:var(--card); }
 .wl-trade-gesamt-tag-datum { font-size:13px; font-weight:700; color:var(--ink); margin-bottom:8px; }
 .wl-trade-gesamt-tagreihe { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
+/* Ohne flex-grow bleibt eine Gruppe exakt so schmal wie ihr Bild (640px) - der
+   Ordner-Button in der Fuss-Zeile (space-between) landete dann direkt neben dem Bild
+   statt ganz rechts in der sichtbaren weissen Karte (Colins Feedback). flex:1 laesst
+   eine EINZELNE Gruppe den ganzen verfuegbaren Platz der Karte ausfuellen, waehrend
+   mehrere Gruppen am selben Tag sich den Platz weiterhin fair teilen (min. 640px je
+   Gruppe dank flex-basis, sonst Umbruch) - die Bildgroesse selbst bleibt unveraendert
+   fix, nur die Karte/Fuss-Zeile darum herum wird breiter. */
+.wl-trade-gesamt-gruppe { flex:1 1 640px; }
 .wl-trade-gesamt-label { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:6px; }
 /* Das EINE feste Bild-Mass fuer diese gesamte Detailansicht - Trade-Gesamtansicht UND
    Einzel-Screenshot-Bereich. Fixe Pixelbreite statt Prozent, damit die Groesse wirklich
