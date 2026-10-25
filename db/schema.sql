@@ -222,8 +222,11 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS pivot_level TEXT;
 -- entry_simulation   direkter_entry | limit_theoretisch_gefuellt | limit_nicht_gefuellt |
 --                    entry_schlechtes_rr | kein_regelkonformer_entry | nicht_eindeutig
 -- kursverlauf        direkt_target | unter_entry_dann_target | 2r_dann_zurueck |
---                    direkt_stop | laenger_seitwaerts | entry_nie_erreicht |
+--                    direkt_stop | laenger_seitwaerts_stop | laenger_seitwaerts_hoch |
+--                    laenger_seitwaerts_runter | entry_nie_erreicht |
 --                    stop_target_gleiche_kerze | sonstiger_verlauf
+--                    (laenger_seitwaerts ist das alte, nicht mehr waehlbare Vorgaenger-
+--                    Feld - bleibt serverseitig gueltig fuer bereits gespeicherte Werte)
 -- kein_trade_grund   rr_schlecht | langer_docht | sl_zu_weit | ziel_zu_nah |
 --                    keine_htf_bestaetigung | pattern_nicht_sauber | divergenz_fehlte | sonstiger_grund
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS ergebnis_detail TEXT;

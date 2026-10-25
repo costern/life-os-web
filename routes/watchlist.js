@@ -34,8 +34,13 @@ const ZIELMETHODE = new Set(['measured_move', 'ema50', 'doji_level', 'horizontal
 // Limit aber nicht, weil es nur minimal runterging und dann schnell hochzog).
 const ENTRY_SIMULATION = new Set(['direkter_entry', 'limit_theoretisch_gefuellt', 'limit_nicht_gefuellt',
   'entry_schlechtes_rr', 'kein_regelkonformer_entry', 'nicht_eindeutig', 'nachkauf_moeglich']);
+// laenger_seitwaerts_* ersetzt das alte, zu unspezifische 'laenger_seitwaerts' (Colin:
+// sagt nichts darueber aus, WOHIN es nach der Seitwaertsphase ging) - 'laenger_seitwaerts'
+// bleibt als Wert weiter gueltig, damit bereits gespeicherte Altsignale nicht ploetzlich
+// als ungueltig gelten, ist aber in der Dropdown-Liste im Frontend nicht mehr waehlbar.
 const KURSVERLAUF = new Set(['direkt_target', 'unter_entry_dann_target', '2r_dann_zurueck',
-  'direkt_stop', 'laenger_seitwaerts', 'entry_nie_erreicht', 'stop_target_gleiche_kerze', 'sonstiger_verlauf']);
+  'direkt_stop', 'laenger_seitwaerts', 'laenger_seitwaerts_stop', 'laenger_seitwaerts_hoch',
+  'laenger_seitwaerts_runter', 'entry_nie_erreicht', 'stop_target_gleiche_kerze', 'sonstiger_verlauf']);
 const KEIN_TRADE_GRUND = new Set(['rr_schlecht', 'langer_docht', 'sl_zu_weit', 'ziel_zu_nah',
   'keine_htf_bestaetigung', 'pattern_nicht_sauber', 'divergenz_fehlte', 'sonstiger_grund']);
 // strategie: eigene Seite im Dashboard je Setup-Art (siehe db/schema.sql), gleiche Tabelle/Felder.

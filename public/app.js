@@ -2762,7 +2762,10 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label>Kursverlauf'+auswahlHtml('wle-kursverlauf', [['','–'],
             ['direkt_target','Direkt zum Target'],['unter_entry_dann_target','Unter Entry, Stop gehalten, danach Target'],
             ['2r_dann_zurueck','2R erreicht, danach zurück zum Entry'],['direkt_stop','Direkt zum Stop-Loss'],
-            ['laenger_seitwaerts','Länger seitwärts'],['entry_nie_erreicht','Entry nie erreicht, direkt gestiegen'],
+            ['laenger_seitwaerts_stop','Länger seitwärts, dann Stop-Loss'],
+            ['laenger_seitwaerts_hoch','Länger seitwärts, dann nach oben'],
+            ['laenger_seitwaerts_runter','Länger seitwärts, dann nach unten'],
+            ['entry_nie_erreicht','Entry nie erreicht, direkt gestiegen'],
             ['stop_target_gleiche_kerze','Stop und Target in derselben Kerze'],['sonstiger_verlauf','Sonstiger Verlauf']], s.kursverlauf)+'</label>' +
           '<label>Grund für "Kein Trade"'+auswahlHtml('wle-keintradegrund', [['','–'],
             ['rr_schlecht','Risk-Reward zu schlecht'],['langer_docht','Historischer langer Docht'],
