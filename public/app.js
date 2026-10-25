@@ -2826,8 +2826,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       '</div></td></tr>';
     }
 
-    // Eine normale (nicht gruppierte) Signal-Zeile: Haupt-Tabellenzeile + Detailzeile.
-    function wlZeileHtml(s, klassen){
+    // Nur die Haupt-Tabellenzeile (ohne Detailzeile) - eigene Funktion, damit sie nach
+    // einem Speichern aus der Trade-Gesamtansicht (wlAktualisiereZeile) einzeln neu
+    // gebaut werden kann, OHNE die gerade aufgeklappte Detailzeile/Trade-Gesamtansicht
+    // mit zu ersetzen (sonst wuerde Colins offene Ansicht beim Speichern zuklappen).
+    function wlZeileNurHtml(s, klassen){
       klassen = klassen || [];
       const tagAnzahl = gleicherTag(s);
       // Kurzform "4×" statt "4× selber Tag" - spart Platz in der (ohnehin schon engen)
@@ -2868,7 +2871,25 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '</td>' +
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
-      '</tr>' + wlEditRowHtml(s);
+      '</tr>';
+    }
+
+    // Haupt-Tabellenzeile + Detailzeile zusammen - fuer den normalen Tabellenaufbau.
+    function wlZeileHtml(s, klassen){
+      return wlZeileNurHtml(s, klassen) + wlEditRowHtml(s);
+    }
+
+    // Baut NUR die sichtbare Haupt-Tabellenzeile eines einzelnen Signals neu und ersetzt
+    // sie im DOM - fuer den Fall, dass sich Feldwerte (Phase, Divergenz, Note, Ergebnis,
+    // Notiz, ...) ueber die Trade-Gesamtansicht geaendert haben (wl-signal-felder-save),
+    // waehrend die Detailzeile/Trade-Gesamtansicht selbst aufgeklappt bleiben soll.
+    function wlAktualisiereZeile(s){
+      const alt = tableWrap.querySelector('tr[data-id="'+s.id+'"]:not(.wl-edit-row)');
+      if (!alt) return;
+      const klassen = Array.from(alt.classList);
+      const vorlage = document.createElement('tbody');
+      vorlage.innerHTML = wlZeileNurHtml(s, klassen);
+      alt.replaceWith(vorlage.firstElementChild);
     }
 
 
@@ -3413,7 +3434,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         try {
           await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) });
           const sigRef = alleSignale.find(sg => String(sg.id) === String(id));
-          if (sigRef) Object.assign(sigRef, body);
+          if (sigRef) {
+            Object.assign(sigRef, body);
+            // Haupt-Tabellenzeile dieses Signals (Phase, Divergenz, Note, Ergebnis, Notiz,
+            // ...) sonst bleibt sie auf den alten Werten stehen, bis die Seite komplett
+            // neu laedt (Colins Bug-Report: "in der Tabelle zeigte es aber trotzdem nichts an").
+            wlAktualisiereZeile(sigRef);
+          }
           if (msg) { msg.textContent = 'Gespeichert ✓'; msg.className = 'te-msg ok'; }
         } catch(e) {
           if (msg) { msg.textContent = 'Fehler: ' + e.message; msg.className = 'te-msg bad'; }
