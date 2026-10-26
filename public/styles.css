@@ -187,6 +187,16 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-axis-label-y { font-size:10px; fill:var(--muted); font-family:inherit; }
 .wl-btc-line { fill:none; stroke:var(--muted); stroke-width:1.5; opacity:.85; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
 .wl-btc-area { fill:var(--muted); opacity:.08; }
+.wl-idx-line-spy { fill:none; stroke:var(--accent); stroke-width:1.5; opacity:.9; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.wl-idx-area-spy { fill:var(--accent); opacity:.08; }
+.wl-idx-line-ndx { fill:none; stroke:var(--purple); stroke-width:1.5; opacity:.9; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.wl-chart-modus { display:flex; gap:6px; margin-left:auto; }
+.wl-chart-modus button { font-family:inherit; font-size:12px; font-weight:500; background:none; border:1px solid var(--line); color:var(--muted); padding:5px 10px; border-radius:7px; cursor:pointer; }
+.wl-chart-modus button:hover { background:var(--hover-bg); }
+.wl-chart-modus button.wl-chart-modus-aktiv { background:var(--accent); border-color:var(--accent); color:#fff; }
+.wl-chart-legende { display:flex; gap:14px; margin:-2px 0 6px; font-size:12px; color:var(--muted); }
+.wl-chart-legende span { display:inline-flex; align-items:center; gap:5px; }
+.wl-chart-legende i { width:12px; height:3px; border-radius:2px; display:inline-block; }
 /* Duenner Strich vom Icon in der Spur hoch zur Stelle im Kurs, dort ein kleiner Punkt */
 .wl-stiel { stroke:var(--muted); stroke-width:1; opacity:.45; }
 .wl-kurspunkt { stroke:var(--card); stroke-width:1.5; }
