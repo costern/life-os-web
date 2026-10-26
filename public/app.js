@@ -2666,6 +2666,10 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // 3D-Kerzen unter dem Level) am Ende doch noch - relevant, um einzuschaetzen, wie
     // "hart" die eigene Regel "Level muss exakt halten" wirklich sein sollte.
     const anzLevelGebrochenGehalten = [...trades.values()].filter(t => t.levelGebrochenGehalten).length;
+    // Signale, die zwar kein regelkonformes MTF-Setup waren, aber als guter Spot-
+    // Einkaufspreis markiert wurden - fuer die spaetere Auswertung, wie oft sich das
+    // im Nachhinein gelohnt haette (Colins Wunsch).
+    const anzGuterSpotKauf = signaleGefiltert.filter(s => s.guterSpotKauf).length;
     const assetsAnzahl = new Set(signaleGefiltert.map(s => s.asset)).size;
     // Bewusst von ALLEN Signalen (nicht der gefilterten Liste), da Trade-IDs
     // asset-uebergreifend hochgezaehlt werden - "naechste freie Nummer" muss beim Filtern
@@ -2730,7 +2734,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         regelkonform: scope.querySelector('.wle-regelkonform').value,
         regelkonformGrund: scope.querySelector('.wle-regelkonformgrund').value.trim() || null,
         levelGebrochenGehalten: scope.querySelector('.wle-levelgebrochen').checked,
-        nurBestaetigung: scope.querySelector('.wle-nurbestaetigung').checked
+        nurBestaetigung: scope.querySelector('.wle-nurbestaetigung').checked,
+        guterSpotKauf: scope.querySelector('.wle-gutspotkauf').checked,
+        spotKaufPreis: scope.querySelector('.wle-spotkaufpreis').value.trim() || null
       };
     }
 
@@ -2803,8 +2809,10 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
           '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>' +
           '<label class="wl-check" title="Kein eigenstaendiges, regelkonformes Setup (z.B. kein eindeutiges Pivot-Level, choppy Candles, Pattern zu kurz - keine/nur eine Kerze zwischen den Tiefpunkten) - bestaetigt nur eine groessere Bewegung. Ergebnis trotzdem eintragen, als haette man nach Standardregeln gehandelt, damit sichtbar bleibt, ob es funktioniert haette."><input type="checkbox" class="wle-nurbestaetigung"'+(s.nurBestaetigung?' checked':'')+'> Nur bestätigendes Signal (kein eigenständiges Setup)</label>' +
+          '<label class="wl-check" title="Kein valides/regelkonformes MTF-Setup (z.B. nur ein einzelnes 1W/2W-Signal ohne Bestaetigung), war im Nachhinein aber trotzdem ein guter Spot-Einkaufspreis - unabhaengig davon, ob es am Ende der absolute Boden war."><input type="checkbox" class="wle-gutspotkauf"'+(s.guterSpotKauf?' checked':'')+'> 💰 Guter Spot-Einkaufspreis</label>' +
         '</div>' +
-        '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>';
+        '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
+        '<label class="wl-detail-voll">Spot-Einkaufspreis (optional)<input type="text" class="wle-spotkaufpreis" value="'+esc(s.spotKaufPreis||'')+'" placeholder="z.B. 82.100 $ oder Preisbereich"></label>';
     }
 
     // Eingeklappter Umschalter + Formular fuer EIN Signal innerhalb der Trade-Gesamtansicht
@@ -2889,6 +2897,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span>'+
           (s.regelkonform === false ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund ? 'Nicht regelkonform: '+s.regelkonformGrund : 'Nicht regelkonform')+'">nicht regelkonform</span>' : '')+
           (s.nurBestaetigung ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)" title="Kein eigenstaendiges Setup, nur bestaetigendes Signal">nur Bestätigung</span>' : '')+
+          (s.guterSpotKauf ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--green);color:var(--green)" title="'+esc(s.spotKaufPreis ? 'Guter Spot-Einkaufspreis: '+s.spotKaufPreis : 'Guter Spot-Einkaufspreis')+'">💰 Spot</span>' : '')+
         '</td>' +
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
@@ -2947,6 +2956,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<div class="stat"><div class="v pnl-neg">'+anzLose+'</div><div class="l">Lose</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+anzNoEntry+'</div><div class="l">No Entry</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+anzLevelGebrochenGehalten+'</div><div class="l">Level gebrochen, aber gehalten</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--green)">'+anzGuterSpotKauf+'</div><div class="l">💰 Guter Spot-Kauf</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+tradeIdInfo.naechsteFrei+'</div><div class="l">Nächste Trade-ID</div></div>' +
       '</div>' +
       '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer. Aktuell höchste vergebene Trade-ID: '+tradeIdInfo.hoechste+'.</div>' +

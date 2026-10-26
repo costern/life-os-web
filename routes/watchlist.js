@@ -107,7 +107,9 @@ function rowOut(r) {
     strategie: r.strategie,
     bodenTyp: r.boden_typ,
     mtfGleichesLevel: r.mtf_gleiches_level === null || r.mtf_gleiches_level === undefined ? null : !!r.mtf_gleiches_level,
-    limitMoeglich: r.limit_moeglich === null || r.limit_moeglich === undefined ? null : !!r.limit_moeglich
+    limitMoeglich: r.limit_moeglich === null || r.limit_moeglich === undefined ? null : !!r.limit_moeglich,
+    guterSpotKauf: !!r.guter_spot_kauf,
+    spotKaufPreis: r.spot_kauf_preis
   };
 }
 
@@ -130,8 +132,8 @@ router.post('/', async (req, res) => {
   const status = STATI.has(b.status) ? b.status : null;
   const strategie = STRATEGIEN.has(b.strategie) ? b.strategie : 'double_bottom';
   const { rows } = await pool.query(
-    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten, nur_bestaetigung, strategie, boden_typ, mtf_gleiches_level, limit_moeglich)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33) RETURNING *`,
+    `INSERT INTO watchlist_signals (date, label, asset, tf, notiz, status, event_typ, mtf, multi_asset, form, details, trade_id, note, marktphase, pattern, candles, div_lokal, div_struktur, pivot_level, ergebnis_detail, zielmethode, entry_simulation, kursverlauf, kein_trade_grund, uhrzeit, regelkonform, regelkonform_grund, level_gebrochen_gehalten, nur_bestaetigung, strategie, boden_typ, mtf_gleiches_level, limit_moeglich, guter_spot_kauf, spot_kauf_preis)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35) RETURNING *`,
     [b.date, b.label || null, b.asset, b.tf || null, b.notiz || null, status,
      EVENT_TYPEN.has(b.eventTyp) ? b.eventTyp : null, mtfOrNull(b.mtf), !!b.multiAsset,
      FORMEN.has(b.form) ? b.form : null, orNull(b.details), orNull(b.tradeId),
@@ -150,7 +152,7 @@ router.post('/', async (req, res) => {
      zeitOrNull(b.uhrzeit),
      regelkonformOrNull(b.regelkonform), orNull(b.regelkonformGrund), !!b.levelGebrochenGehalten, !!b.nurBestaetigung,
      strategie, BODEN_TYPEN.has(b.bodenTyp) ? b.bodenTyp : null, regelkonformOrNull(b.mtfGleichesLevel),
-     regelkonformOrNull(b.limitMoeglich)]
+     regelkonformOrNull(b.limitMoeglich), !!b.guterSpotKauf, orNull(b.spotKaufPreis)]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -177,7 +179,9 @@ router.patch('/:id', async (req, res) => {
                             ['strategie','strategie'],
                             ['bodenTyp','boden_typ'],
                             ['mtfGleichesLevel','mtf_gleiches_level'],
-                            ['limitMoeglich','limit_moeglich']]) {
+                            ['limitMoeglich','limit_moeglich'],
+                            ['guterSpotKauf','guter_spot_kauf'],
+                            ['spotKaufPreis','spot_kauf_preis']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -197,7 +201,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);
-    else if (key === 'multiAsset' || key === 'analysiert' || key === 'levelGebrochenGehalten' || key === 'nurBestaetigung') wert = !!wert;
+    else if (key === 'multiAsset' || key === 'analysiert' || key === 'levelGebrochenGehalten' || key === 'nurBestaetigung' || key === 'guterSpotKauf') wert = !!wert;
     else if (key === 'strategie') wert = STRATEGIEN.has(wert) ? wert : 'double_bottom';
     else if (key === 'bodenTyp') wert = BODEN_TYPEN.has(wert) ? wert : null;
     else wert = orNull(wert);

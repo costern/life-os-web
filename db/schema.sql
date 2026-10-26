@@ -285,6 +285,15 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS strategie TEXT NOT NULL D
 -- gleichem Level ueber viele Wochen/Monate mit mehreren Touches, bevor es dreht;
 -- w_pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen (klassisches W).
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS boden_typ TEXT;
+-- guter_spot_kauf: Signal ist (noch) kein valides, regelkonformes MTF-Setup (z.B. nur
+-- ein einzelnes 1W/2W-Signal ohne Bestaetigung auf weiteren Timeframes), waere aber im
+-- Nachhinein trotzdem ein guter Spot-Einkaufspreis gewesen - unabhaengig davon, ob es
+-- am Ende der absolute Boden war. Getrennt von regelkonform/status, damit man spaeter
+-- auswerten kann, wie oft "kein regelkonformes Setup, aber guter Spot-Preis" zutrifft.
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS guter_spot_kauf BOOLEAN NOT NULL DEFAULT false;
+-- spot_kauf_preis: optionale Notiz zum Spot-Einkaufspreis (Freitext statt NUMERIC, da
+-- Colin hier oft auch kurz einen Bereich/Kommentar notieren will, nicht nur eine Zahl).
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS spot_kauf_preis TEXT;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).
