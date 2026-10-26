@@ -21,7 +21,11 @@ body { font-family:-apple-system,'Segoe UI',Roboto,sans-serif; background:var(--
 /* Colins Wunsch: die Navi-Spalte etwas schmaler, damit Tabellen (z.B. Bottom Events)
    mehr Breite bekommen und seltener horizontal gescrollt werden muss. */
 nav.side { width:146px; flex:0 0 146px; position:sticky; top:18px; }
-nav.side .brand-row { display:flex; align-items:center; justify-content:space-between; padding:0 8px 10px; gap:8px; }
+nav.side .brand-row { display:flex; align-items:center; justify-content:space-between; padding:0 8px 10px; gap:6px; flex-wrap:wrap; row-gap:6px; }
+/* Zwei runde Buttons (Seitenleiste ein-/ausklappen + Dark Mode) passen bei der schmalen
+   Nav-Breite (146px) sonst knapp nicht neben den Markennamen - etwas kleiner als der
+   Standard .theme-toggle, damit es nicht umbricht/abgeschnitten wird. */
+nav.side .brand-row .theme-toggle { width:26px; height:26px; font-size:12px; flex:0 0 26px; }
 nav.side .brand { font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding:0; }
 nav.side button { display:flex; align-items:center; gap:7px; width:100%; text-align:left; font-family:inherit; font-size:13px;
   background:none; border:none; color:var(--ink); padding:8px 9px; border-radius:10px; cursor:pointer; margin-bottom:2px; }
@@ -36,6 +40,23 @@ nav.side .nav-label { font-size:11px; font-weight:700; letter-spacing:.08em; tex
   color:var(--muted); padding:14px 9px 4px; }
 nav.side button.nav-sub { padding-left:20px; }
 main { flex:1; min-width:0; }
+/* Einklappbare Seitenleiste (Colins Wunsch) - per Klick auf den «-Button in der
+   Brand-Zeile. Nur noch die Icons bleiben sichtbar (als schmale Leiste), der Rest
+   der App bekommt dadurch mehr Platz. Status wird in localStorage gemerkt und schon
+   im <head>-Script gesetzt (siehe index.html), damit die Leiste beim Laden nicht kurz
+   breit aufblitzt. */
+nav.side { transition:width .15s ease, flex-basis .15s ease; overflow:hidden; }
+html[data-sidebar="collapsed"] nav.side { width:52px; flex:0 0 52px; }
+html[data-sidebar="collapsed"] nav.side .brand,
+html[data-sidebar="collapsed"] nav.side .nav-txt,
+html[data-sidebar="collapsed"] nav.side .nav-label,
+html[data-sidebar="collapsed"] nav.side #themeToggle { display:none; }
+html[data-sidebar="collapsed"] nav.side .brand-row { justify-content:center; padding:0 0 10px; }
+html[data-sidebar="collapsed"] nav.side button,
+html[data-sidebar="collapsed"] nav.side a#exportLink { justify-content:center; padding:9px 0; }
+html[data-sidebar="collapsed"] nav.side button.nav-sub { padding-left:0; }
+#sidebarToggle { flex:0 0 auto; font-size:13px; transition:transform .15s ease; }
+html[data-sidebar="collapsed"] #sidebarToggle { transform:rotate(180deg); }
 header.top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; flex-wrap:wrap; gap:6px; }
 h1 { font-size:23px; font-weight:700; } h1 span { color:var(--accent); }
 .date { color:var(--muted); font-size:13px; }

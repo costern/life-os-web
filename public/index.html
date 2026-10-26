@@ -6,7 +6,13 @@
 <title>Life OS – Colin</title>
 <link rel="stylesheet" href="/styles.css">
 <script>
-(function(){ try{ if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme','dark'); }catch(e){} })();
+(function(){
+  try{ if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme','dark'); }catch(e){}
+  // Seitenleisten-Status schon VOR dem ersten Rendern setzen (wie beim Dark Mode oben) -
+  // sonst wuerde man kurz die ausgeklappte Leiste aufblitzen sehen, bevor app.js laedt
+  // und sie wieder einklappt (Colin wollte eine einklappbare Seitenleiste per Klick).
+  try{ if (localStorage.getItem('sidebarCollapsed') === '1') document.documentElement.setAttribute('data-sidebar','collapsed'); }catch(e){}
+})();
 </script>
 </head>
 <body>
@@ -14,23 +20,24 @@
   <nav class="side">
     <div class="brand-row">
       <div class="brand">Life OS</div>
+      <button id="sidebarToggle" class="theme-toggle" type="button" title="Seitenleiste ein-/ausklappen">«</button>
       <button id="themeToggle" class="theme-toggle" type="button" title="Dark Mode umschalten">🌙</button>
     </div>
-    <button data-page="uebersicht" class="active"><span class="ico">🏠</span>Übersicht</button>
-    <button data-page="disziplin"><span class="ico">📖</span>Täglich lesen</button>
-    <button data-page="todos"><span class="ico">✅</span>To-Dos</button>
-    <button data-page="news"><span class="ico">📰</span>News</button>
-    <button data-page="trading"><span class="ico">📈</span>Trading</button>
-    <button data-page="portfolio"><span class="ico">💼</span>Portfolio</button>
+    <button data-page="uebersicht" class="active" title="Übersicht"><span class="ico">🏠</span><span class="nav-txt">Übersicht</span></button>
+    <button data-page="disziplin" title="Täglich lesen"><span class="ico">📖</span><span class="nav-txt">Täglich lesen</span></button>
+    <button data-page="todos" title="To-Dos"><span class="ico">✅</span><span class="nav-txt">To-Dos</span></button>
+    <button data-page="news" title="News"><span class="ico">📰</span><span class="nav-txt">News</span></button>
+    <button data-page="trading" title="Trading"><span class="ico">📈</span><span class="nav-txt">Trading</span></button>
+    <button data-page="portfolio" title="Portfolio"><span class="ico">💼</span><span class="nav-txt">Portfolio</span></button>
     <div class="nav-label">Strategie</div>
-    <button data-page="watchlist" class="nav-sub"><span class="ico">📋</span>Bottom Events</button>
-    <button data-page="watchlist-ema50" class="nav-sub"><span class="ico">📐</span>50er EMA Retests</button>
-    <button data-page="watchlist-mtf" class="nav-sub"><span class="ico">⏱️</span>MTF Bottoms</button>
-    <button data-page="watchlist-fvg" class="nav-sub"><span class="ico">🔀</span>FVG</button>
-    <a href="/api/export" id="exportLink" download style="display:flex;align-items:center;gap:9px;width:100%;
+    <button data-page="watchlist" class="nav-sub" title="Bottom Events"><span class="ico">📋</span><span class="nav-txt">Bottom Events</span></button>
+    <button data-page="watchlist-ema50" class="nav-sub" title="50er EMA Retests"><span class="ico">📐</span><span class="nav-txt">50er EMA Retests</span></button>
+    <button data-page="watchlist-mtf" class="nav-sub" title="MTF Bottoms"><span class="ico">⏱️</span><span class="nav-txt">MTF Bottoms</span></button>
+    <button data-page="watchlist-fvg" class="nav-sub" title="FVG"><span class="ico">🔀</span><span class="nav-txt">FVG</span></button>
+    <a href="/api/export" id="exportLink" download title="Daten sichern" style="display:flex;align-items:center;gap:9px;width:100%;
        font-size:14px;color:#6b7280;padding:9px 12px;border-radius:10px;text-decoration:none;margin-top:16px">
-       <span class="ico">💾</span>Daten sichern</a>
-    <button id="logoutBtn" style="color:#9ca3af"><span class="ico">🚪</span>Abmelden</button>
+       <span class="ico">💾</span><span class="nav-txt">Daten sichern</span></a>
+    <button id="logoutBtn" title="Abmelden" style="color:#9ca3af"><span class="ico">🚪</span><span class="nav-txt">Abmelden</span></button>
   </nav>
 
   <main>

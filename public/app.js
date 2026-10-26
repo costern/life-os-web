@@ -13,6 +13,24 @@
   btn.addEventListener('click', () => setzen(!istDunkel()));
 })();
 
+/* ---------- Seitenleiste einklappen: «-Button in der Brand-Zeile, Status in
+   localStorage gemerkt (wird schon im <head>-Script von index.html vor dem ersten
+   Rendern gesetzt, damit sie nicht kurz breit aufblitzt - siehe dort). Colin wollte
+   mehr Platz fuer Tabellen/Charts, ohne die Navigation ganz zu verlieren. ---------- */
+(function(){
+  const btn = document.getElementById('sidebarToggle');
+  if (!btn) return;
+  const istEingeklappt = () => document.documentElement.getAttribute('data-sidebar') === 'collapsed';
+  function setzen(eingeklappt){
+    if (eingeklappt) document.documentElement.setAttribute('data-sidebar', 'collapsed');
+    else document.documentElement.removeAttribute('data-sidebar');
+    try { localStorage.setItem('sidebarCollapsed', eingeklappt ? '1' : '0'); } catch(e){}
+    btn.title = eingeklappt ? 'Seitenleiste ausklappen' : 'Seitenleiste einklappen';
+  }
+  setzen(istEingeklappt());
+  btn.addEventListener('click', () => setzen(!istEingeklappt()));
+})();
+
 const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 
 /* ---------- Schlaues Datum: erkennt ein Datum aus moeglichst vielen frei getippten
