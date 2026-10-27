@@ -2263,9 +2263,10 @@ const WL_FARBEN = { win:'var(--green)', be_win:'var(--amber)', be_loss:'var(--or
   lose:'var(--red)', no_entry:'var(--accent)', '':'var(--muted)' };
 // Event-Typ auf den ersten Blick unterscheidbar machen: Double Bottom (zwei saubere
 // Retests, schoener Bogen dazwischen) = gruen, Single Bottom (kurz, meist 1-2 Kerzen,
-// eher Konsolidierung, nur Bestaetigungssignal statt eigenes Trade-Signal) = orange.
-const WL_EVENT_FARBEN = { double:'var(--green)', single:'var(--orange)' };
-const WL_EVENT_LABEL = { double:'Double', single:'Quick' };
+// eher Konsolidierung, nur Bestaetigungssignal statt eigenes Trade-Signal) = orange,
+// Triple Bottom (dritter Tiefpunkt statt der ueblichen zwei - selten) = lila.
+const WL_EVENT_FARBEN = { double:'var(--green)', single:'var(--orange)', triple:'var(--purple)' };
+const WL_EVENT_LABEL = { double:'Double', single:'Quick', triple:'Triple' };
 const WL_LABEL = { win:'Win', be_win:'BE Win', be_loss:'BE Loss', lose:'Lose',
   no_entry:'No Entry', '':'Noch nicht bewertet' };
 const WL_STATUS_HINT = { win:'Win', be_win:'BE Win (2R erreicht)',
@@ -2720,6 +2721,10 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // Einkaufspreis markiert wurden - fuer die spaetere Auswertung, wie oft sich das
     // im Nachhinein gelohnt haette (Colins Wunsch).
     const anzGuterSpotKauf = signaleGefiltert.filter(s => s.guterSpotKauf).length;
+    // Zaehlt Triple Bottoms (event_typ='triple') - fuer die spaetere Auswertung, ob das auf
+    // kleineren Timeframes eher haeufiger (und damit unbedeutender) vorkommt als auf groesseren
+    // (Colins Wunsch, siehe WL_EVENT_LABEL/WL_EVENT_FARBEN).
+    const anzTripleBottom = signaleGefiltert.filter(s => s.eventTyp === 'triple').length;
     const assetsAnzahl = new Set(signaleGefiltert.map(s => s.asset)).size;
     // Bewusst von ALLEN Signalen (nicht der gefilterten Liste), da Trade-IDs
     // asset-uebergreifend hochgezaehlt werden - "naechste freie Nummer" muss beim Filtern
@@ -2806,7 +2811,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px">Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
           '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : ''))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
-          '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom']], s.eventTyp)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom']], s.eventTyp)+'</label>' +
           '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label class="wl-detail-kurz" style="width:90px" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>' +
           '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
@@ -3007,6 +3012,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<div class="stat"><div class="v" style="color:var(--accent)">'+anzNoEntry+'</div><div class="l">No Entry</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+anzLevelGebrochenGehalten+'</div><div class="l">Level gebrochen, aber gehalten</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--green)">'+anzGuterSpotKauf+'</div><div class="l">💰 Guter Spot-Kauf</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--purple)">'+anzTripleBottom+'</div><div class="l">🔱 Triple Bottom</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+tradeIdInfo.naechsteFrei+'</div><div class="l">Nächste Trade-ID</div></div>' +
       '</div>' +
       '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer. Aktuell höchste vergebene Trade-ID: '+tradeIdInfo.hoechste+'.</div>' +

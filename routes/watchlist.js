@@ -8,7 +8,10 @@ const router = express.Router();
 // no_entry = kein Einstieg zustande gekommen (z.B. Entry zu hoch), der Kurs ist
 //            aber auch nicht mehr runtergekommen - also weder Gewinn noch Verlust.
 const STATI = new Set(['win', 'be_win', 'be_loss', 'lose', 'no_entry']);
-const EVENT_TYPEN = new Set(['single', 'double']);
+// triple = 3-facher Boden statt des ueblichen Doppel-Bodens (selten) - fuer die spaetere
+// Auswertung, ob das auf kleinen Timeframes eher haeufiger (und damit unbedeutender)
+// vorkommt als auf groesseren (ab Tageschart).
+const EVENT_TYPEN = new Set(['single', 'double', 'triple']);
 // form: bogen (sauber) | bogen_unsauber (Bogen erkennbar, aber z.B. nur eine Kerze
 // dazwischen oder Wick unter dem Mittel-Level) | kein_bogen
 const FORMEN = new Set(['bogen', 'bogen_unsauber', 'kein_bogen']);
