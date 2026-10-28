@@ -2393,6 +2393,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
   const el = document.getElementById('wlChart'+SFX);
   if (!el) return;
 
+  // Die 50er-EMA-Retest-Seite hatte urspruenglich 1:1 dieselben Kriterien-Felder wie die
+  // Bottom-Events-Seite uebernommen (Event-Typ, Pivot-Level, Form, Boden-Typ) - das sind
+  // aber Bottom-spezifische Konzepte, die bei einem EMA-Retest keinen Sinn ergeben (Colins
+  // Feedback: "einige muessen geloescht werden"). Marktphase bleibt unveraendert, auch auf
+  // dieser Seite.
+  const istEma50Retest = STRATEGIE === 'ema50_retest';
+
   const btcZeit = BTC_DAILY.map(d => new Date(d[0]+'T00:00:00').getTime());
   const btcPreis = BTC_DAILY.map(d => d[1]);
 
@@ -2758,12 +2765,16 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         asset: scope.querySelector('.wle-asset').value.trim(),
         tf: scope.querySelector('.wle-tf').value.trim() || null,
         status: scope.querySelector('.wle-status').value,
-        eventTyp: scope.querySelector('.wle-event').value,
+        // Event-Typ, Pivot-Level, Form und Boden-Typ gibt es auf der 50er-EMA-Retest-Seite
+        // nicht mehr (Bottom-spezifische Felder, siehe istEma50Retest weiter oben) - die
+        // .wle-*-Elemente fehlen dort im Scope. Wie beim "details"-Feld unten wird der Key
+        // dann bewusst NICHT mitgeschickt, damit das PATCH die gespeicherten Werte nicht anfasst.
+        ...(scope.querySelector('.wle-event') ? { eventTyp: scope.querySelector('.wle-event').value } : {}),
         mtf: scope.querySelector('.wle-mtf').value,
         mtfGleichesLevel: scope.querySelector('.wle-mtflevel').value,
         multiAsset: scope.querySelector('.wle-multiasset').checked,
-        form: scope.querySelector('.wle-form').value,
-        bodenTyp: scope.querySelector('.wle-bodentyp').value,
+        ...(scope.querySelector('.wle-form') ? { form: scope.querySelector('.wle-form').value } : {}),
+        ...(scope.querySelector('.wle-bodentyp') ? { bodenTyp: scope.querySelector('.wle-bodentyp').value } : {}),
         notiz: scope.querySelector('.wle-notiz').value.trim() || null,
         // Das Details-Feld fehlt im Scope, wenn dieses Signal Teil eines gruppierten
         // Multi-Timeframe-Trades ist (siehe wlEditRowHtml) - dann wird "details" hier
@@ -2778,7 +2789,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         candles: scope.querySelector('.wle-candles').value,
         divLokal: scope.querySelector('.wle-divlokal').value,
         divStruktur: scope.querySelector('.wle-divstruktur').value,
-        pivotLevel: scope.querySelector('.wle-pivot').value,
+        ...(scope.querySelector('.wle-pivot') ? { pivotLevel: scope.querySelector('.wle-pivot').value } : {}),
         ergebnisDetail: scope.querySelector('.wle-ergebnisdetail').value,
         zielmethode: scope.querySelector('.wle-zielmethode').value,
         entrySimulation: scope.querySelector('.wle-entrysim').value,
@@ -2811,7 +2822,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px">Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
           '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : ''))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
-          '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom']], s.eventTyp)+'</label>' +
+          (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom']], s.eventTyp)+'</label>') +
           '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label class="wl-detail-kurz" style="width:90px" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>' +
           '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
@@ -2819,9 +2830,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
           '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
           '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
-          '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level']], s.pivotLevel)+'</label>' +
-          '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>' +
-          '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>' +
+          (istEma50Retest ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level']], s.pivotLevel)+'</label>') +
+          (istEma50Retest ? '' : '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>') +
+          (istEma50Retest ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
           '<label>Ergebnis (Detail)'+auswahlHtml('wle-ergebnisdetail', [['','–'],
             ['noch_nicht_bewertet','Noch nicht bewertet'],['target_erreicht','Target erreicht'],
             ['be_2r','Break-even nach 2R'],['stop_loss','Stop-Loss erreicht'],
