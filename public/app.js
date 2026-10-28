@@ -4431,23 +4431,25 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     const gradient = stops.length ? 'conic-gradient('+stops.join(', ')+')' : '#e5e7eb';
 
     const cx = 150, cy = 150, rRing = 85, rLinie = 95, rText = 122;
-    // Bei mehreren kleinen, angular eng benachbarten Segmenten (z.B. Amazon neben
-    // Kfz-Versicherung) wuerden sich die Beschriftungen sonst ueberlappen. Deshalb wird
-    // jedes zweite sichtbare Label zusaetzlich nach aussen versetzt (Colins Feedback:
-    // "die Schrift ist uebereinander").
-    const sichtbareLabels = segmente.filter(s => s.anteil >= 3);
+    // Nur die groessten Segmente kriegen eine Inline-Beschriftung im Kreis - kleine,
+    // angular eng benachbarte Segmente (Amazon, Kfz-Versicherung, ...) wuerden sich sonst
+    // immer ueberlappen, egal wie stark man sie versetzt (Colins Feedback: "die
+    // Beschriftung ist übereinander"). Sie bleiben trotzdem sichtbar, nur eben ueber die
+    // Legende rechts (Farbe + Name + %), nicht im Kreis selbst. "Rest / frei verfügbar"
+    // wird fuers Kreislabel auf "Rest" verkuerzt, damit der Text nicht aus der 300px
+    // breiten Box herausragt (die Legende zeigt weiterhin den vollen Namen).
+    const sichtbareLabels = segmente.filter(s => s.anteil >= 8);
+    const labelText = s => s.e._istRest ? 'Rest' : s.e.label;
     const beschriftungen = sichtbareLabels.map((s, i) => {
-      const versatz = (i % 2 === 1) ? 16 : 0;
-      const rLinieLokal = rLinie + versatz, rTextLokal = rText + versatz;
       const winkel = (s.mitte / 100) * 2 * Math.PI;
       const sin = Math.sin(winkel), cos = Math.cos(winkel);
       const x1 = cx + rRing*sin, y1 = cy - rRing*cos;
-      const x2 = cx + rLinieLokal*sin, y2 = cy - rLinieLokal*cos;
-      const xt = cx + rTextLokal*sin, yt = cy - rTextLokal*cos;
+      const x2 = cx + rLinie*sin, y2 = cy - rLinie*cos;
+      const xt = cx + rText*sin, yt = cy - rText*cos;
       const anchor = xt > cx + 4 ? 'start' : xt < cx - 4 ? 'end' : 'middle';
       const dx = anchor === 'start' ? 4 : anchor === 'end' ? -4 : 0;
       return '<line class="donut-label-line" x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'"/>' +
-        '<text class="donut-label-text" x="'+(xt+dx).toFixed(1)+'" y="'+(yt-2).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(s.e.label)+'</text>' +
+        '<text class="donut-label-text" x="'+(xt+dx).toFixed(1)+'" y="'+(yt-2).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(labelText(s))+'</text>' +
         '<text class="donut-label-pct" x="'+(xt+dx).toFixed(1)+'" y="'+(yt+10).toFixed(1)+'" text-anchor="'+anchor+'">'+s.anteil.toFixed(1)+'%</text>';
     }).join('');
 
@@ -4468,13 +4470,19 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
 
     // Liste aller Posten (inkl. Einkommen), gruppiert nach Typ, mit Loeschen-Button.
     // Monats- und Jahresbetrag stehen als zwei feste Spalten (statt Fliesstext mit "·"),
-    // damit die Zahlen untereinander ausgerichtet sind (Colins Wunsch).
+    // damit die Zahlen untereinander ausgerichtet sind; "m."/"j." statt "€/Mon."/"€/Jahr"
+    // ist kuerzer (Colins Wunsch). zebraZaehler laeuft ueber die gesamte Liste (nicht pro
+    // Gruppe), damit jede zweite ECHTE Zeile (nicht die Zwischenueberschriften) abwechselnd
+    // eingefaerbt wird - ueber CSS-nth-child ginge das nicht, weil die "Abos"-Zwischenzeilen
+    // dazwischen die Zaehlung stoeren wuerden.
+    let zebraZaehler = 0;
     function zeileHtml(e, eingezogen){
       const monatswert = e.frequency === 'yearly' ? monatsBetrag(e) : e.amount;
       const jahreswert = e.frequency === 'yearly' ? e.amount : e.amount*12;
-      return '<div class="pf-legend-item'+(eingezogen?' aus-eingezogen':'')+'" data-id="'+e.id+'">' +
+      const zebra = (zebraZaehler++ % 2 === 1) ? ' aus-zebra' : '';
+      return '<div class="pf-legend-item'+(eingezogen?' aus-eingezogen':'')+zebra+'" data-id="'+e.id+'">' +
         '<span class="t">'+esc(e.label)+'</span>' +
-        '<span class="aus-werte"><span class="aus-val">'+euro(monatswert)+' €/Mon.</span><span class="aus-val">'+euro(jahreswert)+' €/Jahr</span></span>' +
+        '<span class="aus-werte"><span class="aus-val">'+euro(monatswert)+' € m.</span><span class="aus-val">'+euro(jahreswert)+' € j.</span></span>' +
         '<button type="button" class="icon-btn aus-del" data-id="'+e.id+'" title="Löschen">🗑</button>' +
       '</div>';
     }

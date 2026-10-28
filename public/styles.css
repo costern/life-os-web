@@ -526,10 +526,20 @@ a { color:var(--accent); }
 .pf-legend-item .t { flex:1; }
 .pf-dot { width:10px; height:10px; border-radius:99px; flex:0 0 10px; }
 /* Zwei feste Spalten fuer Monats-/Jahresbetrag (Ausgaben-Seite), damit die Zahlen
-   zeilenuebergreifend untereinander ausgerichtet sind, statt als Fliesstext mit "·". */
-.aus-werte { display:grid; grid-template-columns:92px 100px; gap:10px; flex:0 0 auto; }
-.aus-val { color:var(--muted); font-size:13px; text-align:right; font-variant-numeric:tabular-nums; }
+   zeilenuebergreifend untereinander ausgerichtet sind, statt als Fliesstext mit "·".
+   white-space:nowrap verhindert den Zeilenumbruch bei laengeren Betraegen (Colins
+   Feedback zu "2.500,00 € m."); "m."/"j." statt "€/Mon."/"€/Jahr" ist kuerzer. */
+.aus-werte { display:grid; grid-template-columns:82px 82px; gap:10px; flex:0 0 auto; }
+.aus-val { color:var(--muted); font-size:13px; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .aus-eingezogen { padding-left:14px; }
+/* Zeilentrennlinien + Zebra-Streifen NUR in der Ausgaben-Posten-Liste (#ausListe),
+   damit man beim Lesen von links (Bezeichnung) nach rechts (Betrag) die Zeilenhoehe
+   nicht verliert (Colins Feedback). Ueber ID skopiert, damit die Portfolio-Seite und
+   die Legende des Ausgaben-Donuts (beide nutzen ebenfalls .pf-legend-item) unberuehrt
+   bleiben. */
+#ausListe .pf-legend-item { padding:7px 6px; border-bottom:1px solid var(--line); }
+#ausListe .pf-legend-item.aus-zebra { background:var(--hover-bg); }
+#ausListe .pf-legend-item:last-child { border-bottom:none; }
 .pos-hist-grid { grid-column:1/-1; display:grid; grid-template-columns:1fr; gap:16px; }
 @media (min-width:900px){
   .pos-hist-grid { grid-template-columns:1fr 1fr; }
