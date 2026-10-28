@@ -398,3 +398,8 @@ CREATE TABLE IF NOT EXISTS expenses (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ
 );
+-- gruppe: optionale lose Gruppierung innerhalb von "Ausgabe"/"Sparen" (z.B. "Abos" fuer
+-- Spotify/Apple Cloud/Claude) - fasst die Posten in der Liste nur optisch/eingezogen
+-- zusammen, rechnet sie aber NICHT zu einer Summe zusammen (jeder Posten bleibt einzeln
+-- sichtbar, inkl. im Kreisdiagramm).
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS gruppe TEXT;

@@ -525,6 +525,11 @@ a { color:var(--accent); }
 .pf-legend-item { display:flex; align-items:center; gap:8px; font-size:13px; }
 .pf-legend-item .t { flex:1; }
 .pf-dot { width:10px; height:10px; border-radius:99px; flex:0 0 10px; }
+/* Zwei feste Spalten fuer Monats-/Jahresbetrag (Ausgaben-Seite), damit die Zahlen
+   zeilenuebergreifend untereinander ausgerichtet sind, statt als Fliesstext mit "·". */
+.aus-werte { display:grid; grid-template-columns:92px 100px; gap:10px; flex:0 0 auto; }
+.aus-val { color:var(--muted); font-size:13px; text-align:right; font-variant-numeric:tabular-nums; }
+.aus-eingezogen { padding-left:14px; }
 .pos-hist-grid { grid-column:1/-1; display:grid; grid-template-columns:1fr; gap:16px; }
 @media (min-width:900px){
   .pos-hist-grid { grid-template-columns:1fr 1fr; }

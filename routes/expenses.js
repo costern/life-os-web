@@ -7,7 +7,7 @@ const TYPEN = new Set(['einkommen', 'ausgabe', 'sparen']);
 
 function rowOut(r) {
   return { id: r.id, label: r.label, amount: Number(r.amount), frequency: r.frequency,
-    typ: r.typ, sortOrder: r.sort_order, createdAt: r.created_at };
+    typ: r.typ, sortOrder: r.sort_order, gruppe: r.gruppe, createdAt: r.created_at };
 }
 
 router.get('/', async (req, res) => {
@@ -24,9 +24,10 @@ router.post('/', async (req, res) => {
   if (!isFinite(amount)) return res.status(400).json({ error: 'amount muss eine Zahl sein' });
   const frequency = FREQUENZEN.has(b.frequency) ? b.frequency : 'monthly';
   const typ = TYPEN.has(b.typ) ? b.typ : 'ausgabe';
+  const gruppe = b.gruppe && String(b.gruppe).trim() ? String(b.gruppe).trim() : null;
   const { rows } = await pool.query(
-    `INSERT INTO expenses (label, amount, frequency, typ, sort_order) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [b.label.trim(), amount, frequency, typ, Number(b.sortOrder) || 0]
+    `INSERT INTO expenses (label, amount, frequency, typ, sort_order, gruppe) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [b.label.trim(), amount, frequency, typ, Number(b.sortOrder) || 0, gruppe]
   );
   res.status(201).json(rowOut(rows[0]));
 });
@@ -44,6 +45,7 @@ router.patch('/:id', async (req, res) => {
   if (b.frequency !== undefined) { fields.push(`frequency = $${i++}`); vals.push(FREQUENZEN.has(b.frequency) ? b.frequency : 'monthly'); }
   if (b.typ !== undefined) { fields.push(`typ = $${i++}`); vals.push(TYPEN.has(b.typ) ? b.typ : 'ausgabe'); }
   if (b.sortOrder !== undefined) { fields.push(`sort_order = $${i++}`); vals.push(Number(b.sortOrder) || 0); }
+  if (b.gruppe !== undefined) { fields.push(`gruppe = $${i++}`); vals.push(b.gruppe && String(b.gruppe).trim() ? String(b.gruppe).trim() : null); }
   if (!fields.length) return res.status(400).json({ error: 'nichts zu ändern' });
   vals.push(id);
   const { rows } = await pool.query(`UPDATE expenses SET ${fields.join(', ')} WHERE id = $${i} AND deleted_at IS NULL RETURNING *`, vals);

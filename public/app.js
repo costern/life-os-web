@@ -4431,12 +4431,19 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     const gradient = stops.length ? 'conic-gradient('+stops.join(', ')+')' : '#e5e7eb';
 
     const cx = 150, cy = 150, rRing = 85, rLinie = 95, rText = 122;
-    const beschriftungen = segmente.filter(s => s.anteil >= 3).map(s => {
+    // Bei mehreren kleinen, angular eng benachbarten Segmenten (z.B. Amazon neben
+    // Kfz-Versicherung) wuerden sich die Beschriftungen sonst ueberlappen. Deshalb wird
+    // jedes zweite sichtbare Label zusaetzlich nach aussen versetzt (Colins Feedback:
+    // "die Schrift ist uebereinander").
+    const sichtbareLabels = segmente.filter(s => s.anteil >= 3);
+    const beschriftungen = sichtbareLabels.map((s, i) => {
+      const versatz = (i % 2 === 1) ? 16 : 0;
+      const rLinieLokal = rLinie + versatz, rTextLokal = rText + versatz;
       const winkel = (s.mitte / 100) * 2 * Math.PI;
       const sin = Math.sin(winkel), cos = Math.cos(winkel);
       const x1 = cx + rRing*sin, y1 = cy - rRing*cos;
-      const x2 = cx + rLinie*sin, y2 = cy - rLinie*cos;
-      const xt = cx + rText*sin, yt = cy - rText*cos;
+      const x2 = cx + rLinieLokal*sin, y2 = cy - rLinieLokal*cos;
+      const xt = cx + rTextLokal*sin, yt = cy - rTextLokal*cos;
       const anchor = xt > cx + 4 ? 'start' : xt < cx - 4 ? 'end' : 'middle';
       const dx = anchor === 'start' ? 4 : anchor === 'end' ? -4 : 0;
       return '<line class="donut-label-line" x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'"/>' +
@@ -4460,24 +4467,38 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
       '</div>';
 
     // Liste aller Posten (inkl. Einkommen), gruppiert nach Typ, mit Loeschen-Button.
-    // Zu jedem Posten steht zusaetzlich die jeweils andere Frequenz in Klammern (bei
-    // monatlichen Posten der Jahresbetrag, bei jaehrlichen der Monatsbetrag) - Colins
-    // Wunsch, damit man ueberall beide Groessen auf einen Blick sieht.
-    function zeileHtml(e){
-      const zusatz = e.frequency === 'yearly'
-        ? euro(e.amount)+' €/Jahr'
-        : euro(e.amount*12)+' €/Jahr';
-      const hauptwert = e.frequency === 'yearly' ? euro(monatsBetrag(e))+' €/Monat' : euro(e.amount)+' €/Monat';
-      return '<div class="pf-legend-item" data-id="'+e.id+'">' +
+    // Monats- und Jahresbetrag stehen als zwei feste Spalten (statt Fliesstext mit "·"),
+    // damit die Zahlen untereinander ausgerichtet sind (Colins Wunsch).
+    function zeileHtml(e, eingezogen){
+      const monatswert = e.frequency === 'yearly' ? monatsBetrag(e) : e.amount;
+      const jahreswert = e.frequency === 'yearly' ? e.amount : e.amount*12;
+      return '<div class="pf-legend-item'+(eingezogen?' aus-eingezogen':'')+'" data-id="'+e.id+'">' +
         '<span class="t">'+esc(e.label)+'</span>' +
-        '<span class="muted">'+hauptwert+' · '+zusatz+'</span>' +
+        '<span class="aus-werte"><span class="aus-val">'+euro(monatswert)+' €/Mon.</span><span class="aus-val">'+euro(jahreswert)+' €/Jahr</span></span>' +
         '<button type="button" class="icon-btn aus-del" data-id="'+e.id+'" title="Löschen">🗑</button>' +
       '</div>';
     }
+    // Innerhalb von Ausgaben/Sparen werden Posten mit derselben "gruppe" (z.B. "Abos")
+    // NICHT zu einer Summe zusammengefasst, sondern nur unter einer eigenen, leicht
+    // eingezogenen Zwischenueberschrift gruppiert - jeder Posten bleibt einzeln sichtbar.
+    function listeMitGruppenHtml(liste){
+      const ohneGruppe = liste.filter(e => !e.gruppe);
+      const gruppen = new Map();
+      liste.filter(e => e.gruppe).forEach(e => {
+        if (!gruppen.has(e.gruppe)) gruppen.set(e.gruppe, []);
+        gruppen.get(e.gruppe).push(e);
+      });
+      let html = ohneGruppe.map(e => zeileHtml(e, false)).join('');
+      gruppen.forEach((posten, gruppe) => {
+        html += '<div class="muted" style="margin:6px 0 2px 14px;font-size:11.5px">'+esc(gruppe)+'</div>' +
+          posten.map(e => zeileHtml(e, true)).join('');
+      });
+      return html;
+    }
     elListe.innerHTML =
-      '<div class="muted" style="margin-bottom:4px">Einkommen</div>' + einkommen.map(zeileHtml).join('') +
-      '<div class="muted" style="margin:10px 0 4px">Ausgaben</div>' + (ausgaben.map(zeileHtml).join('') || '<div class="empty">Noch keine Ausgaben erfasst.</div>') +
-      '<div class="muted" style="margin:10px 0 4px">Sparen</div>' + (sparen.map(zeileHtml).join('') || '<div class="empty">–</div>');
+      '<div class="muted" style="margin-bottom:4px">Einkommen</div>' + listeMitGruppenHtml(einkommen) +
+      '<div class="muted" style="margin:10px 0 4px">Ausgaben</div>' + (listeMitGruppenHtml(ausgaben) || '<div class="empty">Noch keine Ausgaben erfasst.</div>') +
+      '<div class="muted" style="margin:10px 0 4px">Sparen</div>' + (listeMitGruppenHtml(sparen) || '<div class="empty">–</div>');
 
     elListe.querySelectorAll('.aus-del').forEach(btn => btn.addEventListener('click', async () => {
       if (!confirm('Posten wirklich löschen?')) return;
@@ -4492,11 +4513,12 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     const amount = parseFloat(document.getElementById('ausNewAmount').value.replace(',', '.'));
     const frequency = document.getElementById('ausNewFrequency').value;
     const typ = document.getElementById('ausNewTyp').value;
+    const gruppe = document.getElementById('ausNewGruppe').value.trim() || null;
     const msg = document.getElementById('ausMsg');
     if (!label || !isFinite(amount)) { msg.textContent = 'Bitte Bezeichnung und einen gültigen Betrag angeben.'; return; }
     msg.textContent = '';
     try {
-      await api('/expenses', { method: 'POST', body: JSON.stringify({ label, amount, frequency, typ }) });
+      await api('/expenses', { method: 'POST', body: JSON.stringify({ label, amount, frequency, typ, gruppe }) });
       elForm.reset();
       await laden();
     } catch(e){ msg.textContent = 'Fehler: ' + e.message; }
