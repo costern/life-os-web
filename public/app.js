@@ -2799,10 +2799,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         uhrzeit: scope.querySelector('.wle-uhrzeit').value,
         regelkonform: scope.querySelector('.wle-regelkonform').value,
         regelkonformGrund: scope.querySelector('.wle-regelkonformgrund').value.trim() || null,
-        levelGebrochenGehalten: scope.querySelector('.wle-levelgebrochen').checked,
+        // "Level gebrochen/gehalten" und "Guter Spot-Kauf" (inkl. Preis) gibt es auf der
+        // 50er-EMA-Retest-Seite nicht mehr (Colins Wunsch) - gleiches Omit-Pattern wie oben
+        // bei Event/Pivot-Level/Form/Boden-Typ.
+        ...(scope.querySelector('.wle-levelgebrochen') ? { levelGebrochenGehalten: scope.querySelector('.wle-levelgebrochen').checked } : {}),
         nurBestaetigung: scope.querySelector('.wle-nurbestaetigung').checked,
-        guterSpotKauf: scope.querySelector('.wle-gutspotkauf').checked,
-        spotKaufPreis: scope.querySelector('.wle-spotkaufpreis').value.trim() || null
+        ...(scope.querySelector('.wle-gutspotkauf') ? { guterSpotKauf: scope.querySelector('.wle-gutspotkauf').checked } : {}),
+        ...(scope.querySelector('.wle-spotkaufpreis') ? { spotKaufPreis: scope.querySelector('.wle-spotkaufpreis').value.trim() || null } : {})
       };
     }
 
@@ -2873,12 +2876,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // (Colins Feedback: "warum ist da so ein riesiges freies graues Feld").
         '<div class="wl-detail-checks">' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
-          '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>' +
+          (istEma50Retest ? '' : '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>') +
           '<label class="wl-check" title="Kein eigenstaendiges, regelkonformes Setup (z.B. kein eindeutiges Pivot-Level, choppy Candles, Pattern zu kurz - keine/nur eine Kerze zwischen den Tiefpunkten) - bestaetigt nur eine groessere Bewegung. Ergebnis trotzdem eintragen, als haette man nach Standardregeln gehandelt, damit sichtbar bleibt, ob es funktioniert haette."><input type="checkbox" class="wle-nurbestaetigung"'+(s.nurBestaetigung?' checked':'')+'> Nur bestätigendes Signal (kein eigenständiges Setup)</label>' +
-          '<label class="wl-check" title="Kein valides/regelkonformes MTF-Setup (z.B. nur ein einzelnes 1W/2W-Signal ohne Bestaetigung), war im Nachhinein aber trotzdem ein guter Spot-Einkaufspreis - unabhaengig davon, ob es am Ende der absolute Boden war."><input type="checkbox" class="wle-gutspotkauf"'+(s.guterSpotKauf?' checked':'')+'> 💰 Guter Spot-Einkaufspreis</label>' +
+          (istEma50Retest ? '' : '<label class="wl-check" title="Kein valides/regelkonformes MTF-Setup (z.B. nur ein einzelnes 1W/2W-Signal ohne Bestaetigung), war im Nachhinein aber trotzdem ein guter Spot-Einkaufspreis - unabhaengig davon, ob es am Ende der absolute Boden war."><input type="checkbox" class="wle-gutspotkauf"'+(s.guterSpotKauf?' checked':'')+'> 💰 Guter Spot-Einkaufspreis</label>') +
         '</div>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
-        '<label class="wl-detail-voll">Spot-Einkaufspreis (optional)<input type="text" class="wle-spotkaufpreis" value="'+esc(s.spotKaufPreis||'')+'" placeholder="z.B. 82.100 $ oder Preisbereich"></label>';
+        (istEma50Retest ? '' : '<label class="wl-detail-voll">Spot-Einkaufspreis (optional)<input type="text" class="wle-spotkaufpreis" value="'+esc(s.spotKaufPreis||'')+'" placeholder="z.B. 82.100 $ oder Preisbereich"></label>');
     }
 
     // Eingeklappter Umschalter + Formular fuer EIN Signal innerhalb der Trade-Gesamtansicht
@@ -3021,8 +3024,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<div class="stat"><div class="v pnl-orange">'+anzBeLoss+'</div><div class="l">BE Loss</div></div>' +
         '<div class="stat"><div class="v pnl-neg">'+anzLose+'</div><div class="l">Lose</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+anzNoEntry+'</div><div class="l">No Entry</div></div>' +
-        '<div class="stat"><div class="v" style="color:var(--accent)">'+anzLevelGebrochenGehalten+'</div><div class="l">Level gebrochen, aber gehalten</div></div>' +
-        '<div class="stat"><div class="v" style="color:var(--green)">'+anzGuterSpotKauf+'</div><div class="l">💰 Guter Spot-Kauf</div></div>' +
+        (istEma50Retest ? '' : '<div class="stat"><div class="v" style="color:var(--accent)">'+anzLevelGebrochenGehalten+'</div><div class="l">Level gebrochen, aber gehalten</div></div>') +
+        (istEma50Retest ? '' : '<div class="stat"><div class="v" style="color:var(--green)">'+anzGuterSpotKauf+'</div><div class="l">💰 Guter Spot-Kauf</div></div>') +
         '<div class="stat"><div class="v" style="color:var(--purple)">'+anzTripleBottom+'</div><div class="l">🔱 Triple Bottom</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+tradeIdInfo.naechsteFrei+'</div><div class="l">Nächste Trade-ID</div></div>' +
       '</div>' +
