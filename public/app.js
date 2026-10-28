@@ -4382,6 +4382,9 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
 
   const TYP_LABEL = { einkommen: 'Einkommen', ausgabe: 'Ausgabe', sparen: 'Sparen' };
   const monatsBetrag = e => e.frequency === 'yearly' ? e.amount / 12 : e.amount;
+  // Euro-Betraege immer mit 2 Nachkommastellen (fmtAmount oben ist fuer Krypto-Mengen mit
+  // variabler Genauigkeit gedacht und wuerde z.B. "23,2" statt "23,20" anzeigen).
+  const euro = n => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   async function laden(){
     let posten;
@@ -4402,10 +4405,10 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
     const rest = einkommenGesamt - ausgabenGesamt - sparenGesamt;
 
     elStats.innerHTML =
-      '<div class="stat"><div class="v" style="color:var(--green)">'+fmtAmount(einkommenGesamt)+' €</div><div class="l">Einkommen / Monat</div></div>' +
-      '<div class="stat"><div class="v" style="color:var(--red)">'+fmtAmount(ausgabenGesamt)+' €</div><div class="l">Ausgaben / Monat</div></div>' +
-      '<div class="stat"><div class="v" style="color:var(--accent)">'+fmtAmount(sparenGesamt)+' €</div><div class="l">Sparen / Monat</div></div>' +
-      '<div class="stat"><div class="v" style="color:'+(rest>=0?'var(--green)':'var(--red)')+'">'+fmtAmount(rest)+' €</div><div class="l">Rest / frei verfügbar</div></div>';
+      '<div class="stat"><div class="v" style="color:var(--green)">'+euro(einkommenGesamt)+' €</div><div class="l">Einkommen / Monat</div></div>' +
+      '<div class="stat"><div class="v" style="color:var(--red)">'+euro(ausgabenGesamt)+' €</div><div class="l">Ausgaben / Monat</div></div>' +
+      '<div class="stat"><div class="v" style="color:var(--accent)">'+euro(sparenGesamt)+' €</div><div class="l">Sparen / Monat</div></div>' +
+      '<div class="stat"><div class="v" style="color:'+(rest>=0?'var(--green)':'var(--red)')+'">'+euro(rest)+' €</div><div class="l">Rest / frei verfügbar</div></div>';
 
     // Kreisdiagramm zeigt Ausgaben + Sparen als Anteile vom Einkommen (nicht das
     // Einkommen selbst als Segment) - plus "Rest", falls am Monatsende noch was übrig
@@ -4445,23 +4448,29 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
       '<div class="donut-wrap">' +
         '<div class="donut-labelbox">' +
           '<div class="donut-outer"><div class="donut" style="background:'+gradient+'"></div>' +
-            '<div class="donut-hole"><div class="v">'+fmtAmount(einkommenGesamt)+' €</div><div class="l">Einkommen / Monat</div></div>' +
+            '<div class="donut-hole"><div class="v">'+euro(einkommenGesamt)+' €</div><div class="l">Einkommen / Monat</div></div>' +
           '</div>' +
           '<svg class="donut-labels" viewBox="0 0 300 300">'+beschriftungen+'</svg>' +
         '</div>' +
         '<div class="pf-legend">' +
           segmente.map(s => '<div class="pf-legend-item"><span class="pf-dot" style="background:'+s.farbe+'"></span>' +
-            '<span class="t">'+esc(s.e.label)+'</span><span class="muted">'+fmtAmount(monatsBetrag(s.e))+' € · '+s.anteil.toFixed(1)+'%</span></div>'
+            '<span class="t">'+esc(s.e.label)+'</span><span class="muted">'+euro(monatsBetrag(s.e))+' € · '+s.anteil.toFixed(1)+'%</span></div>'
           ).join('') +
         '</div>' +
       '</div>';
 
     // Liste aller Posten (inkl. Einkommen), gruppiert nach Typ, mit Loeschen-Button.
+    // Zu jedem Posten steht zusaetzlich die jeweils andere Frequenz in Klammern (bei
+    // monatlichen Posten der Jahresbetrag, bei jaehrlichen der Monatsbetrag) - Colins
+    // Wunsch, damit man ueberall beide Groessen auf einen Blick sieht.
     function zeileHtml(e){
-      const jahresHinweis = e.frequency === 'yearly' ? ' <span class="muted">('+fmtAmount(e.amount)+' €/Jahr)</span>' : '';
+      const zusatz = e.frequency === 'yearly'
+        ? euro(e.amount)+' €/Jahr'
+        : euro(e.amount*12)+' €/Jahr';
+      const hauptwert = e.frequency === 'yearly' ? euro(monatsBetrag(e))+' €/Monat' : euro(e.amount)+' €/Monat';
       return '<div class="pf-legend-item" data-id="'+e.id+'">' +
-        '<span class="t">'+esc(e.label)+jahresHinweis+'</span>' +
-        '<span class="muted">'+fmtAmount(monatsBetrag(e))+' €/Monat</span>' +
+        '<span class="t">'+esc(e.label)+'</span>' +
+        '<span class="muted">'+hauptwert+' · '+zusatz+'</span>' +
         '<button type="button" class="icon-btn aus-del" data-id="'+e.id+'" title="Löschen">🗑</button>' +
       '</div>';
     }
