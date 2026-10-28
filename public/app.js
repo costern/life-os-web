@@ -4368,6 +4368,135 @@ document.getElementById('refreshPrices').addEventListener('click', async (ev) =>
   });
 })();
 
+/* ---------- Ausgaben: monatliche Einnahmen/Ausgaben/Sparen-Uebersicht als Kreisdiagramm,
+   im Stil der "Zeig mir deine Ausgaben"-YouTube-Videos. Jaehrliche Posten (z.B. Kfz-Steuer)
+   werden fuers Diagramm und die Summen auf den Monat umgerechnet, bleiben in der Liste
+   aber mit ihrem echten Jahresbetrag + Frequenz sichtbar. ---------- */
+(function(){
+  const FARBEN = ['#4f46e5','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#db2777','#65a30d','#0284c7','#ea580c'];
+  const elChart = document.getElementById('ausChart');
+  const elListe = document.getElementById('ausListe');
+  const elStats = document.getElementById('ausStats');
+  const elForm = document.getElementById('ausForm');
+  if (!elChart || !elListe || !elStats || !elForm) return;
+
+  const TYP_LABEL = { einkommen: 'Einkommen', ausgabe: 'Ausgabe', sparen: 'Sparen' };
+  const monatsBetrag = e => e.frequency === 'yearly' ? e.amount / 12 : e.amount;
+
+  async function laden(){
+    let posten;
+    try { posten = await api('/expenses'); }
+    catch(e){ elChart.innerHTML = elListe.innerHTML = '<div class="empty">Fehler: '+esc(e.message)+'</div>'; return; }
+    zeichne(posten);
+  }
+
+  function zeichne(posten){
+    const einkommen = posten.filter(e => e.typ === 'einkommen');
+    const ausgaben = posten.filter(e => e.typ === 'ausgabe');
+    const sparen = posten.filter(e => e.typ === 'sparen');
+
+    const sum = liste => liste.reduce((s,e) => s + monatsBetrag(e), 0);
+    const einkommenGesamt = sum(einkommen);
+    const ausgabenGesamt = sum(ausgaben);
+    const sparenGesamt = sum(sparen);
+    const rest = einkommenGesamt - ausgabenGesamt - sparenGesamt;
+
+    elStats.innerHTML =
+      '<div class="stat"><div class="v" style="color:var(--green)">'+fmtAmount(einkommenGesamt)+' €</div><div class="l">Einkommen / Monat</div></div>' +
+      '<div class="stat"><div class="v" style="color:var(--red)">'+fmtAmount(ausgabenGesamt)+' €</div><div class="l">Ausgaben / Monat</div></div>' +
+      '<div class="stat"><div class="v" style="color:var(--accent)">'+fmtAmount(sparenGesamt)+' €</div><div class="l">Sparen / Monat</div></div>' +
+      '<div class="stat"><div class="v" style="color:'+(rest>=0?'var(--green)':'var(--red)')+'">'+fmtAmount(rest)+' €</div><div class="l">Rest / frei verfügbar</div></div>';
+
+    // Kreisdiagramm zeigt Ausgaben + Sparen als Anteile vom Einkommen (nicht das
+    // Einkommen selbst als Segment) - plus "Rest", falls am Monatsende noch was übrig
+    // bleibt, damit die Segmente zusammen wieder das volle Einkommen ergeben.
+    const segmentePosten = ausgaben.concat(sparen).slice().sort((a,b) => monatsBetrag(b) - monatsBetrag(a));
+    if (rest > 0.5) segmentePosten.push({ label: 'Rest / frei verfügbar', amount: rest, frequency: 'monthly', typ: 'rest', _istRest: true });
+
+    const basis = einkommenGesamt > 0 ? einkommenGesamt : segmentePosten.reduce((s,e) => s + monatsBetrag(e), 0);
+    let cursor = 0;
+    const stops = [];
+    const segmente = segmentePosten.map((e, idx) => {
+      const betrag = monatsBetrag(e);
+      const anteil = basis > 0 ? betrag/basis*100 : 0;
+      const farbe = e._istRest ? 'var(--line)' : FARBEN[idx % FARBEN.length];
+      stops.push(farbe+' '+cursor.toFixed(2)+'% '+(cursor+anteil).toFixed(2)+'%');
+      const seg = { e, anteil, farbe, mitte: cursor + anteil/2 };
+      cursor += anteil;
+      return seg;
+    });
+    const gradient = stops.length ? 'conic-gradient('+stops.join(', ')+')' : '#e5e7eb';
+
+    const cx = 150, cy = 150, rRing = 85, rLinie = 95, rText = 122;
+    const beschriftungen = segmente.filter(s => s.anteil >= 3).map(s => {
+      const winkel = (s.mitte / 100) * 2 * Math.PI;
+      const sin = Math.sin(winkel), cos = Math.cos(winkel);
+      const x1 = cx + rRing*sin, y1 = cy - rRing*cos;
+      const x2 = cx + rLinie*sin, y2 = cy - rLinie*cos;
+      const xt = cx + rText*sin, yt = cy - rText*cos;
+      const anchor = xt > cx + 4 ? 'start' : xt < cx - 4 ? 'end' : 'middle';
+      const dx = anchor === 'start' ? 4 : anchor === 'end' ? -4 : 0;
+      return '<line class="donut-label-line" x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'"/>' +
+        '<text class="donut-label-text" x="'+(xt+dx).toFixed(1)+'" y="'+(yt-2).toFixed(1)+'" text-anchor="'+anchor+'">'+esc(s.e.label)+'</text>' +
+        '<text class="donut-label-pct" x="'+(xt+dx).toFixed(1)+'" y="'+(yt+10).toFixed(1)+'" text-anchor="'+anchor+'">'+s.anteil.toFixed(1)+'%</text>';
+    }).join('');
+
+    elChart.innerHTML =
+      '<div class="donut-wrap">' +
+        '<div class="donut-labelbox">' +
+          '<div class="donut-outer"><div class="donut" style="background:'+gradient+'"></div>' +
+            '<div class="donut-hole"><div class="v">'+fmtAmount(einkommenGesamt)+' €</div><div class="l">Einkommen / Monat</div></div>' +
+          '</div>' +
+          '<svg class="donut-labels" viewBox="0 0 300 300">'+beschriftungen+'</svg>' +
+        '</div>' +
+        '<div class="pf-legend">' +
+          segmente.map(s => '<div class="pf-legend-item"><span class="pf-dot" style="background:'+s.farbe+'"></span>' +
+            '<span class="t">'+esc(s.e.label)+'</span><span class="muted">'+fmtAmount(monatsBetrag(s.e))+' € · '+s.anteil.toFixed(1)+'%</span></div>'
+          ).join('') +
+        '</div>' +
+      '</div>';
+
+    // Liste aller Posten (inkl. Einkommen), gruppiert nach Typ, mit Loeschen-Button.
+    function zeileHtml(e){
+      const jahresHinweis = e.frequency === 'yearly' ? ' <span class="muted">('+fmtAmount(e.amount)+' €/Jahr)</span>' : '';
+      return '<div class="pf-legend-item" data-id="'+e.id+'">' +
+        '<span class="t">'+esc(e.label)+jahresHinweis+'</span>' +
+        '<span class="muted">'+fmtAmount(monatsBetrag(e))+' €/Monat</span>' +
+        '<button type="button" class="icon-btn aus-del" data-id="'+e.id+'" title="Löschen">🗑</button>' +
+      '</div>';
+    }
+    elListe.innerHTML =
+      '<div class="muted" style="margin-bottom:4px">Einkommen</div>' + einkommen.map(zeileHtml).join('') +
+      '<div class="muted" style="margin:10px 0 4px">Ausgaben</div>' + (ausgaben.map(zeileHtml).join('') || '<div class="empty">Noch keine Ausgaben erfasst.</div>') +
+      '<div class="muted" style="margin:10px 0 4px">Sparen</div>' + (sparen.map(zeileHtml).join('') || '<div class="empty">–</div>');
+
+    elListe.querySelectorAll('.aus-del').forEach(btn => btn.addEventListener('click', async () => {
+      if (!confirm('Posten wirklich löschen?')) return;
+      await api('/expenses/'+btn.dataset.id, { method: 'DELETE' });
+      await laden();
+    }));
+  }
+
+  elForm.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const label = document.getElementById('ausNewLabel').value.trim();
+    const amount = parseFloat(document.getElementById('ausNewAmount').value.replace(',', '.'));
+    const frequency = document.getElementById('ausNewFrequency').value;
+    const typ = document.getElementById('ausNewTyp').value;
+    const msg = document.getElementById('ausMsg');
+    if (!label || !isFinite(amount)) { msg.textContent = 'Bitte Bezeichnung und einen gültigen Betrag angeben.'; return; }
+    msg.textContent = '';
+    try {
+      await api('/expenses', { method: 'POST', body: JSON.stringify({ label, amount, frequency, typ }) });
+      elForm.reset();
+      await laden();
+    } catch(e){ msg.textContent = 'Fehler: ' + e.message; }
+  });
+
+  laden();
+  document.querySelector('button[data-page="ausgaben"]').addEventListener('click', laden);
+})();
+
 /* Auffrischen nur, wenn der Tab wirklich sichtbar ist und die Trading-Seite offen ist.
    Sonst würde die Datenbank bei einem dauerhaft offenen Tab nie schlafen gehen und
    unnötig Rechenstunden der Gratis-Stufe verbrauchen. */

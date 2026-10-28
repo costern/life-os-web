@@ -29,6 +29,7 @@
     <button data-page="news" title="News"><span class="ico">📰</span><span class="nav-txt">News</span></button>
     <button data-page="trading" title="Trading"><span class="ico">📈</span><span class="nav-txt">Trading</span></button>
     <button data-page="portfolio" title="Portfolio"><span class="ico">💼</span><span class="nav-txt">Portfolio</span></button>
+    <button data-page="ausgaben" title="Monatliche Ausgaben"><span class="ico">🧾</span><span class="nav-txt">Ausgaben</span></button>
     <div class="nav-label">Strategie</div>
     <button data-page="watchlist" class="nav-sub" title="Bottom Events"><span class="ico">📋</span><span class="nav-txt">Bottom Events</span></button>
     <button data-page="watchlist-ema50" class="nav-sub" title="50er EMA Retests"><span class="ico">📐</span><span class="nav-txt">50er EMA Retests</span></button>
@@ -389,6 +390,42 @@
         <div class="card wide">
           <h2>➕ Coin hinzufügen</h2>
           <div id="pfForm"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-ausgaben">
+      <div class="grid">
+        <div class="stats" id="ausStats"></div>
+        <div class="pos-hist-grid">
+          <div class="card">
+            <h2>🥧 Monatliche Verteilung</h2>
+            <div id="ausChart"><div class="empty">Lade…</div></div>
+          </div>
+          <div class="card">
+            <h2>🧾 Posten</h2>
+            <div id="ausListe"><div class="empty">Lade…</div></div>
+          </div>
+        </div>
+        <div class="card wide">
+          <h2>➕ Posten hinzufügen</h2>
+          <form id="ausForm" class="addbar" autocomplete="off">
+            <div class="addrow">
+              <input type="text" id="ausNewLabel" placeholder="Bezeichnung (z.B. Miete)" maxlength="60" required style="flex:1;min-width:140px">
+              <input type="text" id="ausNewAmount" placeholder="Betrag in €" maxlength="20" required style="max-width:120px">
+              <select id="ausNewFrequency">
+                <option value="monthly">pro Monat</option>
+                <option value="yearly">pro Jahr</option>
+              </select>
+              <select id="ausNewTyp">
+                <option value="ausgabe">Ausgabe</option>
+                <option value="einkommen">Einkommen</option>
+                <option value="sparen">Sparen</option>
+              </select>
+              <button type="submit">+ Hinzufügen</button>
+            </div>
+            <div class="te-msg muted" id="ausMsg">Jährliche Posten (z.B. Kfz-Steuer) werden im Diagramm automatisch auf den Monat umgerechnet.</div>
+          </form>
         </div>
       </div>
     </section>

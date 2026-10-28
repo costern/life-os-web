@@ -382,3 +382,19 @@ CREATE INDEX IF NOT EXISTS idx_watchlist_screenshots_signal ON watchlist_screens
 ALTER TABLE watchlist_screenshots ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 -- sort_order: siehe trade_screenshots weiter oben, gleiches Prinzip.
 ALTER TABLE watchlist_screenshots ADD COLUMN IF NOT EXISTS sort_order INTEGER;
+
+-- Monatliche Ausgaben/Einnahmen-Uebersicht (eigene Seite, Kreisdiagramm wie bei den
+-- "Zeig mir deine Ausgaben"-YouTube-Videos). typ: einkommen | ausgabe | sparen.
+-- frequency: monthly | yearly (jaehrliche Posten wie Kfz-Steuer werden im UI auf den
+-- Monat umgerechnet). Validierung der beiden Felder erfolgt in JS (routes/expenses.js),
+-- wie bei den anderen Enum-aehnlichen Feldern in diesem Projekt.
+CREATE TABLE IF NOT EXISTS expenses (
+  id SERIAL PRIMARY KEY,
+  label TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  frequency TEXT NOT NULL DEFAULT 'monthly',
+  typ TEXT NOT NULL DEFAULT 'ausgabe',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at TIMESTAMPTZ
+);
