@@ -1065,6 +1065,12 @@ async function ladeOvTrades(){
       const msg = '<div class="err">To-Dos nicht ladbar: '+esc(e.message)+'</div>';
       [elBoard, elOvTodos, elOvBeob].forEach(el => { if (el) el.innerHTML = msg; });
     }
+    // Der Monats-Kalender auf derselben Seite zeigt To-Dos mit Faelligkeitsdatum als
+    // Pseudo-Termine an (siehe weiter oben), laedt seine Daten aber nur einmal beim
+    // Seitenaufruf bzw. beim Monatswechsel - ohne diesen Aufruf hier wuerde ein frisch
+    // angelegtes/geaendertes To-Do im Kalender erst nach einem Reload auftauchen, nicht
+    // sofort (Colins Feedback: neues To-Do mit Datum war im Kalender nicht zu sehen).
+    if (typeof window.ladeKalenderMonat === 'function') window.ladeKalenderMonat();
   }
   window.ladeTodos = laden;
   laden();
