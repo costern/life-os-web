@@ -1024,24 +1024,32 @@ async function ladeOvTrades(){
 
     // ToDo-Seite: eigene Spalte pro Thema, nebeneinander
     if (elBoard){
-      const themenAlle = Array.from(new Set(gefiltert.map(r => r.thema).filter(Boolean))).sort((a,b) => a.localeCompare(b,'de'));
+      // To-Dos MIT Faelligkeitsdatum gelten als "geplant" und bekommen eine eigene Spalte
+      // ganz vorne links, fest an erster Stelle (vor "Beobachten") - unabhaengig von ihrem
+      // eigentlichen Thema. Sie tauchen dadurch NICHT mehr doppelt in ihrer normalen
+      // Thema-Spalte auf, behalten dort aber (anders als in den anderen Spalten) ihr
+      // Thema als Badge, damit man weiterhin sieht, wozu sie gehoeren (Colins Wunsch).
+      const geplant = sortiert(gefiltert.filter(r => r.due));
+      const ungeplant = gefiltert.filter(r => !r.due);
+      const themenAlle = Array.from(new Set(ungeplant.map(r => r.thema).filter(Boolean))).sort((a,b) => a.localeCompare(b,'de'));
       const themen = themenAlle.filter(th => th !== 'Beobachten');
-      const ohneThema = sortiert(gefiltert.filter(r => !r.thema));
-      const beobachten = sortiert(gefiltert.filter(r => r.thema === 'Beobachten'));
+      const ohneThema = sortiert(ungeplant.filter(r => !r.thema));
+      const beobachten = sortiert(ungeplant.filter(r => r.thema === 'Beobachten'));
       const spalten = [];
-      // "Beobachten" fest an erster Stelle, nicht alphabetisch einsortiert und immer sichtbar
-      // (auch leer) - Colin will die Spalte nicht suchen muessen, sie soll immer am gleichen
-      // Platz stehen.
+      // "Geplant" (alle To-Dos mit Datum) ganz vorne, dann "Beobachten" - beide fest an
+      // ihrer Stelle, nicht alphabetisch einsortiert und immer sichtbar (auch leer), damit
+      // Colin sie nicht suchen muss.
+      spalten.push({ label:'Geplant', liste: geplant, zeigeThema:true });
       spalten.push({ label:'Beobachten', liste: beobachten });
       if (ohneThema.length || (!themen.length && !beobachten.length)) spalten.push({ label:'Ohne Thema', liste: ohneThema });
-      themen.forEach(th => spalten.push({ label: th, liste: sortiert(gefiltert.filter(r => r.thema === th)) }));
+      themen.forEach(th => spalten.push({ label: th, liste: sortiert(ungeplant.filter(r => r.thema === th)) }));
 
       let farbIdx = 0;
       elBoard.innerHTML = spalten.map(sp => {
-        const farbe = sp.label === 'Ohne Thema' ? 'var(--muted)' : TODO_SPALTEN_FARBEN[(farbIdx++) % TODO_SPALTEN_FARBEN.length];
+        const farbe = sp.label === 'Geplant' ? 'var(--amber)' : sp.label === 'Ohne Thema' ? 'var(--muted)' : TODO_SPALTEN_FARBEN[(farbIdx++) % TODO_SPALTEN_FARBEN.length];
         return '<div class="card todo-col" data-thema-slug="'+themaSlug(sp.label==='Ohne Thema'?'':sp.label)+'" style="border-top:3px solid '+farbe+'">' +
           '<h2 style="color:'+farbe+'">'+esc(sp.label)+' <span class="sub">'+sp.liste.length+'</span></h2>' +
-          '<div class="todo-col-list">' + (sp.liste.length ? sp.liste.map(r => zeile(r, true)).join('') :
+          '<div class="todo-col-list">' + (sp.liste.length ? sp.liste.map(r => zeile(r, !sp.zeigeThema)).join('') :
             '<div class="empty">'+(ansicht==='erledigt' ? 'Noch nichts erledigt' : 'Keine Einträge')+'</div>') +
           '</div>' +
         '</div>';
