@@ -2413,6 +2413,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
   // Feedback: "einige muessen geloescht werden"). Marktphase bleibt unveraendert, auch auf
   // dieser Seite.
   const istEma50Retest = STRATEGIE === 'ema50_retest';
+  // Eigenes, von "Details" getrenntes News-Feld in der Trade-Gesamtansicht - bislang nur
+  // fuer Bottom Events (Colins Wunsch, siehe wlRenderTradeGesamt weiter unten).
+  const zeigeNewsFeld = STRATEGIE === 'double_bottom';
 
   const btcZeit = BTC_DAILY.map(d => new Date(d[0]+'T00:00:00').getTime());
   const btcPreis = BTC_DAILY.map(d => d[1]);
@@ -3353,6 +3356,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const chronologisch = verwandte.slice().sort((a,b) =>
         a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
       const gemeinsamerText = (chronologisch.find(s => (s.details||'').trim()) || {}).details || '';
+      // News, genau wie Details: ein geteiltes Feld fuer den gesamten Trade, vorbelegt mit
+      // dem ersten bereits vorhandenen Text. Anders als Details aber nur eingeblendet,
+      // wenn schon etwas drinsteht oder Colin explizit "+ News hinzufuegen" anklickt - ein
+      // leeres News-Feld soll keinen Platz verbrauchen (Colins Wunsch).
+      const gemeinsamerNewsText = zeigeNewsFeld ? ((chronologisch.find(s => (s.news||'').trim()) || {}).news || '') : '';
       const alleIds = verwandte.map(s => s.id).join(',');
 
       el.innerHTML =
@@ -3361,6 +3369,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-voll">Details (gemeinsam für den gesamten Trade)' +
             '<textarea class="wle-trade-gesamt-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse für den GESAMTEN Trade über alle Timeframes: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(gemeinsamerText)+'</textarea>' +
           '</label>' +
+          (!zeigeNewsFeld ? '' :
+            '<div class="wl-trade-gesamt-news-wrap">' +
+              (gemeinsamerNewsText ? '' : '<button type="button" class="wl-signal-felder-toggle wl-trade-gesamt-news-toggle">+ News hinzufügen</button>') +
+              '<label class="wl-detail-voll wl-trade-gesamt-news-feld"'+(gemeinsamerNewsText ? '' : ' style="display:none"')+'>News (kurz, gemeinsam für den gesamten Trade)' +
+                '<textarea class="wle-trade-gesamt-news tl-notiz-auto" rows="1" placeholder="Kurze Markt-News zu diesem Trade…">'+esc(gemeinsamerNewsText)+'</textarea>' +
+              '</label>' +
+            '</div>') +
           '<div class="wl-detail-aktionen"><button type="button" class="wl-trade-gesamt-save">Speichern</button><span class="te-msg wl-trade-gesamt-msg"></span></div>' +
         '</div>' +
         '<div class="wl-trade-gesamt-tage">' +
@@ -3418,6 +3433,22 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       if (gemeinsamesFeld) {
         tlAutoResize(gemeinsamesFeld);
         gemeinsamesFeld.addEventListener('input', () => tlAutoResize(gemeinsamesFeld));
+      }
+      const newsFeld = el.querySelector('.wle-trade-gesamt-news');
+      if (newsFeld) {
+        tlAutoResize(newsFeld);
+        newsFeld.addEventListener('input', () => tlAutoResize(newsFeld));
+      }
+      const newsToggle = el.querySelector('.wl-trade-gesamt-news-toggle');
+      if (newsToggle) {
+        newsToggle.addEventListener('click', () => {
+          const label = el.querySelector('.wl-trade-gesamt-news-feld');
+          label.style.display = '';
+          newsToggle.remove();
+          const feld = label.querySelector('.wle-trade-gesamt-news');
+          tlAutoResize(feld);
+          feld.focus();
+        });
       }
 
       // Die eingeklappten Felder-Formulare pro Signal (wlSignalFelderHtml) kommen erst
@@ -3503,23 +3534,31 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const cancelBtn = ev.target.closest('.wl-cancel');
       if (cancelBtn) { cancelBtn.closest('tr').hidden = true; wlOffenId = null; return; }
 
-      // Gemeinsames Details-Feld der Trade-Gesamtansicht speichern - schreibt denselben
-      // Text in die "details"-Spalte JEDES zugehoerigen Signals (Trade-ID), damit es
-      // sich wirklich wie EIN geteiltes Feld verhaelt statt pro Signal getrennt zu sein.
+      // Gemeinsames Details-Feld (und, nur bei Bottom Events, News-Feld) der
+      // Trade-Gesamtansicht speichern - schreibt denselben Text in die "details"- bzw.
+      // "news"-Spalte JEDES zugehoerigen Signals (Trade-ID), damit es sich wirklich wie
+      // EIN geteiltes Feld verhaelt statt pro Signal getrennt zu sein.
       const gesamtSaveBtn = ev.target.closest('.wl-trade-gesamt-save');
       if (gesamtSaveBtn) {
         const box = gesamtSaveBtn.closest('.wl-trade-gesamt-details-box');
         const feld = box.querySelector('.wle-trade-gesamt-details');
+        const newsFeld = box.querySelector('.wle-trade-gesamt-news');
         const msg = box.querySelector('.wl-trade-gesamt-msg');
         const ids = box.dataset.ids.split(',').filter(Boolean);
         const text = feld.value.trim() || null;
+        const newsText = newsFeld ? (newsFeld.value.trim() || null) : undefined;
+        const body = { details: text };
+        if (newsText !== undefined) body.news = newsText;
         gesamtSaveBtn.disabled = true; gesamtSaveBtn.textContent = 'Speichert…';
         msg.textContent = ''; msg.className = 'te-msg wl-trade-gesamt-msg';
         try {
-          await Promise.all(ids.map(id => api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify({ details: text }) })));
+          await Promise.all(ids.map(id => api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) })));
           ids.forEach(id => {
             const sigRef = alleSignale.find(s => String(s.id) === String(id));
-            if (sigRef) sigRef.details = text;
+            if (sigRef) {
+              sigRef.details = text;
+              if (newsText !== undefined) sigRef.news = newsText;
+            }
           });
           msg.textContent = 'Gespeichert ✓'; msg.className = 'te-msg wl-trade-gesamt-msg ok';
         } catch(e) {

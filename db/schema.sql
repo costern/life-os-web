@@ -294,6 +294,12 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS guter_spot_kauf BOOLEAN N
 -- spot_kauf_preis: optionale Notiz zum Spot-Einkaufspreis (Freitext statt NUMERIC, da
 -- Colin hier oft auch kurz einen Bereich/Kommentar notieren will, nicht nur eine Zahl).
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS spot_kauf_preis TEXT;
+-- news: eigenes, von "details" getrenntes Freitext-Feld fuer kurze Markt-News zu einem
+-- Trade (bisher stand alles zusammen im "Details"-Feld der Trade-Gesamtansicht - Colins
+-- Wunsch, das zu trennen). Wie "details" wird derselbe Text beim Speichern in ALLE
+-- Signale desselben Trades geschrieben (siehe wl-trade-gesamt-save in app.js), bislang
+-- nur fuer die Bottom-Events-Seite sichtbar (STRATEGIE === 'double_bottom').
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS news TEXT;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).
