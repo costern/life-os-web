@@ -991,20 +991,33 @@ async function ladeOvTrades(){
   // direkt die normale Textanzeige durch ein gleich breites, mitwachsendes Textfeld ersetzt -
   // so sieht man beim Tippen immer den ganzen Text statt nur einen kurzen Ausschnitt.
   function zeile(r, hideThema){
-    return '<div class="row" data-id="'+r.id+'">' +
+    // Wird das Thema inline gezeigt (z.B. in der "Geplant"-Spalte, wo To-Dos aus allen
+    // Themen gemeinsam auftauchen), stand es bisher einfach mitten in der Zeile zwischen
+    // Text und Datum - wirkte bei langem Text "random" platziert (Colins Feedback). Jetzt
+    // kommt Thema+Datum stattdessen in eine eigene, schmale Kopfzeile darueber, und die
+    // eigentliche Zeile darunter sieht wieder genauso aus wie in den normalen Thema-Spalten
+    // (volle Breite fuer den Text statt durch Thema-Badge und Datum zusammengequetscht).
+    const zeigeKopf = !!(r.thema && !hideThema);
+    const altersBar = (r.done || r.thema === 'Beobachten') ? '' : todoAlterBarHtml(r);
+    const hauptInhalt =
       '<span class="tcb'+(r.done?' done':'')+'" role="button">'+(r.done?'✓':'○')+'</span>' +
       '<span class="t todo-text-anzeige">'+esc(r.text)+'</span>' +
       '<textarea class="t te-text todo-text-edit" maxlength="200" rows="1" hidden>'+esc(r.text)+'</textarea>' +
       (r.prio ? '<span class="badge'+(r.prio==='Hoch'?' red':r.prio==='Mittel'?' amber':'')+'">'+esc(r.prio)+'</span>' : '') +
-      (r.thema && !hideThema ? '<span class="badge">'+esc(r.thema)+'</span>' : '') +
-      (r.due ? '<span class="muted">'+new Date(r.due).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</span>' : '') +
+      // Datum steht, wenn es eine Kopfzeile gibt, schon dort zusammen mit dem Thema -
+      // hier in der Hauptzeile dann nicht nochmal.
+      (!zeigeKopf && r.due ? '<span class="muted">'+new Date(r.due).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</span>' : '') +
       '<span class="row-actions">' +
         '<span class="icon-btn todo-edit-toggle" role="button" title="Bearbeiten">✎</span>' +
         '<span class="icon-btn del todo-del" role="button" title="Löschen">🗑</span>' +
-      '</span>' +
-      // "Beobachten"-Themen sind bewusst dauerhaft offen (kein "wird alt/liegt rum"-Signal
-      // noetig) - deshalb dort kein Alters-Balken, anders als bei normalen To-Dos.
-      (r.done || r.thema === 'Beobachten' ? '' : todoAlterBarHtml(r)) +
+      '</span>';
+    const kopf = zeigeKopf ? '<div class="todo-kopf-zeile"><span class="badge">'+esc(r.thema)+'</span>' +
+      (r.due ? '<span class="muted">'+new Date(r.due).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</span>' : '') +
+    '</div>' : '';
+    return '<div class="row'+(zeigeKopf?' todo-kopf-row':'')+'" data-id="'+r.id+'">' +
+      kopf +
+      (zeigeKopf ? '<div class="todo-haupt-zeile">'+hauptInhalt+'</div>' : hauptInhalt) +
+      altersBar +
     '</div>' + panel(r);
   }
 

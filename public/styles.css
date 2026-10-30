@@ -75,6 +75,19 @@ section.page { display:none; } section.page.active { display:block; }
    Zeile unter den Rest der Zeile. */
 .todo-age { flex:0 0 100%; height:3px; border-radius:2px; background:var(--line); overflow:hidden; }
 .todo-age-fill { height:100%; border-radius:2px; }
+/* Zeilen mit sichtbarem Thema-Badge (z.B. in der "Geplant"-Spalte, wo To-Dos aus allen
+   Themen gemeinsam stehen): Thema+Datum in einer eigenen schmalen Kopfzeile UEBER der
+   eigentlichen Zeile, statt mitten zwischen Text und Aktionen gequetscht (Colins
+   Feedback: "das Thema steht einfach random in der Mitte"). .row wechselt dafuer von
+   der normalen Zeilen-Anordnung auf column, damit Kopf- und Hauptzeile sauber
+   untereinander stehen statt wie die uebrigen .row-Kinder nebeneinander/umbrechend.*/
+.todo-kopf-row { flex-direction:column; align-items:stretch; }
+.todo-kopf-zeile { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.todo-haupt-zeile { display:flex; align-items:center; gap:10px; width:100%; }
+/* flex:0 0 100% zielte auf die Breite in der normalen (Zeilen-)Row - in der jetzt
+   column-gerichteten .todo-kopf-row waere das stattdessen die HOEHE (100% der Zeile!),
+   deshalb hier ueberschrieben. */
+.todo-kopf-row .todo-age { flex:0 0 auto; width:100%; margin-top:6px; }
 /* Bearbeiten-Textfeld fuer To-Dos: ersetzt beim Bearbeiten die normale Anzeige an
    derselben Stelle - gleiche Breite, waechst mit dem Text mit statt ihn abzuschneiden. */
 .todo-text-edit { font-family:inherit; font-size:inherit; line-height:1.4; padding:3px 7px; margin:-3px 0;
