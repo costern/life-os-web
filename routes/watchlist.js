@@ -41,9 +41,16 @@ const ENTRY_SIMULATION = new Set(['direkter_entry', 'limit_theoretisch_gefuellt'
 // sagt nichts darueber aus, WOHIN es nach der Seitwaertsphase ging) - 'laenger_seitwaerts'
 // bleibt als Wert weiter gueltig, damit bereits gespeicherte Altsignale nicht ploetzlich
 // als ungueltig gelten, ist aber in der Dropdown-Liste im Frontend nicht mehr waehlbar.
-const KURSVERLAUF = new Set(['direkt_target', 'unter_entry_dann_target', '2r_dann_zurueck',
-  'direkt_stop', 'laenger_seitwaerts', 'laenger_seitwaerts_stop', 'laenger_seitwaerts_hoch',
-  'laenger_seitwaerts_runter', 'entry_nie_erreicht', 'stop_target_gleiche_kerze', 'sonstiger_verlauf']);
+// Neu (Colin): 'unter_entry_dann_target' ist in zwei Werte aufgeteilt (ueber Pivot gehalten /
+// unter Pivots gehalten); Seitwaerts gibt es nur noch mit Stop-Loss oder mit Target
+// ('laenger_seitwaerts_target' ersetzt _hoch/_runter). Die alten Werte bleiben gueltig, damit
+// nichts Gespeichertes ungueltig wird, sind im Frontend aber nicht mehr (bzw. nur der erste
+// als "alt - bitte zuordnen") waehlbar.
+const KURSVERLAUF = new Set(['direkt_target', 'unter_entry_dann_target',
+  'unter_entry_ueber_pivot_dann_target', 'unter_entry_unter_pivot_dann_target', '2r_dann_zurueck',
+  'direkt_stop', 'laenger_seitwaerts', 'laenger_seitwaerts_stop', 'laenger_seitwaerts_target',
+  'laenger_seitwaerts_hoch', 'laenger_seitwaerts_runter', 'entry_nie_erreicht',
+  'stop_target_gleiche_kerze', 'sonstiger_verlauf']);
 const KEIN_TRADE_GRUND = new Set(['rr_schlecht', 'langer_docht', 'sl_zu_weit', 'ziel_zu_nah',
   'keine_htf_bestaetigung', 'pattern_nicht_sauber', 'divergenz_fehlte', 'sonstiger_grund']);
 // strategie: eigene Seite im Dashboard je Setup-Art (siehe db/schema.sql), gleiche Tabelle/Felder.

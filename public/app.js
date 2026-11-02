@@ -2883,11 +2883,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             ['kein_regelkonformer_entry','Kein regelkonformer Entry'],['nicht_eindeutig','Nicht eindeutig']], s.entrySimulation)+'</label>' +
           '<label class="wl-detail-kurz" style="width:90px" title="Unabhaengig von der Entry-Simulation oben: waere ein Limit deutlich weiter unten/oben trotzdem gefuellt worden? Kann z.B. bei „Nachkauf möglich“ trotzdem Nein sein (Preis ging nur minimal zurück und zog dann schnell weiter).">Limit möglich'+auswahlHtml('wle-limitmoeglich', [['','–'],['ja','Ja'],['nein','Nein']], s.limitMoeglich === true ? 'ja' : (s.limitMoeglich === false ? 'nein' : ''))+'</label>' +
           '<label>Kursverlauf'+auswahlHtml('wle-kursverlauf', [['','–'],
-            ['direkt_target','Direkt zum Target'],['unter_entry_dann_target','Unter Entry, Stop gehalten, danach Target'],
+            ['direkt_target','Direkt zum Target'],
+            ['unter_entry_ueber_pivot_dann_target','Unter Entry, aber über Pivot gehalten, danach Target'],
+            ['unter_entry_unter_pivot_dann_target','Unter Entry und unter Pivots gehalten, danach Target'],
+            ['unter_entry_dann_target','Unter Entry, Stop gehalten, danach Target (alt – bitte zuordnen)'],
             ['2r_dann_zurueck','2R erreicht, danach zurück zum Entry'],['direkt_stop','Direkt zum Stop-Loss'],
             ['laenger_seitwaerts_stop','Länger seitwärts, dann Stop-Loss'],
-            ['laenger_seitwaerts_hoch','Länger seitwärts, dann nach oben'],
-            ['laenger_seitwaerts_runter','Länger seitwärts, dann nach unten'],
+            ['laenger_seitwaerts_target','Länger seitwärts, danach Target'],
             ['entry_nie_erreicht','Entry nie erreicht, direkt gestiegen'],
             ['stop_target_gleiche_kerze','Stop und Target in derselben Kerze'],['sonstiger_verlauf','Sonstiger Verlauf']], s.kursverlauf)+'</label>' +
           '<label>Grund für "Kein Trade"'+auswahlHtml('wle-keintradegrund', [['','–'],
