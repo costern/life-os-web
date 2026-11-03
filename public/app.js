@@ -2338,6 +2338,175 @@ function wlTradeFarbe(tid){
 // Signal fuer sich - Schluessel dann eindeutig ueber die Zeilen-ID.
 const wlTradeKey = s => (s.tradeId && String(s.tradeId).trim()) ? 't:' + String(s.tradeId).trim() : 'e:' + s.id;
 
+// ===== Auswertung (Bottom-Events-Seiten): Analyse der bisher eingetragenen Signale =====
+// Reine Funktion: bekommt die (bereits gefilterten) Signale, liefert HTML. Alle Zahlen
+// zaehlen TRADES (gleiche Trade-ID = ein Trade, Ergebnis = juengstes bewertetes Signal),
+// wie die Statistik-Kacheln. "Quote" = (Win + BE Win) / (Win + BE Win + BE Loss + Lose);
+// No Entry und noch nicht bewertete Trades zaehlen NICHT mit - sonst waere die Quote
+// verzerrt. Gruppen mit weniger als WL_AW_MIN bewerteten Trades werden als "wenig Daten" markiert.
+const WL_AW_MIN = 5;
+function wlAuswertungHtml(signale){
+  const rangNote = { 'A++':5, 'A+':4, 'A':3, 'B':2, 'C':1 };
+  const rangEvent = { triple:3, double:2, single:1 };
+  const mtfRang = { 3:4, 4:3, 2:2, 1:1 };
+  const map = new Map();
+  signale.slice().sort((a,b) => a.date.localeCompare(b.date)).forEach(s => {
+    const k = wlTradeKey(s);
+    if (!map.has(k)) map.set(k, { sigs:[], status:'', tfs:new Set() });
+    const t = map.get(k);
+    t.sigs.push(s);
+    if (s.status) t.status = s.status;
+    if (s.tf) t.tfs.add(String(s.tf).toUpperCase());
+  });
+  const erstes = (t, f) => { const x = t.sigs.find(s => s[f]); return x ? x[f] : ''; };
+  const trades = [...map.values()].map(t => {
+    const sg = t.sigs;
+    const note = sg.map(s => s.note).filter(Boolean).sort((a,b) => (rangNote[b]||0)-(rangNote[a]||0))[0] || '';
+    const ev = sg.map(s => s.eventTyp).filter(Boolean).sort((a,b) => (rangEvent[b]||0)-(rangEvent[a]||0))[0] || '';
+    const mtf = sg.map(s => +s.mtf).filter(Boolean).sort((a,b) => (mtfRang[b]||0)-(mtfRang[a]||0))[0] || 0;
+    const d0 = new Date(sg[0].date+'T00:00:00');
+    return Object.assign(t, {
+      asset: sg[0].asset, date: sg[0].date, jahr: sg[0].date.slice(0,4), wochentag: d0.getDay(),
+      anzTf: t.tfs.size, tfKombi: [...t.tfs].sort().join(' + '),
+      note, ev, mtf, multi: sg.some(s => s.multiAsset),
+      phase: erstes(t,'marktphase'), pattern: erstes(t,'pattern'), candles: erstes(t,'candles'),
+      pivot: erstes(t,'pivotLevel'), divL: erstes(t,'divLokal'), divS: erstes(t,'divStruktur'),
+      form: erstes(t,'form'), boden: erstes(t,'bodenTyp'),
+      doppeltDiv: sg.some(s => wlDoppelteDivergenz(s)),
+      nichtRegel: sg.every(s => s.regelkonform === false),
+      nurBest: sg.some(s => s.nurBestaetigung), gebrochen: sg.some(s => s.levelGebrochenGehalten),
+      spot: sg.some(s => s.guterSpotKauf), analysiert: sg.every(s => s.analysiert)
+    });
+  });
+
+  const zaehle = ts => {
+    const c = { n: ts.length, win:0, be_win:0, be_loss:0, lose:0, no_entry:0, offen:0 };
+    ts.forEach(t => { if (c[t.status] !== undefined) c[t.status]++; else c.offen++; });
+    c.wertbar = c.win + c.be_win + c.be_loss + c.lose;
+    c.quote = c.wertbar ? (c.win + c.be_win) / c.wertbar : null;
+    return c;
+  };
+  const gesamt = zaehle(trades);
+  const pct = q => q === null ? '–' : Math.round(q*100) + '%';
+  const farbeQ = (q, w) => q === null || w < WL_AW_MIN ? 'var(--muted)' : q >= 0.7 ? 'var(--green)' : q >= 0.5 ? 'var(--amber)' : 'var(--red)';
+  const alleZeilen = [];   // fuer Highlights: { gruppe, label, c }
+  const zeileHtml = (gruppe, label, ts) => {
+    const c = zaehle(ts);
+    if (!c.n) return '';
+    alleZeilen.push({ gruppe, label, c });
+    const wenig = c.wertbar < WL_AW_MIN;
+    return '<tr'+(wenig?' class="aw-wenig"':'')+'><td>'+esc(label)+'</td><td>'+c.n+'</td>' +
+      '<td class="pnl-pos">'+(c.win||'')+'</td><td class="pnl-amber">'+(c.be_win||'')+'</td><td class="pnl-orange">'+(c.be_loss||'')+'</td>' +
+      '<td class="pnl-neg">'+(c.lose||'')+'</td><td class="muted">'+(c.no_entry||'')+'</td><td class="muted">'+(c.offen||'')+'</td>' +
+      '<td class="aw-q"><span class="aw-bar"><i style="width:'+(c.quote===null?0:Math.round(c.quote*100))+'%;background:'+farbeQ(c.quote,c.wertbar)+'"></i></span> ' +
+      '<b style="color:'+farbeQ(c.quote,c.wertbar)+'">'+pct(c.quote)+'</b>'+(wenig&&c.wertbar?' <span class="muted" title="Weniger als '+WL_AW_MIN+' bewertete Trades - noch nicht aussagekraeftig">⚠ wenig Daten</span>':'')+'</td></tr>';
+  };
+  const kopf = '<thead><tr><th></th><th>Trades</th><th>Win</th><th>BE Win</th><th>BE Loss</th><th>Lose</th><th>No Entry</th><th>offen</th><th>Quote</th></tr></thead>';
+  const block = (titel, hinweis, zeilen) => {
+    const html = zeilen.join('');
+    if (!html) return '';
+    return '<div class="aw-block"><h3>'+titel+(hinweis?' <span class="muted">'+hinweis+'</span>':'')+'</h3><table class="aw-table">'+kopf+'<tbody>'+html+'</tbody></table></div>';
+  };
+  const nachDef = (titel, hinweis, defs) => block(titel, hinweis, defs.map(([l, fn]) => zeileHtml(titel, l, trades.filter(fn))));
+  const nachWert = (titel, hinweis, keyFn, labelFn, sortFn, minN) => {
+    const m = new Map();
+    trades.forEach(t => { [].concat(keyFn(t)).filter(k => k !== '' && k != null).forEach(k => { if (!m.has(k)) m.set(k, []); m.get(k).push(t); }); });
+    let keys = [...m.keys()].filter(k => !minN || m.get(k).length >= minN);
+    keys = sortFn ? keys.sort(sortFn) : keys.sort((a,b) => m.get(b).length - m.get(a).length);
+    return block(titel, hinweis, keys.map(k => zeileHtml(titel, labelFn ? labelFn(k) : String(k), m.get(k))));
+  };
+
+  const WT = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+  const tfRang = { '15M':1,'1H':2,'4H':3,'12H':4,'1D':5,'3D':6,'1W':7,'2W':8 };
+  const sektionen = [
+    nachWert('Setup-Note', 'deine Bewertung der Setup-Qualität', t => t.note, null, (a,b) => (rangNote[b]||0)-(rangNote[a]||0)),
+    nachDef('Setup-Note (grob)', '', [['A++ / A+', t => t.note==='A++'||t.note==='A+'], ['A', t => t.note==='A'], ['B', t => t.note==='B'], ['keine Note', t => !t.note]]),
+    nachWert('Timeframe', 'ein Trade zählt bei jedem seiner Timeframes', t => [...t.tfs], null, (a,b) => (tfRang[a]||99)-(tfRang[b]||99)),
+    nachWert('Anzahl Timeframes gleichzeitig', 'verschiedene TFs, die zu einem Trade gehören', t => t.anzTf ? Math.min(t.anzTf,4) : '', k => k>=4 ? '4 oder mehr TFs' : k+(k===1?' TF':' TFs'), (a,b) => a-b),
+    nachWert('Timeframe-Kombinationen', 'nur Kombinationen mit mind. 2 Trades', t => t.anzTf >= 2 ? t.tfKombi : '', null, null, 2),
+    nachWert('MTF-Einstufung (Feld im Signal)', '', t => t.mtf || '', k => ({1:'Only 1 TF',2:'2 TF (12H+1D)',4:'MTF 2',3:'MTF 3'}[k]), (a,b) => (mtfRang[b]||0)-(mtfRang[a]||0)),
+    nachWert('Event-Typ', '', t => t.ev, k => WL_EVENT_LABEL[k] || k, (a,b) => (rangEvent[b]||0)-(rangEvent[a]||0)),
+    nachDef('Multi-Asset', 'Signal auf mehreren Assets gleichzeitig', [['Multi-Asset', t => t.multi], ['nur dieses Asset', t => !t.multi]]),
+    nachWert('Marktphase', '', t => t.phase, k => WL_PHASE_LABEL[k]),
+    nachWert('Pattern', '', t => t.pattern, k => WL_PATTERN_LABEL[k]),
+    nachWert('Kerzenbild am Boden', '', t => t.candles, k => WL_CANDLE_LABEL[k]),
+    nachWert('Pivot-Level', '', t => t.pivot, k => WL_PIVOT_LABEL[k]),
+    nachWert('Divergenz lokal', '', t => t.divL, k => WL_DIV_KURZ[k]),
+    nachWert('Divergenz Struktur', '', t => t.divS, k => WL_DIV_KURZ[k]),
+    nachDef('Doppelte Divergenz', 'lokal + strukturell', [['Doppelte Divergenz', t => t.doppeltDiv], ['ohne', t => !t.doppeltDiv]]),
+    nachWert('Form', '', t => t.form, k => WL_FORM_LABEL[k]),
+    nachWert('Boden-Typ', '', t => t.boden, k => WL_BODENTYP_LABEL[k]),
+    nachDef('Regel-Status', '', [['regelkonform / nicht bewertet', t => !t.nichtRegel], ['nicht regelkonform', t => t.nichtRegel], ['nur Bestätigung', t => t.nurBest], ['Level gebrochen, aber gehalten', t => t.gebrochen], ['💰 guter Spot-Kauf', t => t.spot]]),
+    nachWert('Jahr', '', t => t.jahr, null, (a,b) => a.localeCompare(b)),
+    nachWert('Wochentag des ersten Signals', '', t => t.wochentag, k => WT[k], (a,b) => ((a+6)%7)-((b+6)%7)),
+    nachWert('Asset', 'nur Assets mit mind. 2 Trades', t => t.asset, null, null, 2)
+  ];
+
+  // ---- Hypothesen-Check: Regeln aus der Strategie-Notiz (Obsidian) gegen die Daten ----
+  const regeln = [
+    ['Wirklich mehrere Timeframes (≥ 3 verschiedene) = starke Confluence', 'gut', t => t.anzTf >= 3],
+    ['"Only 1 TF" allein ist schwächer', 'schlecht', t => t.mtf === 1 || t.anzTf === 1],
+    ['12H + 1D allein zählt nicht als echte MTF-Confluence', 'schlecht', t => t.mtf === 2],
+    ['Multi-Asset-Signal erhöht die Wahrscheinlichkeit', 'gut', t => t.multi],
+    ['Perfektes Pivot-Level (open/close gleiche Höhe)', 'gut', t => t.pivot === 'perfekt'],
+    ['Zu weit abweichendes Pivot-Level ist ein Warnsignal', 'schlecht', t => t.pivot === 'zu_weit_abweichend'],
+    ['Mini Candles (Doji) am Boden sind ein Warnsignal', 'schlecht', t => t.candles === 'mini'],
+    ['Choppy Pattern ist schlechter als saubere Struktur', 'schlecht', t => t.pattern === 'choppy'],
+    ['Sauberes (clean) Pattern', 'gut', t => t.pattern === 'clean'],
+    ['Doppelte Divergenz (lokal + Struktur)', 'gut', t => t.doppeltDiv],
+    ['Starke Struktur-Divergenz', 'gut', t => t.divS === 'stark'],
+    ['Nicht am Swing Bottom (Uptrend/Range) ist ein Warnsignal', 'schlecht', t => t.phase === 'uptrend' || t.phase === 'ranging'],
+    ['Bogen-ähnlicher Boden ist High Probability', 'gut', t => t.form === 'bogen'],
+    ['Setup-Note A++ / A+', 'gut', t => t.note === 'A++' || t.note === 'A+'],
+    ['Setup-Note B', 'schlecht', t => t.note === 'B']
+  ];
+  const regelZeilen = regeln.map(([text, erwartung, fn]) => {
+    const a = zaehle(trades.filter(fn)), b = zaehle(trades.filter(t => !fn(t)));
+    if (!a.n) return '';
+    let urteil, farbe;
+    if (a.wertbar < WL_AW_MIN || b.wertbar < WL_AW_MIN) { urteil = 'zu wenig Daten'; farbe = 'var(--muted)'; }
+    else {
+      const diff = a.quote - b.quote, richtung = erwartung === 'gut' ? diff : -diff;
+      if (richtung >= 0.08) { urteil = '✔ bestätigt'; farbe = 'var(--green)'; }
+      else if (richtung <= -0.08) { urteil = '✖ widerlegt (bisher)'; farbe = 'var(--red)'; }
+      else { urteil = '≈ kein klarer Unterschied'; farbe = 'var(--amber)'; }
+    }
+    return '<tr><td>'+esc(text)+'</td><td class="muted">'+(erwartung==='gut'?'sollte besser sein':'sollte schlechter sein')+'</td>' +
+      '<td>'+pct(a.quote)+' <span class="muted">('+a.wertbar+')</span></td><td>'+pct(b.quote)+' <span class="muted">('+b.wertbar+')</span></td>' +
+      '<td><b style="color:'+farbe+'">'+urteil+'</b></td></tr>';
+  }).join('');
+
+  // ---- Highlights ----
+  const basis = gesamt.quote;
+  const kand = alleZeilen.filter(z => z.c.wertbar >= WL_AW_MIN && basis !== null && !['Setup-Note (grob)'].includes(z.gruppe));
+  const mitDiff = kand.map(z => Object.assign({ diff: z.c.quote - basis }, z));
+  const beste = mitDiff.filter(z => z.diff >= 0.08).sort((a,b) => b.diff - a.diff).slice(0,5);
+  const schwaechste = mitDiff.filter(z => z.diff <= -0.08).sort((a,b) => a.diff - b.diff).slice(0,5);
+  const hl = (z) => '<li><b>'+esc(z.label)+'</b> <span class="muted">('+esc(z.gruppe)+')</span> – '+pct(z.c.quote)+' bei '+z.c.wertbar+' bewerteten Trades ('+(z.diff>0?'+':'')+Math.round(z.diff*100)+' Punkte)</li>';
+
+  const datenqualitaet = [
+    ['Trades gesamt', trades.length],
+    ['davon bewertet (Win/BE/Lose)', gesamt.wertbar],
+    ['No Entry', gesamt.no_entry],
+    ['noch nicht bewertet', gesamt.offen],
+    ['komplett analysiert (grüner Haken)', trades.filter(t => t.analysiert).length],
+    ['mit Setup-Note', trades.filter(t => t.note).length],
+    ['mit Marktphase', trades.filter(t => t.phase).length],
+    ['mit Pattern', trades.filter(t => t.pattern).length]
+  ].map(([l, v]) => '<div class="stat"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>').join('');
+
+  return '<div class="wl-ausw">' +
+    '<div class="muted" style="margin-bottom:10px">Zählt Trades (gleiche Trade-ID = ein Trade) und folgt den Spaltenfiltern oben. <b>Quote</b> = (Win + BE Win) ÷ (Win + BE Win + BE Loss + Lose); No Entry und unbewertete Trades zählen nicht mit. Bei weniger als '+WL_AW_MIN+' bewerteten Trades ist eine Gruppe nur ein Hinweis, kein Beleg.</div>' +
+    '<div class="aw-hero"><div class="aw-hero-q" style="color:'+farbeQ(gesamt.quote, gesamt.wertbar)+'">'+pct(gesamt.quote)+'</div><div><b>Gesamt-Quote</b><br><span class="muted">'+(gesamt.win+gesamt.be_win)+' positiv von '+gesamt.wertbar+' bewerteten Trades ('+gesamt.win+' Win · '+gesamt.be_win+' BE Win · '+gesamt.be_loss+' BE Loss · '+gesamt.lose+' Lose)</span></div></div>' +
+    '<div class="stats" style="margin:10px 0">'+datenqualitaet+'</div>' +
+    ((beste.length || schwaechste.length) ? '<div class="aw-hl"><div><h3 style="color:var(--green)">Stärkste Merkmale</h3><ul>'+(beste.map(hl).join('')||'<li class="muted">noch nichts Auffälliges</li>')+'</ul></div>' +
+      '<div><h3 style="color:var(--red)">Schwächste Merkmale</h3><ul>'+(schwaechste.map(hl).join('')||'<li class="muted">noch nichts Auffälliges</li>')+'</ul></div></div>' : '') +
+    (regelZeilen ? '<div class="aw-block"><h3>Regel-Check <span class="muted">stimmen deine Regeln aus der Strategie-Notiz mit den bisherigen Daten überein? Quote mit Merkmal vs. ohne (in Klammern: bewertete Trades)</span></h3>' +
+      '<table class="aw-table"><thead><tr><th>Regel / Annahme</th><th>Erwartung</th><th>mit Merkmal</th><th>ohne</th><th>Urteil</th></tr></thead><tbody>'+regelZeilen+'</tbody></table></div>' : '') +
+    sektionen.join('') +
+  '</div>';
+}
+
 // Ueberblick ueber bereits vergebene Trade-IDs: welche Nummer ist fuer welches(e) Asset(s)
 // schon in Benutzung (Mehrfachnutzung = mehrere Signale desselben Trades, das ist gewollt),
 // die aktuell hoechste vergebene Nummer, und die naechste noch komplett freie Nummer -
@@ -2524,6 +2693,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
   // wirken zusammen (UND), auf Tabelle, Chart-Marker und Statistiken. Asset nutzt weiter
   // wlAssetFilter (kommagetrennt, ODER). Leerer Wert = Filter aus.
   let wlSpaltenFilter = {};
+  // 'tabelle' | 'auswertung' - Umschalter neben "Nur regelkonforme zaehlen"
+  let wlAnsicht = 'tabelle';
   function wlSpaltenPasst(s){
     const f = wlSpaltenFilter;
     const txt = (v) => String(v||'').toLowerCase();
@@ -3183,8 +3354,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<button type="button" id="wlFilterAlleLoeschen'+SFX+'" class="btn ghost" style="margin-left:auto"'+(wlAssetFilter||Object.values(wlSpaltenFilter).some(Boolean)?'':' hidden')+'>Alle Filter zurücksetzen ✕</button>' +
         '<label class="wl-check" style="margin-left:14px" title="Signale, die als nicht regelkonform markiert sind, aus Tabelle/Chart/Statistiken ausblenden">' +
           '<input type="checkbox" id="wlNurRegelkonform'+SFX+'"'+(wlNurRegelkonform?' checked':'')+'> Nur regelkonforme zählen</label>' +
+        '<span class="wl-ansicht-switch" style="margin-left:14px">' +
+          '<button type="button" data-ansicht="tabelle" class="'+(wlAnsicht==='tabelle'?'aktiv':'')+'">Tabelle</button>' +
+          '<button type="button" data-ansicht="auswertung" class="'+(wlAnsicht==='auswertung'?'aktiv':'')+'">Auswertung</button>' +
+        '</span>' +
       '</div>' +
-      '<div class="wl-table-wrap">' +
+      (wlAnsicht === 'auswertung' ? '<div id="wlAuswertung'+SFX+'">'+wlAuswertungHtml(signaleGefiltert)+'</div>' : '') +
+      '<div class="wl-table-wrap"'+(wlAnsicht === 'auswertung' ? ' style="display:none"' : '')+'>' +
         '<table class="wl-table">' +
           '<thead><tr>' +
             '<th title="Komplett analysiert"></th>' +
@@ -3308,6 +3484,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     });
     const alleLoeschen = document.getElementById('wlFilterAlleLoeschen'+SFX);
     if (alleLoeschen) alleLoeschen.addEventListener('click', () => { wlAssetFilter = ''; wlSpaltenFilter = {}; render(); });
+    el.querySelectorAll('.wl-ansicht-switch button').forEach(b => b.addEventListener('click', () => { wlAnsicht = b.dataset.ansicht; render(); }));
     const nurRegelkonformBox = document.getElementById('wlNurRegelkonform'+SFX);
     if (nurRegelkonformBox) nurRegelkonformBox.addEventListener('change', () => { wlNurRegelkonform = nurRegelkonformBox.checked; render(); });
 

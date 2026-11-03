@@ -899,3 +899,24 @@ a { color:var(--accent); }
 /* Filterzeile: Unterkante um 2px nach unten mit Kartenfarbe verlaengern, damit zwischen Filter
    und der darunter durchscrollenden Tabelle (z.B. schwarzer Jahresbalken) kein Schlitz bleibt */
 .wl-table thead tr.wl-filter-row th { box-shadow:inset 0 -1px 0 var(--line), 0 2px 0 0 var(--card); }
+
+/* Umschalter Tabelle | Auswertung (Bottom-Events-Seiten) */
+.wl-ansicht-switch { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; vertical-align:middle; }
+.wl-ansicht-switch button { border:0; background:var(--card); color:var(--muted); font:inherit; font-size:13px; padding:5px 14px; cursor:pointer; }
+.wl-ansicht-switch button.aktiv { background:var(--accent); color:#fff; }
+/* Auswertung */
+.wl-ausw { padding:6px 0 20px; }
+.wl-ausw h3 { font-size:14px; margin:0 0 6px; }
+.aw-hero { display:flex; align-items:center; gap:16px; margin:6px 0; }
+.aw-hero-q { font-size:44px; font-weight:800; line-height:1; }
+.aw-hl { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:14px 0; }
+.aw-hl ul { margin:0; padding-left:18px; font-size:13px; line-height:1.6; }
+.aw-block { margin:18px 0; }
+.aw-table { border-collapse:collapse; width:100%; font-size:13px; }
+.aw-table th { text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:5px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.aw-table td { padding:5px 8px; border-bottom:1px solid var(--line); }
+.aw-table tr.aw-wenig td { opacity:.7; }
+.aw-q { white-space:nowrap; }
+.aw-bar { display:inline-block; width:70px; height:7px; background:var(--hover-bg); border-radius:4px; overflow:hidden; vertical-align:middle; }
+.aw-bar i { display:block; height:100%; }
+@media (max-width:900px){ .aw-hl { grid-template-columns:1fr; } }
