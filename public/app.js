@@ -3353,7 +3353,17 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // dafuer muss die Kopfzeilen-Hoehe als CSS-Variable bekannt sein, statt sie fest zu
     // verdrahten (sie haengt von Schriftgroesse/Zoom/Theme ab).
     const wlThead = tableWrap.querySelector('thead');
-    if (wlThead) tableWrap.style.setProperty('--wl-thead-h', wlThead.offsetHeight + 'px');
+    if (wlThead) {
+      // Echte Unterkante der (zweizeiligen) Kopfzeile = Oberkante Filterzeile + deren Hoehe.
+      // 3px Ueberlappung: die Jahresbalken liegen unter der Kopfzeile (z-index), so bleibt
+      // garantiert kein Schlitz, durch den die Tabellenzeilen durchscheinen.
+      const kopfTh = wlThead.querySelector('tr:first-child th');
+      const filterTh = wlThead.querySelector('tr.wl-filter-row th');
+      const unten = (kopfTh && filterTh)
+        ? (kopfTh.getBoundingClientRect().height - 1) + filterTh.getBoundingClientRect().height
+        : wlThead.offsetHeight;
+      tableWrap.style.setProperty('--wl-thead-h', Math.max(unten - 3, 0) + 'px');
+    }
 
     // In jeder aufgeklappten Trade-Gruppen-Karte die Screenshots DES EIGENEN Signals laden -
     // jede Karte zeigt nur ihre eigenen Bilder (gleiche Lade-/Upload-/Loesch-Funktion wie im
