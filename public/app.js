@@ -3218,7 +3218,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         tooltip.style.top = m.style.top;
         tooltip.innerHTML = esc(p.titel);
         // Umgekehrt zum Hover ueber die Tabelle: Maus auf einem Chart-Marker markiert die
-        // ganze zugehoerige Zeile unten (und weitere Zeilen desselben Trades), und scrollt
+        // ganze zugehoerige Zeile unten (und weitere Zeilen desselben Trades) (ohne zu scrollen)
         const tw = el.querySelector('.wl-table-wrap');
         const zeile = tw && tw.querySelector('tr[data-id="'+m.dataset.id+'"]:not(.wl-edit-row)');
         if (zeile) {
