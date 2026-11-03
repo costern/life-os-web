@@ -3208,8 +3208,22 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         tooltip.style.left = m.style.left;
         tooltip.style.top = m.style.top;
         tooltip.innerHTML = esc(p.titel);
+        // Umgekehrt zum Hover ueber die Tabelle: Maus auf einem Chart-Marker markiert die
+        // ganze zugehoerige Zeile unten (und weitere Zeilen desselben Trades), und scrollt
+        // sie bei Bedarf ins Blickfeld der Tabelle.
+        const tw = el.querySelector('.wl-table-wrap');
+        const zeile = tw && tw.querySelector('tr[data-id="'+m.dataset.id+'"]:not(.wl-edit-row)');
+        if (zeile) {
+          zeile.classList.add('wl-row-hover');
+          if (zeile.dataset.trade) tw.querySelectorAll('tr[data-trade="'+zeile.dataset.trade.replace(/"/g,'\\"')+'"]').forEach(r => r.classList.add('wl-trade-hover'));
+          const zr = zeile.getBoundingClientRect(), wr = tw.getBoundingClientRect();
+          if (zr.top < wr.top + 60 || zr.bottom > wr.bottom) tw.scrollTop += (zr.top - wr.top) - wr.height / 2;
+        }
       });
-      m.addEventListener('pointerleave', () => { tooltip.style.display = 'none'; });
+      m.addEventListener('pointerleave', () => {
+        tooltip.style.display = 'none';
+        el.querySelectorAll('.wl-table tr.wl-row-hover, .wl-table tr.wl-trade-hover').forEach(r => r.classList.remove('wl-row-hover', 'wl-trade-hover'));
+      });
       // Klick auf einen Marker springt direkt zur zugehoerigen Zeile unten in der
       // Tabelle (ins Blickfeld scrollen + Detailansicht aufklappen), damit man vom
       // Chart aus schnell zum Trade kommt, statt ihn erst mit der Maus suchen zu
