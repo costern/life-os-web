@@ -2520,6 +2520,51 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
   let signale = [];
   let sortSpalte = 'date', sortRichtung = 'desc';
   let wlAssetFilter = '';
+  // Excel-artige Spaltenfilter (Zeile direkt unter den Tabellen-Ueberschriften). Alle Filter
+  // wirken zusammen (UND), auf Tabelle, Chart-Marker und Statistiken. Asset nutzt weiter
+  // wlAssetFilter (kommagetrennt, ODER). Leerer Wert = Filter aus.
+  let wlSpaltenFilter = {};
+  function wlSpaltenPasst(s){
+    const f = wlSpaltenFilter;
+    const txt = (v) => String(v||'').toLowerCase();
+    if (f.analysiert === 'ja' && !s.analysiert) return false;
+    if (f.analysiert === 'offen' && s.analysiert) return false;
+    if (f.datum) {
+      const d = txt(wlDatumLabel(s)+' '+s.date+' '+(s.date||'').split('-').reverse().join('.')+' '+(s.date||'').slice(5,7)+'/'+(s.date||'').slice(2,4));
+      if (!d.includes(f.datum.trim().toLowerCase())) return false;
+    }
+    if (f.trade && !txt(s.tradeId).includes(f.trade.trim().toLowerCase())) return false;
+    if (f.tf && (s.tf||'') !== f.tf) return false;
+    if (f.setup) {
+      const m = +s.mtf;
+      const ok = { quick: s.eventTyp==='single', double: s.eventTyp==='double', triple: s.eventTyp==='triple',
+        mtf1: m===1, mtf2: m===2, mtf4: m===4, mtf3: m===3, multi: !!s.multiAsset,
+        bogen: s.form==='bogen', bottom: s.form==='bottom' }[f.setup];
+      if (!ok) return false;
+    }
+    if (f.phase && (s.marktphase||'') !== f.phase) return false;
+    if (f.pattern) {
+      const [art, wert] = f.pattern.split(':');
+      const feld = { pattern:'pattern', candles:'candles', pivot:'pivotLevel' }[art];
+      if ((s[feld]||'') !== wert) return false;
+    }
+    if (f.div) {
+      const [art, wert] = f.div.split(':');
+      if (art === 'doppelt') { if (!wlDoppelteDivergenz(s)) return false; }
+      else { const feld = art === 'lokal' ? 'divLokal' : 'divStruktur'; if ((s[feld]||'') !== wert) return false; }
+    }
+    if (f.note && (s.note||'') !== f.note) return false;
+    if (f.ergebnis) {
+      const e = f.ergebnis;
+      if (e === 'regel_nein') { if (s.regelkonform !== false) return false; }
+      else if (e === 'bestaetigung') { if (!s.nurBestaetigung) return false; }
+      else if (e === 'spot') { if (!s.guterSpotKauf) return false; }
+      else if (e === 'offen') { if (wlStatus(s) !== '') return false; }
+      else if (wlStatus(s) !== e) return false;
+    }
+    if (f.notiz && !txt(s.notiz).includes(f.notiz.trim().toLowerCase())) return false;
+    return true;
+  }
   // Checkbox ist standardmaessig AUS: Statistiken zaehlen alle Signale (regelkonform=null/true).
   // Erst wenn Colin sie aktiviert, fallen explizit als regelkonform=false markierte Signale
   // (nicht nach eigenen Kriterien getradet) aus Tabelle/Chart/Statistiken raus.
@@ -2533,7 +2578,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     const wlVorherTableWrap = el.querySelector('.wl-table-wrap');
     const wlVorherScrollTop = wlVorherTableWrap ? wlVorherTableWrap.scrollTop : null;
     const wlVorherAktiv = document.activeElement;
-    const wlFilterHatteFokus = !!(wlVorherAktiv && wlVorherAktiv.id === 'wlAssetFilter');
+    const wlFilterHatteFokus = !!(wlVorherAktiv && wlVorherAktiv.classList && wlVorherAktiv.classList.contains('wl-colfilter') && wlVorherAktiv.tagName === 'INPUT');
+    const wlFilterFeldId = wlFilterHatteFokus ? wlVorherAktiv.id : null;
     const wlFilterCursor = wlFilterHatteFokus ? wlVorherAktiv.selectionStart : null;
 
     // Asset-Filter: wenn gesetzt, werden Tabelle, Chart-Marker UND Statistiken auf das
@@ -2548,7 +2594,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     const wlFilterBegriffe = (wlAssetFilter || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
     const signaleGefiltert = alleSignale.filter(s =>
       (!wlFilterBegriffe.length || wlFilterBegriffe.some(b => (s.asset||'').toLowerCase().includes(b))) &&
-      (!wlNurRegelkonform || s.regelkonform !== false)
+      (!wlNurRegelkonform || s.regelkonform !== false) &&
+      wlSpaltenPasst(s)
     );
 
     // Haeufungen: Signale innerhalb eines FENSTERS von max. 2 Tagen ab dem ersten Signal
@@ -2956,6 +3003,32 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       '</div></td></tr>';
     }
 
+    // Filterzeile unter den Spaltenueberschriften (wie Excel-Autofilter): je Spalte ein
+    // Textfeld bzw. Dropdown. Optionen fuer TF/Note kommen aus den vorhandenen Signalen.
+    function wlFilterZeileHtml(alle){
+      const f = wlSpaltenFilter;
+      const sel = (id, opts, wert) => '<select class="wl-colfilter" data-col="'+id+'" id="wlcf-'+id+SFX+'"><option value="">alle</option>' +
+        opts.map(o => '<option value="'+esc(o[0])+'"'+(o[0]===wert?' selected':'')+'>'+esc(o[1])+'</option>').join('') + '</select>';
+      const txt = (id, wert, ph) => '<input type="text" class="wl-colfilter" data-col="'+id+'" id="wlcf-'+id+SFX+'" placeholder="'+ph+'" autocomplete="off" value="'+esc(wert||'')+'">';
+      const uniq = fn => Array.from(new Set(alle.map(fn).filter(Boolean))).sort();
+      const tfs = uniq(s => s.tf).map(v => [v, v]);
+      const noten = uniq(s => s.note).map(v => [v, v]);
+      return '<tr class="wl-filter-row">' +
+        '<th>'+sel('analysiert',[['ja','✓ fertig'],['offen','offen']],f.analysiert)+'</th>' +
+        '<th>'+txt('datum',f.datum,'z.B. 09/25')+'</th>' +
+        '<th>'+txt('trade',f.trade,'Nr.')+'</th>' +
+        '<th><input type="text" class="wl-colfilter" id="wlAssetFilter'+SFX+'" placeholder="z.B. Gold, BTC" autocomplete="off" value="'+esc(wlAssetFilter)+'"></th>' +
+        '<th>'+sel('tf',tfs,f.tf)+'</th>' +
+        '<th>'+sel('setup',[['quick','Quick'],['double','Double'],['triple','Triple'],['mtf1','Only 1 TF'],['mtf2','2 TF (12H+1D)'],['mtf4','MTF 2'],['mtf3','MTF 3'],['multi','Multi-Asset'],['bogen','Bogen'],['bottom','Bottom']],f.setup)+'</th>' +
+        '<th>'+sel('phase',[['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']],f.phase)+'</th>' +
+        '<th>'+sel('pattern',[['pattern:clean','clean'],['pattern:valid','valid'],['pattern:choppy','choppy'],['candles:mini','Mini Candles'],['candles:gap','Gap Candles'],['candles:decent','Decent Candles'],['candles:choppy','Choppy Candles'],['pivot:perfekt','Pivot perfekt'],['pivot:nicht_perfekt','Pivot abweichend'],['pivot:zu_weit_abweichend','Pivot zu weit']],f.pattern)+'</th>' +
+        '<th>'+sel('div',[['doppelt:','Doppelte Div.'],['lokal:rsi','Lokal RSI'],['lokal:stark','Lokal stark'],['lokal:leicht','Lokal leicht'],['lokal:hidden','Lokal hidden'],['lokal:none','Lokal keine'],['struktur:rsi','Struktur RSI'],['struktur:stark','Struktur stark'],['struktur:leicht','Struktur leicht'],['struktur:hidden','Struktur hidden'],['struktur:none','Struktur keine']],f.div)+'</th>' +
+        '<th>'+sel('note',noten,f.note)+'</th>' +
+        '<th>'+sel('ergebnis',[['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry'],['offen','Noch nicht bewertet'],['regel_nein','nicht regelkonform'],['bestaetigung','nur Bestätigung'],['spot','Spot-Kauf']],f.ergebnis)+'</th>' +
+        '<th>'+txt('notiz',f.notiz,'Suche')+'</th>' +
+        '<th></th></tr>';
+    }
+
     // Nur die Haupt-Tabellenzeile (ohne Detailzeile) - eigene Funktion, damit sie nach
     // einem Speichern aus der Trade-Gesamtansicht (wlAktualisiereZeile) einzeln neu
     // gebaut werden kann, OHNE die gerade aufgeklappte Detailzeile/Trade-Gesamtansicht
@@ -3099,11 +3172,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       '<div class="tl-jump">' +
         '<label for="wlJumpDate">Zu Datum springen</label>' +
         '<input type="text" id="wlJumpDate'+SFX+'" placeholder="z.B. 26.03.25, 09/25, 2025 …" autocomplete="off">' +
-        '<span class="wl-asset-filter-wrap">' +
-          '<label for="wlAssetFilter" class="wl-asset-filter-label">Asset filtern</label>' +
-          '<input type="text" id="wlAssetFilter'+SFX+'" class="wl-asset-filter" placeholder="z. B. Gold, Silber" autocomplete="off" value="'+esc(wlAssetFilter)+'">' +
-          (wlAssetFilter ? '<button type="button" id="wlAssetFilterClear'+SFX+'" class="icon-btn" title="Filter zurücksetzen">✕</button>' : '') +
-        '</span>' +
+        '<button type="button" id="wlFilterAlleLoeschen'+SFX+'" class="btn ghost" style="margin-left:auto"'+(wlAssetFilter||Object.values(wlSpaltenFilter).some(Boolean)?'':' hidden')+'>Alle Filter zurücksetzen ✕</button>' +
         '<label class="wl-check" style="margin-left:14px" title="Signale, die als nicht regelkonform markiert sind, aus Tabelle/Chart/Statistiken ausblenden">' +
           '<input type="checkbox" id="wlNurRegelkonform'+SFX+'"'+(wlNurRegelkonform?' checked':'')+'> Nur regelkonforme zählen</label>' +
       '</div>' +
@@ -3116,7 +3185,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             '<th class="wl-sortable" data-sort="asset">Asset'+(sortSpalte==='asset'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
             '<th>TF</th><th>Setup</th><th>Phase</th><th>Pattern</th><th>Divergenz</th>' +
             '<th>Note</th><th>Ergebnis</th><th>Notiz</th><th></th>' +
-          '</tr></thead>' +
+          '</tr>' + wlFilterZeileHtml(alleSignale) + '</thead>' +
           '<tbody>'+tabelle+'</tbody>' +
         '</table>' +
       '</div>';
@@ -3205,8 +3274,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // von render()).
     const filterInput = document.getElementById('wlAssetFilter'+SFX);
     if (filterInput) filterInput.addEventListener('input', () => { wlAssetFilter = filterInput.value; render(); });
-    const filterClear = document.getElementById('wlAssetFilterClear'+SFX);
-    if (filterClear) filterClear.addEventListener('click', () => { wlAssetFilter = ''; render(); });
+    el.querySelectorAll('.wl-colfilter[data-col]').forEach(feld => {
+      const setze = () => { wlSpaltenFilter[feld.dataset.col] = feld.value; render(); };
+      feld.addEventListener(feld.tagName === 'SELECT' ? 'change' : 'input', setze);
+    });
+    const alleLoeschen = document.getElementById('wlFilterAlleLoeschen'+SFX);
+    if (alleLoeschen) alleLoeschen.addEventListener('click', () => { wlAssetFilter = ''; wlSpaltenFilter = {}; render(); });
     const nurRegelkonformBox = document.getElementById('wlNurRegelkonform'+SFX);
     if (nurRegelkonformBox) nurRegelkonformBox.addEventListener('change', () => { wlNurRegelkonform = nurRegelkonformBox.checked; render(); });
 
@@ -3697,7 +3770,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       if (neuerTableWrap) neuerTableWrap.scrollTop = wlVorherScrollTop;
     }
     if (wlFilterHatteFokus) {
-      const neuesFilterFeld = document.getElementById('wlAssetFilter'+SFX);
+      const neuesFilterFeld = document.getElementById(wlFilterFeldId);
       if (neuesFilterFeld) {
         neuesFilterFeld.focus();
         try { neuesFilterFeld.setSelectionRange(wlFilterCursor, wlFilterCursor); } catch(e){}

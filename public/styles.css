@@ -887,3 +887,8 @@ a { color:var(--accent); }
 .undo-toast-btn:disabled { opacity:.6; cursor:default; text-decoration:none; }
 @keyframes undoToastEin { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 @keyframes undoToastAus { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(8px); } }
+
+/* Excel-artige Spaltenfilter unter den Tabellen-Ueberschriften (Bottom Events etc.) */
+.wl-table thead tr.wl-filter-row th { top:30px; padding:3px 4px; text-transform:none; letter-spacing:0; font-weight:400; cursor:default; }
+.wl-colfilter { width:100%; min-width:56px; box-sizing:border-box; font:inherit; font-size:12px; padding:3px 5px;
+  border:1px solid var(--line); border-radius:6px; background:var(--card); color:inherit; }
