@@ -2815,7 +2815,14 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // auf ein einzelnes Asset weiterhin global stimmen.
     const tradeIdInfo = wlTradeIdUebersicht(alleSignale);
 
-    const tabelleSortiert = signaleGefiltert.slice().sort((a,b) => {
+    // Zoom im Chart = automatischer Zeitraum-Filter fuer die Tabelle: nur Signale, die im
+    // gerade sichtbaren Chart-Ausschnitt liegen (im Indizes-Modus zusaetzlich nur die dort
+    // angezeigten Index-Assets). Statistiken oben bleiben bewusst unveraendert.
+    const tabelleBasis = !zoomAktiv ? signaleGefiltert : signaleGefiltert.filter(s => {
+      const t = new Date(s.date+'T00:00:00').getTime();
+      return t >= minT && t <= maxT && (chartModus !== 'indices' || istIndexRelevantesAsset(s.asset));
+    });
+    const tabelleSortiert = tabelleBasis.slice().sort((a,b) => {
       let cmp;
       if (sortSpalte === 'asset') cmp = a.asset.localeCompare(b.asset) || a.date.localeCompare(b.date);
       else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'');
@@ -3172,6 +3179,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       '<div class="tl-jump">' +
         '<label for="wlJumpDate">Zu Datum springen</label>' +
         '<input type="text" id="wlJumpDate'+SFX+'" placeholder="z.B. 26.03.25, 09/25, 2025 …" autocomplete="off">' +
+        (zoomAktiv ? '<span class="muted" style="margin-left:14px" title="Der im Chart markierte Zeitraum filtert die Tabelle - Doppelklick auf den Chart oder Zoom-Reset hebt das auf">🔍 Zoom-Filter: '+tabelleBasis.length+' von '+signaleGefiltert.length+' Signalen</span>' : '') +
         '<button type="button" id="wlFilterAlleLoeschen'+SFX+'" class="btn ghost" style="margin-left:auto"'+(wlAssetFilter||Object.values(wlSpaltenFilter).some(Boolean)?'':' hidden')+'>Alle Filter zurücksetzen ✕</button>' +
         '<label class="wl-check" style="margin-left:14px" title="Signale, die als nicht regelkonform markiert sind, aus Tabelle/Chart/Statistiken ausblenden">' +
           '<input type="checkbox" id="wlNurRegelkonform'+SFX+'"'+(wlNurRegelkonform?' checked':'')+'> Nur regelkonforme zählen</label>' +
