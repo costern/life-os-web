@@ -3198,6 +3198,15 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '</table>' +
       '</div>';
 
+    // Filterzeile klebt exakt unter der Ueberschriftenzeile (Hoehe wird gemessen, damit keine
+    // Luecke entsteht, durch die man die Tabellenzeilen durchscheinen sieht).
+    (function(){
+      const kopf = el.querySelector('.wl-table thead tr:first-child th');
+      if (!kopf) return;
+      const h = kopf.getBoundingClientRect().height;
+      el.querySelectorAll('.wl-table thead tr.wl-filter-row th').forEach(th => { th.style.top = (h - 1) + 'px'; });
+    })();
+
     // Tooltips für die Marker
     const wrap = document.getElementById('wlChartWrap'+SFX);
     const tooltip = document.getElementById('wlTooltip'+SFX);
@@ -3210,14 +3219,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         tooltip.innerHTML = esc(p.titel);
         // Umgekehrt zum Hover ueber die Tabelle: Maus auf einem Chart-Marker markiert die
         // ganze zugehoerige Zeile unten (und weitere Zeilen desselben Trades), und scrollt
-        // sie bei Bedarf ins Blickfeld der Tabelle.
         const tw = el.querySelector('.wl-table-wrap');
         const zeile = tw && tw.querySelector('tr[data-id="'+m.dataset.id+'"]:not(.wl-edit-row)');
         if (zeile) {
           zeile.classList.add('wl-row-hover');
           if (zeile.dataset.trade) tw.querySelectorAll('tr[data-trade="'+zeile.dataset.trade.replace(/"/g,'\\"')+'"]').forEach(r => r.classList.add('wl-trade-hover'));
-          const zr = zeile.getBoundingClientRect(), wr = tw.getBoundingClientRect();
-          if (zr.top < wr.top + 60 || zr.bottom > wr.bottom) tw.scrollTop += (zr.top - wr.top) - wr.height / 2;
         }
       });
       m.addEventListener('pointerleave', () => {
