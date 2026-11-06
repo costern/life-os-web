@@ -2048,7 +2048,7 @@ function renderTradeLogShots(tradeId, shots, el){
     '<span class="te-msg tl-shots-msg"></span>';
 
   el.querySelectorAll('.tl-shot-thumb img').forEach(img => {
-    img.addEventListener('click', () => tlZeigeLightbox(img.src));
+    img.addEventListener('click', () => tlZeigeLightbox(img.src, img.closest('.wl-trade-gesamt-wrap') || el));
   });
   el.querySelectorAll('.tl-shot-del').forEach(btn => {
     btn.addEventListener('click', ev => {
@@ -2113,14 +2113,39 @@ function tlWireDragSort(el, onReorder){
   });
 }
 
-function tlZeigeLightbox(src){
+// Grossansicht eines Screenshots. Mit "scopeEl" (z.B. die Trade-Gesamtansicht bzw. die
+// Galerie eines Trades) laesst sich per Pfeiltasten links/rechts oder die Pfeil-Buttons zum
+// vorherigen/naechsten Bild desselben Trades wechseln, ohne die Grossansicht zu schliessen.
+function tlZeigeLightbox(src, scopeEl){
+  let liste = scopeEl ? [...scopeEl.querySelectorAll('.tl-shot-thumb img')].map(i => i.src) : [];
+  if (!liste.length || !liste.includes(src)) liste = [src];
+  let idx = liste.indexOf(src);
   const overlay = document.createElement('div');
   overlay.className = 'tl-lightbox';
-  overlay.innerHTML = '<img src="'+src+'">';
-  overlay.addEventListener('click', () => overlay.remove());
-  document.addEventListener('keydown', function esc(ev){
-    if (ev.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
-  });
+  const mehrere = liste.length > 1;
+  overlay.innerHTML = '<img src="'+src+'">' +
+    (mehrere ? '<button type="button" class="tl-lb-nav tl-lb-prev" title="Vorheriges Bild (←)">‹</button>' +
+               '<button type="button" class="tl-lb-nav tl-lb-next" title="Nächstes Bild (→)">›</button>' +
+               '<div class="tl-lb-count"></div>' : '');
+  const imgEl = overlay.querySelector('img'), zaehler = overlay.querySelector('.tl-lb-count');
+  const zeige = neu => {
+    idx = (neu + liste.length) % liste.length;
+    imgEl.src = liste[idx];
+    if (zaehler) zaehler.textContent = (idx + 1) + ' / ' + liste.length;
+  };
+  if (mehrere) {
+    zeige(idx);
+    overlay.querySelector('.tl-lb-prev').addEventListener('click', ev => { ev.stopPropagation(); zeige(idx - 1); });
+    overlay.querySelector('.tl-lb-next').addEventListener('click', ev => { ev.stopPropagation(); zeige(idx + 1); });
+  }
+  overlay.addEventListener('click', () => schliessen());
+  function taste(ev){
+    if (ev.key === 'Escape') schliessen();
+    else if (mehrere && ev.key === 'ArrowLeft') { ev.preventDefault(); zeige(idx - 1); }
+    else if (mehrere && ev.key === 'ArrowRight') { ev.preventDefault(); zeige(idx + 1); }
+  }
+  function schliessen(){ overlay.remove(); document.removeEventListener('keydown', taste); }
+  document.addEventListener('keydown', taste);
   document.body.appendChild(overlay);
 }
 
@@ -2214,7 +2239,7 @@ function renderWlShots(signalId, shots, el, uploadZielEl){
   const uploadScope = uploadZielEl || el;
 
   el.querySelectorAll('.tl-shot-thumb img').forEach(img => {
-    img.addEventListener('click', () => tlZeigeLightbox(img.src));
+    img.addEventListener('click', () => tlZeigeLightbox(img.src, img.closest('.wl-trade-gesamt-wrap') || el));
   });
   el.querySelectorAll('.tl-shot-del').forEach(btn => {
     btn.addEventListener('click', ev => {
