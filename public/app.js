@@ -2800,11 +2800,16 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     const alleSignale = signale;
     // Mehrfachsuche: kommagetrennte Begriffe ("Gold, Silber") - ein Treffer reicht (ODER-Logik).
     const wlFilterBegriffe = (wlAssetFilter || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-    const signaleGefiltert = alleSignale.filter(s =>
+    // Spalten-/Asset-Filter treffen einzelne Signale - zeigen aber IMMER den ganzen Trade: wenn
+    // ein Signal passt (z.B. das mit "MTF 3"), erscheinen auch die uebrigen Signale derselben
+    // Trade-ID (andere Timeframes), selbst wenn sie den Filter fuer sich nicht erfuellen
+    // wuerden (Colins Wunsch). "Nur regelkonforme" bleibt ein harter Filter.
+    const wlBasis = alleSignale.filter(s => !wlNurRegelkonform || s.regelkonform !== false);
+    const wlTrifft = s =>
       (!wlFilterBegriffe.length || wlFilterBegriffe.some(b => (s.asset||'').toLowerCase().includes(b))) &&
-      (!wlNurRegelkonform || s.regelkonform !== false) &&
-      wlSpaltenPasst(s)
-    );
+      wlSpaltenPasst(s);
+    const wlTrefferTrades = new Set(wlBasis.filter(wlTrifft).map(wlTradeKey));
+    const signaleGefiltert = wlBasis.filter(s => wlTrefferTrades.has(wlTradeKey(s)));
 
     // Haeufungen: Signale innerhalb eines FENSTERS von max. 2 Tagen ab dem ersten Signal
     // der Gruppe. Bewusst kein Verketten (0->2->4->6 Tage waere sonst eine einzige Gruppe) -
