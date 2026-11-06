@@ -2624,10 +2624,22 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
   // fuer Bottom Events (Colins Wunsch, siehe wlRenderTradeGesamt weiter unten).
   const zeigeNewsFeld = STRATEGIE === 'double_bottom';
 
-  const btcZeit = BTC_DAILY.map(d => new Date(d[0]+'T00:00:00').getTime());
-  const btcPreis = BTC_DAILY.map(d => d[1]);
+  let btcZeit = BTC_DAILY.map(d => new Date(d[0]+'T00:00:00').getTime());
+  let btcPreis = BTC_DAILY.map(d => d[1]);
 
-  const btcMap = new Map(BTC_DAILY.map(d => [d[0], d[1]]));
+  let btcMap = new Map(BTC_DAILY.map(d => [d[0], d[1]]));
+  // Haengt neuere Tageskurse (von /api/watchlist/btc-recent) an die eingebettete Historie an,
+  // damit auch Signale nach dem Ende der eingebetteten Daten im Chart erscheinen.
+  async function btcDatenErweitern(){
+    try {
+      const neu = await api('/watchlist/btc-recent');
+      const letztes = BTC_DAILY[BTC_DAILY.length - 1][0];
+      neu.filter(d => d[0] > letztes).forEach(d => BTC_DAILY.push(d));
+    } catch(e) { /* Chart bleibt wie bisher */ }
+    btcZeit = BTC_DAILY.map(d => new Date(d[0]+'T00:00:00').getTime());
+    btcPreis = BTC_DAILY.map(d => d[1]);
+    btcMap = new Map(BTC_DAILY.map(d => [d[0], d[1]]));
+  }
   function btcPreisAm(dateStr){
     if (btcMap.has(dateStr)) return btcMap.get(dateStr);
     const t = new Date(dateStr+'T00:00:00').getTime();
@@ -4018,12 +4030,19 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     }
   }
 
+  let wlBtcErweitert = false;
   async function ladeUndZeichne(){
     try {
       signale = await api('/watchlist?strategie='+encodeURIComponent(STRATEGIE));
     } catch(e) {
       el.innerHTML = '<div class="empty">Watchlist konnte nicht geladen werden.</div>';
       return;
+    }
+    if (!wlBtcErweitert) {
+      wlBtcErweitert = true;
+      const vorher = btcZeit.length;
+      await btcDatenErweitern();
+      if (btcZeit.length !== vorher) { const warVoll = domain[0] === fullMinT && domain[1] === fullMaxT; setzeVollbereich(); if (warVoll) domain = [fullMinT, fullMaxT]; }
     }
     render();
   }

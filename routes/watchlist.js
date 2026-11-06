@@ -124,6 +124,30 @@ function rowOut(r) {
   };
 }
 
+// BTC-Tageskurse der letzten ~150 Tage fuer den Hintergrund-Chart. Die eingebettete Kurs-
+// historie im Frontend (BTC_DAILY in public/app.js) endet irgendwann - ohne diese Ergaenzung
+// liegen neuere Signale (z.B. ein 50er-EMA-Retest nach dem Ende der Daten) ausserhalb des
+// Charts und werden dort gar nicht als Marker gezeichnet. Quelle: oeffentliche Crypto.com-
+// Exchange-API (ohne Key), 1h gecacht. Bei Fehlern leere Liste -> Chart bleibt wie bisher.
+let btcRecentCache = { at: 0, data: [] };
+router.get('/btc-recent', async (req, res) => {
+  try {
+    if (Date.now() - btcRecentCache.at < 60 * 60 * 1000 && btcRecentCache.data.length) return res.json(btcRecentCache.data);
+    const url = 'https://api.crypto.com/exchange/v1/public/get-candlestick?instrument_name=BTC_USDT&timeframe=1D&count=300';
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const kerzen = (j.result && j.result.data) || [];
+    const proTag = new Map();
+    kerzen.forEach(k => proTag.set(new Date(Number(k.t)).toISOString().slice(0, 10), Number(k.c)));
+    const data = [...proTag.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    if (data.length) btcRecentCache = { at: Date.now(), data };
+    res.json(data);
+  } catch (e) {
+    res.json(btcRecentCache.data || []);
+  }
+});
+
 router.get('/', async (req, res) => {
   const { strategie } = req.query;
   const where = ['deleted_at IS NULL'];
