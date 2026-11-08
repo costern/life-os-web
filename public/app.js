@@ -2394,6 +2394,7 @@ function wlAuswertungHtml(signale){
       asset: sg[0].asset, date: sg[0].date, jahr: sg[0].date.slice(0,4), wochentag: d0.getDay(),
       anzTf: t.tfs.size, tfKombi: [...t.tfs].sort().join(' + '),
       note, ev, mtf, multi: sg.some(s => s.multiAsset),
+      fng: (sg.find(s => s.fearGreed != null) || {}).fearGreed ?? null,
       phase: erstes(t,'marktphase'), pattern: erstes(t,'pattern'), candles: erstes(t,'candles'),
       pivot: erstes(t,'pivotLevel'), divL: erstes(t,'divLokal'), divS: erstes(t,'divStruktur'),
       form: erstes(t,'form'), boden: erstes(t,'bodenTyp'),
@@ -2453,6 +2454,7 @@ function wlAuswertungHtml(signale){
     nachWert('Event-Typ', '', t => t.ev, k => WL_EVENT_LABEL[k] || k, (a,b) => (rangEvent[b]||0)-(rangEvent[a]||0)),
     nachDef('Multi-Asset', 'Signal auf mehreren Assets gleichzeitig', [['Multi-Asset', t => t.multi], ['nur dieses Asset', t => !t.multi]]),
     nachWert('Marktphase', '', t => t.phase, k => WL_PHASE_LABEL[k]),
+    nachDef('Fear & Greed Index', 'nur Trades mit eingetragenem Wert', [['Extreme Angst (0–24)', t => t.fng != null && t.fng <= 24], ['Angst (25–44)', t => t.fng != null && t.fng >= 25 && t.fng <= 44], ['Neutral (45–55)', t => t.fng != null && t.fng >= 45 && t.fng <= 55], ['Gier (56–74)', t => t.fng != null && t.fng >= 56 && t.fng <= 74], ['Extreme Gier (75–100)', t => t.fng != null && t.fng >= 75]]),
     nachWert('Pattern', '', t => t.pattern, k => WL_PATTERN_LABEL[k]),
     nachWert('Kerzenbild am Boden', '', t => t.candles, k => WL_CANDLE_LABEL[k]),
     nachWert('Pivot-Level', '', t => t.pivot, k => WL_PIVOT_LABEL[k]),
@@ -2483,10 +2485,12 @@ function wlAuswertungHtml(signale){
     ['Nicht am Swing Bottom (Uptrend/Range) ist ein Warnsignal', 'schlecht', t => t.phase === 'uptrend' || t.phase === 'ranging'],
     ['Bogen-ähnlicher Boden ist High Probability', 'gut', t => t.form === 'bogen'],
     ['Setup-Note A++ / A+', 'gut', t => t.note === 'A++' || t.note === 'A+'],
-    ['Setup-Note B', 'schlecht', t => t.note === 'B']
+    ['Setup-Note B', 'schlecht', t => t.note === 'B'],
+    ['Boden bei extremer Angst (Fear & Greed ≤ 24) wird eher zum echten Boden', 'gut', t => t.fng != null && t.fng <= 24, t => t.fng != null]
   ];
-  const regelZeilen = regeln.map(([text, erwartung, fn]) => {
-    const a = zaehle(trades.filter(fn)), b = zaehle(trades.filter(t => !fn(t)));
+  const regelZeilen = regeln.map(([text, erwartung, fn, basisFn]) => {
+    const basis = basisFn ? trades.filter(basisFn) : trades;
+    const a = zaehle(basis.filter(fn)), b = zaehle(basis.filter(t => !fn(t)));
     if (!a.n) return '';
     let urteil, farbe;
     if (a.wertbar < WL_AW_MIN || b.wertbar < WL_AW_MIN) { urteil = 'zu wenig Daten'; farbe = 'var(--muted)'; }
@@ -2517,7 +2521,8 @@ function wlAuswertungHtml(signale){
     ['komplett analysiert (grüner Haken)', trades.filter(t => t.analysiert).length],
     ['mit Setup-Note', trades.filter(t => t.note).length],
     ['mit Marktphase', trades.filter(t => t.phase).length],
-    ['mit Pattern', trades.filter(t => t.pattern).length]
+    ['mit Pattern', trades.filter(t => t.pattern).length],
+    ['mit Fear & Greed', trades.filter(t => t.fng != null).length]
   ].map(([l, v]) => '<div class="stat"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>').join('');
 
   return '<div class="wl-ausw">' +
@@ -3082,6 +3087,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         tradeId: scope.querySelector('.wle-tradeid').value.trim() || null,
         note: scope.querySelector('.wle-note').value,
         marktphase: scope.querySelector('.wle-phase').value,
+        ...(scope.querySelector('.wle-fng') ? { fearGreed: scope.querySelector('.wle-fng').value } : {}),
         pattern: scope.querySelector('.wle-pattern').value,
         candles: scope.querySelector('.wle-candles').value,
         divLokal: scope.querySelector('.wle-divlokal').value,
@@ -3125,6 +3131,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom']], s.eventTyp)+'</label>') +
           '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label class="wl-detail-kurz" style="width:90px" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>' +
+          '<label class="wl-detail-kurz" style="width:90px" title="Crypto Fear &amp; Greed Index (0 = extreme Angst, 100 = extreme Gier) zum Zeitpunkt des Signals - optional">Fear &amp; Greed<input type="number" min="0" max="100" step="1" class="wle-fng" placeholder="0-100" value="'+(s.fearGreed != null ? s.fearGreed : '')+'"></label>' +
           '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
           '<label class="wl-detail-kurz" style="width:74px">Pattern (Gesamt)'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
@@ -3276,7 +3283,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+esc(s.tf||'–')+'</td>' +
         '<td class="wl-setup-cell">'+wlEventBadgeHtml(s)+(mtfWarnBadge ? ' '+mtfWarnBadge : '')+(setupRest ? ' <span class="muted">'+esc(setupRest)+'</span>' : ((s.eventTyp||mtfWarnBadge) ? '' : '<span class="muted">–</span>'))+'</td>' +
-        '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+'</td>' +
+        '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+(s.fearGreed != null ? '<div title="Crypto Fear &amp; Greed Index zum Signal">F&amp;G <b style="color:'+(s.fearGreed<=24?'var(--red)':s.fearGreed<=44?'var(--orange)':s.fearGreed<=55?'var(--muted)':'var(--green)')+'">'+s.fearGreed+'</b></div>' : '')+'</td>' +
         '<td class="muted">'+
           ([s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '', s.pivotLevel ? WL_PIVOT_KURZ[s.pivotLevel] : '']
             .filter(Boolean).join(' · ') || '–') +

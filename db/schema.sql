@@ -409,3 +409,8 @@ CREATE TABLE IF NOT EXISTS expenses (
 -- zusammen, rechnet sie aber NICHT zu einer Summe zusammen (jeder Posten bleibt einzeln
 -- sichtbar, inkl. im Kreisdiagramm).
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS gruppe TEXT;
+
+-- fear_greed: Crypto Fear & Greed Index (0-100) zum Zeitpunkt des Signals - optional, nicht bei
+-- jedem Signal/Asset relevant (Colin: z.B. 16 = extreme Angst am Signal vom 30.06.). Dient der
+-- Auswertung, ob Boeden eher bei extremer Angst entstehen.
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS fear_greed INTEGER;

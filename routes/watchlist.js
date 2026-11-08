@@ -120,7 +120,8 @@ function rowOut(r) {
     mtfGleichesLevel: r.mtf_gleiches_level === null || r.mtf_gleiches_level === undefined ? null : !!r.mtf_gleiches_level,
     limitMoeglich: r.limit_moeglich === null || r.limit_moeglich === undefined ? null : !!r.limit_moeglich,
     guterSpotKauf: !!r.guter_spot_kauf,
-    spotKaufPreis: r.spot_kauf_preis
+    spotKaufPreis: r.spot_kauf_preis,
+    fearGreed: r.fear_greed === null || r.fear_greed === undefined ? null : Number(r.fear_greed)
   };
 }
 
@@ -217,7 +218,8 @@ router.patch('/:id', async (req, res) => {
                             ['mtfGleichesLevel','mtf_gleiches_level'],
                             ['limitMoeglich','limit_moeglich'],
                             ['guterSpotKauf','guter_spot_kauf'],
-                            ['spotKaufPreis','spot_kauf_preis']]) {
+                            ['spotKaufPreis','spot_kauf_preis'],
+                            ['fearGreed','fear_greed']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -237,6 +239,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);
+    else if (key === 'fearGreed') { const n = parseInt(wert, 10); wert = Number.isFinite(n) && n >= 0 && n <= 100 ? n : null; }
     else if (key === 'multiAsset' || key === 'analysiert' || key === 'levelGebrochenGehalten' || key === 'nurBestaetigung' || key === 'guterSpotKauf') wert = !!wert;
     else if (key === 'strategie') wert = STRATEGIEN.has(wert) ? wert : 'double_bottom';
     else if (key === 'bodenTyp') wert = BODEN_TYPEN.has(wert) ? wert : null;
