@@ -2913,6 +2913,29 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       ? visZeit.map((t,i) => (i===0?'M':'L') + x(t).toFixed(1) + ',' + yPreis(visNdxPreis[i]).toFixed(1)).join(' ')
       : '';
 
+    // Fear-&-Greed-Linie (0-100) ueber dem Kurs: eigene Skala ueber die Hoehe des Kurs-Bereichs,
+    // in den ueblichen Index-Farben (rot = extreme Angst, orange = Angst, gelb = neutral,
+    // hellgruen = Gier, gruen = extreme Gier). Aufeinanderfolgende Tage gleicher Farbe werden
+    // zu einem Pfad zusammengefasst.
+    let fngSvg = '';
+    if (wlFngAn && window.wlFngDaten && window.wlFngDaten.length) {
+      const yFng = v => PADT + PLOTP - v / 100 * PLOTP;
+      const pts = window.wlFngDaten
+        .map(d => ({ t: new Date(d[0]+'T00:00:00').getTime(), v: d[1] }))
+        .filter(p => p.t >= minT - 3 * 86400000 && p.t <= maxT + 3 * 86400000);
+      let pfade = [], aktuell = null;
+      for (let k = 1; k < pts.length; k++) {
+        const farbe = wlFngFarbe((pts[k-1].v + pts[k].v) / 2);
+        const seg = x(pts[k-1].t).toFixed(1)+','+yFng(pts[k-1].v).toFixed(1)+' '+x(pts[k].t).toFixed(1)+','+yFng(pts[k].v).toFixed(1);
+        if (aktuell && aktuell.farbe === farbe) aktuell.d += ' L'+x(pts[k].t).toFixed(1)+','+yFng(pts[k].v).toFixed(1);
+        else { aktuell = { farbe, d: 'M'+seg.replace(' ', ' L') }; pfade.push(aktuell); }
+      }
+      const achse = [[0,'0'],[25,'25'],[50,'50'],[75,'75'],[100,'100']].map(([v, l]) =>
+        '<line x1="'+PADL+'" y1="'+yFng(v).toFixed(1)+'" x2="'+(B-PADR)+'" y2="'+yFng(v).toFixed(1)+'" stroke="'+wlFngFarbe(v)+'" stroke-opacity=".18" stroke-dasharray="3 5" vector-effect="non-scaling-stroke" style="pointer-events:none"/>' +
+        '<text x="'+(B-PADR-3)+'" y="'+(yFng(v)-2).toFixed(1)+'" text-anchor="end" font-size="9" fill="'+wlFngFarbe(v)+'" opacity=".85" style="pointer-events:none">'+l+'</text>').join('');
+      fngSvg = achse + pfade.map(p => '<path d="'+p.d+'" fill="none" stroke="'+p.farbe+'" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".95" style="pointer-events:none"/>').join('');
+    }
+
     // Preis-Gitterlinien: bei weiter Spanne logarithmisch (1-2-5 je Dekade), damit sie
     // sich auf der log-Achse gleichmaessig verteilen; beim Reinzoomen in ein enges Band
     // dagegen lineare runde Schritte.
@@ -3365,11 +3388,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       '<div class="wl-toolbar">' +
         '<span class="muted">🔍 Ziehen zum Hineinzoomen · Doppelklick zum Zurücksetzen</span>' +
         (zoomAktiv ? '<button type="button" class="btn ghost" id="wlZoomReset'+SFX+'">Zoom zurücksetzen</button>' : '') +
-        '<div class="wl-chart-modus">' +
+        '<label class="wl-check wl-fng-toggle" style="margin-left:auto" title="Crypto Fear &amp; Greed Index als farbige Linie (0-100) über den Chart legen"><input type="checkbox" id="wlFngToggle'+SFX+'"'+(wlFngAn?' checked':'')+'> Fear &amp; Greed Index</label>' +
+        '<div class="wl-chart-modus" style="margin-left:0">' +
           '<button type="button" class="'+(chartModus==='btc'?'wl-chart-modus-aktiv':'')+'" data-modus="btc">Bitcoin</button>' +
           '<button type="button" class="'+(chartModus==='indices'?'wl-chart-modus-aktiv':'')+'" data-modus="indices">S&P 500 / NASDAQ 100</button>' +
         '</div>' +
       '</div>' +
+      (wlFngAn ? '<div class="wl-chart-legende"><span><i style="background:#dc2626"></i>Extreme Angst (0–24)</span><span><i style="background:#f97316"></i>Angst (25–44)</span><span><i style="background:#eab308"></i>Neutral (45–55)</span><span><i style="background:#84cc16"></i>Gier (56–74)</span><span><i style="background:#16a34a"></i>Extreme Gier (75–100)</span><span class="muted">Fear &amp; Greed-Skala 0–100 über die Höhe des Charts</span></div>' : '') +
       (chartModus === 'indices' ? '<div class="wl-chart-legende"><span><i style="background:var(--accent)"></i>S&P 500 (SPY, Wochenschluss)</span><span><i style="background:var(--purple)"></i>NASDAQ 100 (QQQ, Wochenschluss)</span></div>' : '') +
       '<div class="wl-chart-wrap" id="wlChartWrap'+SFX+'">' +
         '<svg viewBox="0 0 '+B+' '+H+'" preserveAspectRatio="none" class="wl-svg" id="wlSvg'+SFX+'">' +
@@ -3377,7 +3402,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           (chartModus === 'indices'
             ? '<path class="wl-idx-area-spy" d="'+flaeche+'"/><path class="wl-idx-line-spy" d="'+linie+'"/><path class="wl-idx-line-ndx" d="'+linieNdx+'"/>'
             : '<path class="wl-btc-area" d="'+flaeche+'"/><path class="wl-btc-line" d="'+linie+'"/>') +
-          stiele + tradeLinien + kursPunkte +
+          fngSvg + stiele + tradeLinien + kursPunkte +
           '<rect id="wlSelRect'+SFX+'" class="wl-sel-rect" x="0" y="'+PADT+'" width="0" height="'+(H-PADB-PADT)+'" style="display:none"/>' +
           '<rect id="wlHitArea'+SFX+'" x="'+PADL+'" y="'+PADT+'" width="'+PLOTW+'" height="'+(H-PADB-PADT)+'" fill="transparent" style="cursor:crosshair"/>' +
         '</svg>' +
@@ -3512,6 +3537,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
 
     // Umschalter Bitcoin-Chart <-> S&P 500/NASDAQ-100-Chart. Beim Wechsel wird der
     // Zoom auf den vollen Bereich der jeweils neuen Kurve zurückgesetzt.
+    const fngBox = document.getElementById('wlFngToggle'+SFX);
+    if (fngBox) fngBox.addEventListener('change', async () => {
+      wlFngAn = fngBox.checked;
+      if (wlFngAn) await wlFngLaden();
+      render();
+    });
     el.querySelectorAll('.wl-chart-modus button').forEach(btn => {
       btn.addEventListener('click', () => {
         if (btn.dataset.modus === chartModus) return;
@@ -4043,6 +4074,15 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
   }
 
   let wlBtcErweitert = false;
+  // Fear-&-Greed-Linie ueber dem Chart (Haken rechts oben). Daten werden erst beim ersten
+  // Einschalten geladen und seitenuebergreifend (window) gemerkt.
+  let wlFngAn = false;
+  async function wlFngLaden(){
+    if (window.wlFngDaten) return window.wlFngDaten;
+    try { window.wlFngDaten = await api('/watchlist/fng'); } catch(e) { window.wlFngDaten = []; }
+    return window.wlFngDaten;
+  }
+  const wlFngFarbe = v => v <= 24 ? '#dc2626' : v <= 44 ? '#f97316' : v <= 55 ? '#eab308' : v <= 74 ? '#84cc16' : '#16a34a';
   async function ladeUndZeichne(){
     try {
       signale = await api('/watchlist?strategie='+encodeURIComponent(STRATEGIE));

@@ -149,6 +149,26 @@ router.get('/btc-recent', async (req, res) => {
   }
 });
 
+// Crypto Fear & Greed Index (alternative.me), komplette Historie seit 2018 - fuer die optionale
+// Linie ueber dem Bitcoin-Chart. 6h gecacht. Bei Fehlern leere Liste (Chart bleibt wie bisher).
+let fngCache = { at: 0, data: [] };
+router.get('/fng', async (req, res) => {
+  try {
+    if (Date.now() - fngCache.at < 6 * 60 * 60 * 1000 && fngCache.data.length) return res.json(fngCache.data);
+    const r = await fetch('https://api.alternative.me/fng/?limit=0&format=json');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const data = (j.data || [])
+      .map(d => [new Date(Number(d.timestamp) * 1000).toISOString().slice(0, 10), Number(d.value)])
+      .filter(d => Number.isFinite(d[1]))
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    if (data.length) fngCache = { at: Date.now(), data };
+    res.json(data);
+  } catch (e) {
+    res.json(fngCache.data || []);
+  }
+});
+
 router.get('/', async (req, res) => {
   const { strategie } = req.query;
   const where = ['deleted_at IS NULL'];
