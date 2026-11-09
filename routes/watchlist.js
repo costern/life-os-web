@@ -81,7 +81,28 @@ function mtfOrNull(v) {
   return [1, 2, 3, 4].includes(n) ? n : null;
 }
 
-function rowOut(r) {
+// Crypto Fear & Greed Index (alternative.me), komplette Historie seit 2018. Wird fuer die
+// optionale Linie ueber dem Bitcoin-Chart UND zum automatischen Eintragen des Index-Werts je
+// Signal (Wert des Signal-Tages) genutzt. 6h gecacht; bei Fehlern wird der letzte bekannte
+// Stand (oder leer) verwendet.
+let fngCache = { at: 0, data: [] };
+async function fngHistorie() {
+  try {
+    if (Date.now() - fngCache.at < 6 * 60 * 60 * 1000 && fngCache.data.length) return fngCache.data;
+    const r = await fetch('https://api.alternative.me/fng/?limit=0&format=json');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const data = (j.data || [])
+      .map(d => [new Date(Number(d.timestamp) * 1000).toISOString().slice(0, 10), Number(d.value)])
+      .filter(d => Number.isFinite(d[1]))
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    if (data.length) fngCache = { at: Date.now(), data };
+  } catch (e) { /* alter Stand bleibt */ }
+  return fngCache.data;
+}
+async function fngMap() { return new Map(await fngHistorie()); }
+
+function rowOut(r, fng) {
   return {
     id: r.id,
     date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date,
@@ -121,7 +142,12 @@ function rowOut(r) {
     limitMoeglich: r.limit_moeglich === null || r.limit_moeglich === undefined ? null : !!r.limit_moeglich,
     guterSpotKauf: !!r.guter_spot_kauf,
     spotKaufPreis: r.spot_kauf_preis,
-    fearGreed: r.fear_greed === null || r.fear_greed === undefined ? null : Number(r.fear_greed)
+    // Wirksamer Wert: von Hand eingetragener Wert (Ueberschreiben) sonst automatisch der Index-Wert
+    // des Signal-Tages. fearGreedManuell = nur der handschriftliche Wert (fuer das Eingabefeld).
+    fearGreed: r.fear_greed !== null && r.fear_greed !== undefined ? Number(r.fear_greed)
+      : (fng && fng.has(r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date).slice(0, 10))
+          ? fng.get(r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date).slice(0, 10)) : null),
+    fearGreedManuell: r.fear_greed === null || r.fear_greed === undefined ? null : Number(r.fear_greed)
   };
 }
 
@@ -149,25 +175,7 @@ router.get('/btc-recent', async (req, res) => {
   }
 });
 
-// Crypto Fear & Greed Index (alternative.me), komplette Historie seit 2018 - fuer die optionale
-// Linie ueber dem Bitcoin-Chart. 6h gecacht. Bei Fehlern leere Liste (Chart bleibt wie bisher).
-let fngCache = { at: 0, data: [] };
-router.get('/fng', async (req, res) => {
-  try {
-    if (Date.now() - fngCache.at < 6 * 60 * 60 * 1000 && fngCache.data.length) return res.json(fngCache.data);
-    const r = await fetch('https://api.alternative.me/fng/?limit=0&format=json');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const j = await r.json();
-    const data = (j.data || [])
-      .map(d => [new Date(Number(d.timestamp) * 1000).toISOString().slice(0, 10), Number(d.value)])
-      .filter(d => Number.isFinite(d[1]))
-      .sort((a, b) => a[0].localeCompare(b[0]));
-    if (data.length) fngCache = { at: Date.now(), data };
-    res.json(data);
-  } catch (e) {
-    res.json(fngCache.data || []);
-  }
-});
+router.get('/fng', async (req, res) => { res.json(await fngHistorie()); });
 
 router.get('/', async (req, res) => {
   const { strategie } = req.query;
@@ -178,7 +186,8 @@ router.get('/', async (req, res) => {
     `SELECT * FROM watchlist_signals WHERE ${where.join(' AND ')} ORDER BY date ASC, uhrzeit ASC NULLS FIRST, id ASC`,
     params
   );
-  res.json(rows.map(rowOut));
+  const fng = await fngMap();
+  res.json(rows.map(r => rowOut(r, fng)));
 });
 
 router.post('/', async (req, res) => {
@@ -210,7 +219,7 @@ router.post('/', async (req, res) => {
      strategie, BODEN_TYPEN.has(b.bodenTyp) ? b.bodenTyp : null, regelkonformOrNull(b.mtfGleichesLevel),
      regelkonformOrNull(b.limitMoeglich), !!b.guterSpotKauf, orNull(b.spotKaufPreis)]
   );
-  res.status(201).json(rowOut(rows[0]));
+  res.status(201).json(rowOut(rows[0], await fngMap()));
 });
 
 router.patch('/:id', async (req, res) => {
@@ -271,7 +280,7 @@ router.patch('/:id', async (req, res) => {
   vals.push(id);
   const { rows } = await pool.query(`UPDATE watchlist_signals SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`, vals);
   if (!rows.length) return res.status(404).json({ error: 'Signal nicht gefunden' });
-  res.json(rowOut(rows[0]));
+  res.json(rowOut(rows[0], await fngMap()));
 });
 
 // Bottom-Events-Screenshots: gleiches Prinzip wie beim Trading-Log (routes/trades.js) -
@@ -362,7 +371,7 @@ router.post('/:id/restore', async (req, res) => {
   const id = +req.params.id;
   const { rows } = await pool.query('UPDATE watchlist_signals SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *', [id]);
   if (!rows.length) return res.status(404).json({ error: 'nichts zum Wiederherstellen (evtl. Frist abgelaufen)' });
-  res.json(rowOut(rows[0]));
+  res.json(rowOut(rows[0], await fngMap()));
 });
 
 module.exports = router;
