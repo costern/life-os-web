@@ -5079,6 +5079,187 @@ document.addEventListener('visibilitychange', () => { if (tradingSichtbar()) vie
 document.querySelectorAll('nav.side button[data-page]').forEach(b =>
   b.addEventListener('click', () => seiteAuffrischen(b.dataset.page)));
 
+
+/* ---------- Ausgaben: Kontoumsaetze (Revolut-CSV) - Monats-/Jahresuebersicht, Kategorien,
+   Kategorie x Monat, Top-Haendler, Umsatzliste mit aenderbarer Kategorie. Daten liegen in
+   bank_transactions (Import ueber den Button oben oder per SQL), Kategorien kommen vom Server
+   (lib/bankKategorien.js + eigene Haendler-Regeln). ---------- */
+(function(){
+  const wrap = document.getElementById('ausKontoWrap');
+  const fixWrap = document.getElementById('ausFixWrap');
+  const switchEl = document.getElementById('ausViewSwitch');
+  if (!wrap || !fixWrap || !switchEl) return;
+
+  const eur0 = n => (n < 0 ? '−' : '') + Math.abs(n).toLocaleString('de-DE', { maximumFractionDigits: 0 }) + ' €';
+  const eur2 = n => (n < 0 ? '−' : '') + Math.abs(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  const MONATE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  const monatLabel = k => MONATE[+k.slice(5,7) - 1] + ' ' + k.slice(2,4);
+  let daten = null;                // { kategorien, umsaetze }
+  let zeitraum = 'l12';            // 'l12' | 'gesamt' | 'YYYY-MM'
+  let katFilter = '';              // Kategorie-Filter fuer die Umsatzliste
+  let suche = '';
+  let fuerAlle = true;
+  let geladen = false;
+
+  const kind = u => u.kind;
+  function monateListe(){ return [...new Set(daten.umsaetze.map(u => u.datum.slice(0,7)))].sort(); }
+  function imZeitraum(u, monate){
+    if (zeitraum === 'gesamt') return true;
+    if (zeitraum === 'l12') return monate.slice(-12).includes(u.datum.slice(0,7));
+    return u.datum.slice(0,7) === zeitraum;
+  }
+  function summen(liste){
+    const s = { einnahmen:0, ausgaben:0, sparen:0, krypto:0, unklar:0, unklarAnzahl:0 };
+    liste.forEach(u => {
+      if (kind(u) === 'einnahme') s.einnahmen += u.betrag;
+      else if (kind(u) === 'ausgabe') s.ausgaben += -u.betrag;
+      else if (u.kategorie === 'Sparen (Tagesgeld)') s.sparen += -u.betrag;
+      else if (u.kategorie === 'Krypto-Einzahlung') s.krypto += -u.betrag;
+      else if (kind(u) === 'unklar') { s.unklar += u.betrag; s.unklarAnzahl++; }
+    });
+    return s;
+  }
+  const haendlerName = b => String(b).replace(/^(To|An|Von|Zahlung von)\s+/i, '').trim();
+
+  function render(){
+    if (!daten) { wrap.innerHTML = '<div class="empty">Lade…</div>'; return; }
+    if (!daten.umsaetze.length) {
+      wrap.innerHTML = kopfHtml([]) + '<div class="empty">Noch keine Kontoumsätze – oben „Kontoauszug importieren“ (Revolut-CSV) wählen.</div>';
+      verdrahten(); return;
+    }
+    const monate = monateListe();
+    const liste = daten.umsaetze.filter(u => imZeitraum(u, monate));
+    const monateImZeitraum = zeitraum === 'gesamt' ? monate : zeitraum === 'l12' ? monate.slice(-12) : [zeitraum];
+    const s = summen(liste);
+    const nM = Math.max(monateImZeitraum.length, 1);
+    const saldo = s.einnahmen - s.ausgaben;
+
+    // Kategorien (nur Ausgaben)
+    const kat = new Map();
+    liste.filter(u => kind(u) === 'ausgabe').forEach(u => kat.set(u.kategorie, (kat.get(u.kategorie) || 0) + -u.betrag));
+    const katSort = [...kat.entries()].sort((a,b) => b[1] - a[1]);
+    const maxKat = katSort.length ? katSort[0][1] : 1;
+
+    // Monatsuebersicht (alle Monate, neueste zuerst)
+    const proMonat = monate.map(m => ({ m, ...summen(daten.umsaetze.filter(u => u.datum.slice(0,7) === m)) }));
+    const maxAusg = Math.max(...proMonat.map(x => x.ausgaben), 1);
+    const monatsZeilen = proMonat.slice().reverse().map(x => {
+      const aktiv = zeitraum === x.m ? ' class="aw-aktiv"' : '';
+      const sal = x.einnahmen - x.ausgaben;
+      return '<tr data-monat="'+x.m+'"'+aktiv+' title="Klick: nur diesen Monat anzeigen"><td>'+monatLabel(x.m)+'</td>' +
+        '<td class="pnl-pos">'+eur0(x.einnahmen)+'</td><td class="pnl-neg">'+eur0(-x.ausgaben)+'</td>' +
+        '<td class="'+(sal>=0?'pnl-pos':'pnl-neg')+'"><b>'+eur0(sal)+'</b></td>' +
+        '<td class="muted">'+eur0(x.sparen)+'</td><td class="muted">'+eur0(x.krypto)+'</td>' +
+        '<td class="aus-bar-cell"><span class="aus-bar"><i style="width:'+Math.round(x.ausgaben/maxAusg*100)+'%"></i></span></td></tr>';
+    }).join('');
+
+    // Heatmap Kategorie x Monat (max. 12 Monate des Zeitraums)
+    const hmMonate = monateImZeitraum.slice(-12);
+    const hm = new Map(); let hmMax = 1;
+    liste.filter(u => kind(u) === 'ausgabe' && hmMonate.includes(u.datum.slice(0,7))).forEach(u => {
+      const key = u.kategorie + '|' + u.datum.slice(0,7);
+      hm.set(key, (hm.get(key) || 0) + -u.betrag);
+    });
+    hm.forEach(v => { if (v > hmMax) hmMax = v; });
+    const hmZeilen = katSort.map(([k, tot]) => '<tr><td class="aus-hm-kat">'+esc(k)+'</td>' +
+      hmMonate.map(m => { const v = hm.get(k+'|'+m) || 0; const a = v ? (0.12 + 0.7 * v / hmMax).toFixed(2) : 0;
+        return '<td style="'+(v?'background:rgba(220,38,38,'+a+')':'')+'" class="'+(v?'':'muted')+'">'+(v?Math.round(v):'')+'</td>'; }).join('') +
+      '<td><b>'+eur0(tot)+'</b></td></tr>').join('');
+
+    // Top-Haendler
+    const hd = new Map();
+    liste.filter(u => kind(u) === 'ausgabe').forEach(u => { const n = haendlerName(u.beschreibung); const e = hd.get(n) || { sum:0, n:0, kat:u.kategorie }; e.sum += -u.betrag; e.n++; hd.set(n, e); });
+    const topH = [...hd.entries()].sort((a,b) => b[1].sum - a[1].sum).slice(0, 12);
+
+    // Umsatzliste
+    const q = suche.trim().toLowerCase();
+    const zeilen = liste.filter(u => (!katFilter || u.kategorie === katFilter) && (!q || u.beschreibung.toLowerCase().includes(q)));
+    const katOptionen = Object.keys(daten.kategorien);
+    const listeHtml = zeilen.slice(0, 300).map(u => '<tr><td class="muted">'+u.datum.split('-').reverse().join('.')+'</td><td>'+esc(u.beschreibung)+'</td>' +
+      '<td><select class="aus-kat-sel" data-id="'+u.id+'">'+katOptionen.map(k => '<option value="'+esc(k)+'"'+(k===u.kategorie?' selected':'')+'>'+esc(k)+'</option>').join('')+'</select></td>' +
+      '<td class="'+(u.betrag>=0?'pnl-pos':'pnl-neg')+'" style="text-align:right">'+eur2(u.betrag)+'</td></tr>').join('');
+
+    wrap.innerHTML = kopfHtml(monate) +
+      (s.unklarAnzahl ? '<div class="aus-warn">⚠ '+s.unklarAnzahl+' Umsätze ('+eur0(s.unklar)+') sind noch keiner Kategorie zugeordnet („Unklar“) und zählen in keiner Summe. Unten in der Liste auf „Unklar“ filtern und zuordnen.</div>' : '') +
+      '<div class="stats" style="margin-bottom:14px">' +
+        '<div class="stat"><div class="v pnl-pos">'+eur0(s.einnahmen)+'</div><div class="l">Einnahmen</div></div>' +
+        '<div class="stat"><div class="v pnl-neg">'+eur0(s.ausgaben)+'</div><div class="l">Ausgaben</div></div>' +
+        '<div class="stat"><div class="v '+(saldo>=0?'pnl-pos':'pnl-neg')+'">'+eur0(saldo)+'</div><div class="l">Übrig (Einnahmen − Ausgaben)</div></div>' +
+        '<div class="stat"><div class="v">'+eur0(s.ausgaben / nM)+'</div><div class="l">Ø Ausgaben / Monat</div></div>' +
+        '<div class="stat"><div class="v">'+eur0(s.sparen)+'</div><div class="l">ins Tagesgeld gespart (netto)</div></div>' +
+        '<div class="stat"><div class="v">'+eur0(s.krypto)+'</div><div class="l">Krypto-Einzahlungen</div></div>' +
+        '<div class="stat"><div class="v">'+(s.einnahmen>0?Math.round((s.sparen)/s.einnahmen*100)+'%':'–')+'</div><div class="l">Sparquote (Tagesgeld ÷ Einnahmen)</div></div>' +
+      '</div>' +
+      '<div class="aus-grid">' +
+        '<div class="card"><h2>📅 Monatsübersicht</h2><div class="aw-scroll"><table class="aus-table"><thead><tr><th>Monat</th><th>Einnahmen</th><th>Ausgaben</th><th>Übrig</th><th>Gespart</th><th>Krypto</th><th></th></tr></thead><tbody>'+monatsZeilen+'</tbody></table></div></div>' +
+        '<div class="card"><h2>🧾 Ausgaben nach Kategorie <span class="sub">'+zeitraumLabel(monateImZeitraum)+'</span></h2>' +
+          (katSort.length ? katSort.map(([k, v]) => '<div class="aus-kat-zeile" data-kat="'+esc(k)+'" title="Klick: Umsätze dieser Kategorie anzeigen"><span class="aus-kat-name">'+esc(k)+'</span>' +
+            '<span class="aus-bar aus-bar-gross"><i style="width:'+Math.round(v/maxKat*100)+'%"></i></span>' +
+            '<span class="aus-kat-wert">'+eur0(v)+'</span><span class="muted aus-kat-pct">'+Math.round(v/s.ausgaben*100)+'% · Ø '+eur0(v/nM)+'/M</span></div>').join('') : '<div class="empty">Keine Ausgaben im Zeitraum</div>') +
+        '</div>' +
+      '</div>' +
+      '<div class="card" style="margin-top:14px"><h2>🔥 Kategorie × Monat <span class="sub">Ausgaben in € – je dunkler, desto mehr</span></h2><div class="aw-scroll"><table class="aus-table aus-hm"><thead><tr><th></th>'+hmMonate.map(m => '<th>'+monatLabel(m)+'</th>').join('')+'<th>Summe</th></tr></thead><tbody>'+hmZeilen+'</tbody></table></div></div>' +
+      '<div class="card" style="margin-top:14px"><h2>🏪 Top-Händler <span class="sub">'+zeitraumLabel(monateImZeitraum)+'</span></h2><table class="aus-table"><thead><tr><th>Händler</th><th>Kategorie</th><th>Käufe</th><th>Summe</th></tr></thead><tbody>' +
+        topH.map(([n, e]) => '<tr><td>'+esc(n)+'</td><td class="muted">'+esc(e.kat)+'</td><td class="muted">'+e.n+'×</td><td><b>'+eur0(e.sum)+'</b></td></tr>').join('') + '</tbody></table></div>' +
+      '<div class="card" style="margin-top:14px"><h2>📋 Alle Umsätze <span class="sub">'+zeilen.length+' im Zeitraum'+(katFilter?' · Kategorie: '+esc(katFilter):'')+'</span></h2>' +
+        '<div class="aus-filterzeile"><select id="ausKatFilter"><option value="">alle Kategorien</option>'+katOptionen.map(k => '<option value="'+esc(k)+'"'+(k===katFilter?' selected':'')+'>'+esc(k)+'</option>').join('')+'</select>' +
+        '<input type="text" id="ausSuche" placeholder="Suche (Händler…)" value="'+esc(suche)+'" autocomplete="off">' +
+        '<label class="wl-check" title="Kategorie-Änderung gilt für alle Umsätze desselben Händlers, auch bei künftigen Importen"><input type="checkbox" id="ausFuerAlle"'+(fuerAlle?' checked':'')+'> Änderung für alle gleichen Händler übernehmen</label></div>' +
+        '<div class="aw-scroll" style="max-height:520px;overflow:auto"><table class="aus-table"><thead><tr><th>Datum</th><th>Beschreibung</th><th>Kategorie</th><th style="text-align:right">Betrag</th></tr></thead><tbody>'+listeHtml+'</tbody></table></div>' +
+        (zeilen.length > 300 ? '<div class="muted" style="margin-top:6px">Es werden die ersten 300 gezeigt – Zeitraum oder Kategorie eingrenzen.</div>' : '') + '</div>' +
+      '<div class="muted" style="margin:10px 0 24px">Umbuchungen zwischen deinen eigenen Konten und der Tagesgeld-Transfer zählen weder als Einnahme noch als Ausgabe. Kategorien sind Vorschläge anhand des Händlernamens – falsche einfach in der Liste ändern.</div>';
+    verdrahten();
+  }
+  function zeitraumLabel(ms){ return ms.length ? (ms.length === 1 ? monatLabel(ms[0]) : monatLabel(ms[0]) + ' – ' + monatLabel(ms[ms.length-1]) + ' ('+ms.length+' Monate)') : ''; }
+  function kopfHtml(monate){
+    const opts = '<option value="l12"'+(zeitraum==='l12'?' selected':'')+'>Letzte 12 Monate</option><option value="gesamt"'+(zeitraum==='gesamt'?' selected':'')+'>Gesamter Zeitraum</option>' +
+      monate.slice().reverse().map(m => '<option value="'+m+'"'+(zeitraum===m?' selected':'')+'>'+monatLabel(m)+'</option>').join('');
+    return '<div class="aus-kopf"><label>Zeitraum <select id="ausZeitraum">'+opts+'</select></label>' +
+      '<span class="aus-import"><button type="button" class="btn ghost" id="ausImportBtn">⬆ Kontoauszug importieren (Revolut-CSV)</button><input type="file" id="ausImportFile" accept=".csv,text/csv" hidden><span class="muted" id="ausImportMsg"></span></span></div>';
+  }
+  function verdrahten(){
+    const z = document.getElementById('ausZeitraum');
+    if (z) z.addEventListener('change', () => { zeitraum = z.value; render(); });
+    wrap.querySelectorAll('tr[data-monat]').forEach(tr => tr.addEventListener('click', () => { zeitraum = tr.dataset.monat; render(); }));
+    wrap.querySelectorAll('.aus-kat-zeile').forEach(d => d.addEventListener('click', () => { katFilter = d.dataset.kat; render(); document.getElementById('ausKatFilter')?.scrollIntoView({ behavior:'smooth', block:'center' }); }));
+    const kf = document.getElementById('ausKatFilter');
+    if (kf) kf.addEventListener('change', () => { katFilter = kf.value; render(); });
+    const su = document.getElementById('ausSuche');
+    if (su) su.addEventListener('input', () => { suche = su.value; const pos = su.selectionStart; render(); const n = document.getElementById('ausSuche'); n.focus(); n.setSelectionRange(pos, pos); });
+    const fa = document.getElementById('ausFuerAlle');
+    if (fa) fa.addEventListener('change', () => { fuerAlle = fa.checked; });
+    wrap.querySelectorAll('.aus-kat-sel').forEach(sel => sel.addEventListener('change', async () => {
+      try { await api('/bank/'+sel.dataset.id, { method:'PATCH', body: JSON.stringify({ kategorie: sel.value, fuerAlle }) }); await laden(true); }
+      catch(e){ alert('Konnte nicht gespeichert werden: '+e.message); }
+    }));
+    const ib = document.getElementById('ausImportBtn'), ifile = document.getElementById('ausImportFile'), msg = document.getElementById('ausImportMsg');
+    if (ib && ifile) {
+      ib.addEventListener('click', () => ifile.click());
+      ifile.addEventListener('change', async () => {
+        const f = ifile.files[0]; if (!f) return;
+        msg.textContent = 'importiere…';
+        try {
+          const text = await f.text();
+          const r = await api('/bank/import', { method:'POST', body: JSON.stringify({ csv: text }) });
+          await laden(true);
+          const m2 = document.getElementById('ausImportMsg'); if (m2) m2.textContent = r.neu + ' neue Umsätze importiert, ' + r.uebersprungen + ' schon vorhanden.';
+        } catch(e){ msg.textContent = 'Fehler: ' + e.message; }
+      });
+    }
+  }
+  async function laden(neu){
+    if (geladen && !neu) return;
+    try { daten = await api('/bank'); geladen = true; } catch(e){ wrap.innerHTML = '<div class="empty">Kontoumsätze konnten nicht geladen werden.</div>'; return; }
+    render();
+  }
+  switchEl.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const konto = b.dataset.ausview === 'konto';
+    switchEl.querySelectorAll('button').forEach(x => x.classList.toggle('aktiv', x === b));
+    fixWrap.hidden = konto; wrap.hidden = !konto;
+    if (konto) { render(); laden(false); }
+  }));
+})();
+
 ladeMacro(); ladeKonjunkturzyklus(); ladeNews(); ladeHistorie(); ladeKalender(); ladeOvTrades();
 renderLivePos().then(() => { letzteAktualisierung = Date.now(); });
 setInterval(() => vielleichtAuffrischen(), AKTUALISIERUNG_MS);

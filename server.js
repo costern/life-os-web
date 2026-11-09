@@ -25,6 +25,7 @@ const coiniconRoutes = require('./routes/coinicon');
 const ledgerRoutes = require('./routes/ledger');
 const watchlistRoutes = require('./routes/watchlist');
 const expensesRoutes = require('./routes/expenses');
+const bankRoutes = require('./routes/bank');
 
 const app = express();
 // 12mb, damit Trading-Log-Screenshots (als Base64-JSON) hochgeladen werden koennen.
@@ -54,6 +55,7 @@ app.use('/api/coinicon', requireAuthOrClaude, coiniconRoutes);
 app.use('/api/ledger', requireAuthOrClaude, ledgerRoutes);
 app.use('/api/watchlist', requireAuthOrClaude, watchlistRoutes);
 app.use('/api/expenses', requireAuthOrClaude, expensesRoutes);
+app.use('/api/bank', requireAuthOrClaude, bankRoutes);
 
 // Statische Seiten: login.html frei, alles andere hinter Login
 app.use('/login.html', express.static(path.join(__dirname, 'public', 'login.html')));

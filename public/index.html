@@ -395,6 +395,12 @@
     </section>
 
     <section class="page" id="page-ausgaben">
+      <div class="aus-view-switch" id="ausViewSwitch">
+        <button type="button" class="aktiv" data-ausview="fix">Fixkosten (monatlich)</button>
+        <button type="button" data-ausview="konto">Kontoumsätze &amp; Analyse</button>
+      </div>
+      <div id="ausKontoWrap" hidden></div>
+      <div id="ausFixWrap">
       <div class="grid">
         <div class="pos-hist-grid">
           <div class="card">
@@ -429,6 +435,7 @@
           </form>
         </div>
       </div>
+          </div>
     </section>
   </main>
 </div>

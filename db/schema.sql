@@ -414,3 +414,27 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS gruppe TEXT;
 -- jedem Signal/Asset relevant (Colin: z.B. 16 = extreme Angst am Signal vom 30.06.). Dient der
 -- Auswertung, ob Boeden eher bei extremer Angst entstehen.
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS fear_greed INTEGER;
+
+-- Kontoumsaetze (Revolut-Kontoauszug als CSV importiert) fuer die Ausgaben-Analyse. Nur die
+-- Rohdaten werden gespeichert; die Kategorie wird beim Auslesen aus lib/bankKategorien.js,
+-- den eigenen Haendler-Regeln (bank_regeln) bzw. einer manuellen Zuordnung (kategorie) bestimmt.
+-- hash verhindert Doppelimporte, wenn sich Auszuege ueberschneiden.
+CREATE TABLE IF NOT EXISTS bank_transactions (
+  id SERIAL PRIMARY KEY,
+  datum DATE NOT NULL,
+  beschreibung TEXT NOT NULL,
+  bank_kategorie TEXT,
+  betrag NUMERIC NOT NULL,
+  waehrung TEXT NOT NULL DEFAULT 'EUR',
+  konto TEXT,
+  kategorie TEXT,
+  hash TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_bank_tx_datum ON bank_transactions (datum);
+CREATE TABLE IF NOT EXISTS bank_regeln (
+  id SERIAL PRIMARY KEY,
+  muster TEXT UNIQUE NOT NULL,
+  kategorie TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
