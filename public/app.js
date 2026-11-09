@@ -5250,8 +5250,41 @@ document.querySelectorAll('nav.side button[data-page]').forEach(b =>
   async function laden(neu){
     if (geladen && !neu) return;
     try { daten = await api('/bank'); geladen = true; } catch(e){ wrap.innerHTML = '<div class="empty">Kontoumsätze konnten nicht geladen werden.</div>'; return; }
-    render();
+    render(); renderIst();
   }
+  /* Fixkosten "wie sie das Konto zeigt": Durchschnitt je Kategorie ueber die letzten 12 vollen Monate,
+     daneben die selbst eingetragenen Fixkosten (monatlich, Jahresposten /12) zum Vergleich. */
+  const IST_MAP = { 'Wohnen':'Miete', 'Versicherungen':'Versicherung', 'Tanken':'Tanken & Auto', 'Amazon':'Online-Shopping',
+    'Kantine':'Essen & Kantine', 'Müller':'Haushalt & Wohnen', 'Spotify':'Abos & Software', 'Apple Cloud Service':'Abos & Software', 'Claude':'Abos & Software' };
+  async function renderIst(){
+    const box = document.getElementById('ausIstWrap'); if (!box || !daten || !daten.umsaetze.length) return;
+    let eigene = [];
+    try { eigene = await api('/expenses'); } catch(e){}
+    let monate = monateListe();
+    const letzte = daten.umsaetze.reduce((m,u) => u.datum > m ? u.datum : m, '');
+    if (+letzte.slice(8,10) < 27) monate = monate.slice(0, -1);   // angefangenen Monat nicht mitzaehlen
+    monate = monate.slice(-12); const n = monate.length || 1;
+    const kat = new Map();
+    daten.umsaetze.filter(u => kind(u) === 'ausgabe' && monate.includes(u.datum.slice(0,7))).forEach(u => {
+      const e = kat.get(u.kategorie) || { sum:0, m:new Set() }; e.sum += -u.betrag; e.m.add(u.datum.slice(0,7)); kat.set(u.kategorie, e);
+    });
+    const eig = new Map();
+    eigene.filter(x => x.typ === 'ausgabe').forEach(x => { const c = IST_MAP[x.label]; if (!c) return; eig.set(c, (eig.get(c) || 0) + (x.frequency === 'yearly' ? x.amount / 12 : x.amount)); });
+    const zeilen = [...kat.entries()].map(([k, e]) => ({ k, avg: e.sum / n, m: e.m.size })).sort((a,b) => b.avg - a.avg);
+    const fix = zeilen.filter(z => z.m >= Math.ceil(n * 0.8));
+    const fixSum = fix.reduce((a,z) => a + z.avg, 0), restSum = zeilen.filter(z => z.m < Math.ceil(n * 0.8)).reduce((a,z) => a + z.avg, 0);
+    box.innerHTML = '<div class="card" style="margin-top:14px"><h2>🏦 Fixkosten laut Kontoauszug <span class="sub">Ø pro Monat, '+monatLabel(monate[0])+' – '+monatLabel(monate[n-1])+' ('+n+' Monate)</span></h2>' +
+      '<div class="muted" style="margin-bottom:8px">Regelmäßig = in mindestens '+Math.ceil(n*0.8)+' von '+n+' Monaten gezahlt. „Dein Eintrag" ist die Summe deiner Posten oben, soweit sie zu der Kategorie passen.</div>' +
+      '<table class="aus-table"><thead><tr><th>Kategorie</th><th>Ø / Monat</th><th>Monate</th><th></th><th>Dein Eintrag</th><th>Differenz</th></tr></thead><tbody>' +
+      zeilen.map(z => { const e = eig.get(z.k); const reg = z.m >= Math.ceil(n * 0.8);
+        return '<tr><td>'+esc(z.k)+'</td><td><b>'+eur0(z.avg)+'</b></td><td class="muted">'+z.m+'/'+n+'</td><td class="muted">'+(reg?'regelmäßig':'unregelmäßig')+'</td>' +
+          '<td>'+(e!=null?eur0(e):'<span class="muted">–</span>')+'</td><td class="'+(e==null?'muted':(z.avg-e>20?'pnl-neg':z.avg-e<-20?'pnl-pos':'muted'))+'">'+(e!=null?((z.avg-e>=0?'+':'')+eur0(z.avg-e)):'')+'</td></tr>'; }).join('') +
+      '</tbody><tfoot><tr><td><b>Regelmäßig gesamt</b></td><td><b>'+eur0(fixSum)+'</b></td><td></td><td></td><td></td><td></td></tr>' +
+      '<tr><td><b>Unregelmäßig gesamt</b></td><td><b>'+eur0(restSum)+'</b></td><td></td><td></td><td></td><td></td></tr>' +
+      '<tr><td><b>Alle Ausgaben</b></td><td><b>'+eur0(fixSum+restSum)+'</b></td><td></td><td></td><td></td><td></td></tr></tfoot></table>' +
+      '<div class="muted" style="margin-top:6px">Differenz = Konto minus dein Eintrag (rot: Konto ist mehr als eingetragen). Kfz-Versicherung/-Steuer tauchen hier nicht auf, wenn sie nicht über Revolut laufen.</div></div>';
+  }
+  laden(false);
   switchEl.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
     const konto = b.dataset.ausview === 'konto';
     switchEl.querySelectorAll('button').forEach(x => x.classList.toggle('aktiv', x === b));
