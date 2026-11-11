@@ -2353,9 +2353,38 @@ const WL_NOTEN = ['A++', 'A+', 'A', 'B'];
 const WL_NOTE_FARBEN = { 'A++':'var(--green-strong)', 'A+':'var(--green)', 'A':'var(--green-light)', 'B':'var(--red)' };
 // Feste Farbpalette fuer Trades. Die Farbe haengt nur an der Trade-ID, bleibt also
 // beim Umsortieren gleich; die Nummer steht immer daneben, Farbe allein traegt nichts.
-const WL_TRADE_FARBEN = ['#8b5cf6','#0ea5e9','#c026d3','#65a30d','#06b6d4','#7c3aed','#2563eb','#db2777'];
+const WL_TRADE_FARBEN = ['#8b5cf6','#0ea5e9','#c026d3','#65a30d','#06b6d4','#f59e0b','#2563eb','#db2777','#ef4444','#14b8a6','#84cc16','#f97316'];
+let wlFarbMap = {};
+// Farben werden aus der ANGEZEIGTEN Reihenfolge vergeben: Trade-IDs, die in der Tabelle direkt
+// untereinander stehen, bekommen nie dieselbe Farbe (Greedy-Faerbung ueber die Nachbarschaft).
+// Aendert sich Filter/Sortierung, wird neu vergeben - die Nummer steht immer daneben.
+function wlFarbenVergeben(signale){
+  const nachbarn = new Map(); const reihenfolge = [];
+  let vorher = null;
+  signale.forEach(s => {
+    const t = (s.tradeId != null && String(s.tradeId).trim()) ? String(s.tradeId).trim() : null;
+    if (!t) { vorher = null; return; }
+    if (!nachbarn.has(t)) { nachbarn.set(t, new Set()); reihenfolge.push(t); }
+    if (vorher && vorher !== t) { nachbarn.get(t).add(vorher); nachbarn.get(vorher).add(t); }
+    vorher = t;
+  });
+  const map = {}; const nutz = WL_TRADE_FARBEN.map(() => 0);
+  reihenfolge.forEach(t => {
+    const belegt = new Set([...nachbarn.get(t)].map(n => map[n]).filter(Boolean));
+    let best = -1;
+    for (let i = 0; i < WL_TRADE_FARBEN.length; i++) {
+      if (belegt.has(WL_TRADE_FARBEN[i])) continue;
+      if (best < 0 || nutz[i] < nutz[best]) best = i;
+    }
+    if (best < 0) best = 0;
+    map[t] = WL_TRADE_FARBEN[best]; nutz[best]++;
+  });
+  wlFarbMap = map;
+}
 function wlTradeFarbe(tid){
-  const t = String(tid); let h = 0;
+  const t = String(tid).trim();
+  if (wlFarbMap[t]) return wlFarbMap[t];
+  let h = 0;
   for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
   return WL_TRADE_FARBEN[h % WL_TRADE_FARBEN.length];
 }
@@ -3069,6 +3098,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'');
       return sortRichtung === 'asc' ? cmp : -cmp;
     });
+    wlFarbenVergeben(tabelleSortiert);
     // Keine automatische Zusammenklapp-Gruppierung mehr - weder nach Trade-ID noch nach
     // Kalendertag. Colin wollte das komplett weg: jedes Signal bekommt immer seine eigene,
     // sofort sichtbare Zeile (kein Klick zum Aufklappen noetig). Die Trade-ID bleibt pro
