@@ -3157,6 +3157,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // stattdessen gemeinsam ueber die Trade-Gesamtansicht gespeichert, siehe
         // wl-trade-gesamt-save).
         ...(scope.querySelector('.wle-details') ? { details: scope.querySelector('.wle-details').value.trim() || null } : {}),
+        ...(scope.querySelector('.wle-zieldatum') ? { zielDatum: scope.querySelector('.wle-zieldatum').value || null } : {}),
         tradeId: scope.querySelector('.wle-tradeid').value.trim() || null,
         note: scope.querySelector('.wle-note').value,
         marktphase: scope.querySelector('.wle-phase').value,
@@ -3295,7 +3296,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         (gruppiert ? '' :
           '<div class="tl-shots-wrap" id="wl-shots-'+s.id+'"></div>' +
           '<div class="wl-felder-scope" data-felder-id="'+s.id+'">' + wlFelderGridHtml(s) + '</div>' +
-          '<label class="wl-detail-voll">Details<textarea class="wle-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>') +
+          '<label class="wl-detail-voll">Details<textarea class="wle-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(s.details||'')+'</textarea></label>' +
+          '<label class="wl-detail-kurz" style="width:190px" title="Tag, an dem das Preisziel bzw. 3R erreicht wurde - daraus wird die Dauer in Tagen berechnet. Leer = noch nicht erreicht/nicht eingetragen.">⏱ Ziel / 3R erreicht am<input type="date" class="wle-zieldatum" value="'+esc(s.zielDatum||'')+'"></label>') +
         '<div class="wl-detail-aktionen">' +
           (gruppiert ? '' : '<button type="button" class="wl-save" data-felder-id="'+s.id+'">Speichern</button>') +
           '<button type="button" class="wl-cancel ghost">Schließen</button>' +
@@ -3342,6 +3344,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const st = wlStatus(s);
       const setupRest = wlSetupRestText(s);
       const mtfWarnBadge = wlMtfWarnBadgeHtml(s);
+      const zielTage = wlZielTage(s);
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
       return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'" data-date="'+s.date+'"'+tradeAttr+' title="Klick für Details">' +
         '<td class="wl-analysiert-cell"><button type="button" class="wl-analysiert-btn'+(s.analysiert?' ist-analysiert':'')+'" title="'+(s.analysiert?'Komplett analysiert – Klick zum Zurücksetzen':'Als komplett analysiert markieren')+'">✓</button></td>' +
@@ -3372,6 +3375,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           (s.regelkonform === false ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund ? 'Nicht regelkonform: '+s.regelkonformGrund : 'Nicht regelkonform')+'">nicht regelkonform</span>' : '')+
           (s.nurBestaetigung ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)" title="Kein eigenstaendiges Setup, nur bestaetigendes Signal">nur Bestätigung</span>' : '')+
           (s.guterSpotKauf ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--green);color:var(--green)" title="'+esc(s.spotKaufPreis ? 'Guter Spot-Einkaufspreis: '+s.spotKaufPreis : 'Guter Spot-Einkaufspreis')+'">💰 Spot</span>' : '')+
+          (zielTage != null ? '<div class="muted" style="font-size:11.5px;margin-top:2px" title="Zeit bis Preisziel/3R, ab dem ersten Signal des Trades">⏱ '+wlZielTageText(zielTage)+'</div>' : '')+
         '</td>' +
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
         '<td class="wl-row-actions"><button type="button" class="wl-edit" title="Details">✎</button><button type="button" class="wl-del" title="Löschen">🗑</button></td>' +
@@ -3419,6 +3423,18 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       return jahrZeile + wlZeileHtml(s, klassen);
     }).join('');
 
+    // Ø Tage bis Ziel/3R: jeder Trade nur einmal (gleiche Trade-ID = ein Trade)
+    const zielGesehen = new Set();
+    const zielTageListe = [];
+    signaleGefiltert.forEach(s => {
+      const key = s.tradeId != null && String(s.tradeId).trim() ? 't:'+String(s.tradeId).trim() : 's:'+s.id;
+      if (zielGesehen.has(key)) return;
+      zielGesehen.add(key);
+      const t = wlZielTage(s);
+      if (t != null) zielTageListe.push(t);
+    });
+    const zielTageSchnitt = zielTageListe.length ? Math.round(zielTageListe.reduce((a,b) => a+b, 0) / zielTageListe.length) : 0;
+    const zielTageMedian = zielTageListe.length ? zielTageListe.slice().sort((a,b) => a-b)[Math.floor(zielTageListe.length/2)] : 0;
     el.innerHTML =
       '<div class="stats" style="margin-bottom:10px">' +
         '<div class="stat"><div class="v">'+signaleGefiltert.length+'</div><div class="l">Signale</div></div>' +
@@ -3432,6 +3448,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         (istEma50Retest ? '' : '<div class="stat"><div class="v" style="color:var(--accent)">'+anzLevelGebrochenGehalten+'</div><div class="l">Level gebrochen, aber gehalten</div></div>') +
         (istEma50Retest ? '' : '<div class="stat"><div class="v" style="color:var(--green)">'+anzGuterSpotKauf+'</div><div class="l">💰 Guter Spot-Kauf</div></div>') +
         '<div class="stat"><div class="v" style="color:var(--purple)">'+anzTripleBottom+'</div><div class="l">🔱 Triple Bottom</div></div>' +
+        (zielTageListe.length ? '<div class="stat" title="Durchschnitt über '+zielTageListe.length+' Trades mit eingetragenem Ziel-Datum (Median: '+zielTageMedian+' Tage)"><div class="v">'+zielTageSchnitt+'</div><div class="l">⏱ Ø Tage bis Ziel/3R</div></div>' : '') +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+tradeIdInfo.naechsteFrei+'</div><div class="l">Nächste Trade-ID</div></div>' +
       '</div>' +
       '<div class="muted" style="margin:-4px 0 10px">Ergebnis-Zahlen zählen Trades – Signale mit derselben Trade-ID zählen als einer. Aktuell höchste vergebene Trade-ID: '+tradeIdInfo.hoechste+'.</div>' +
@@ -3791,6 +3808,21 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // Liefert die zu einem Signal gehoerenden Trade-Gesamt-Signale (inkl. sich selbst),
     // aber nur wenn es mindestens 2 sind (sonst gibt es keine Gesamtansicht - ein
     // einzelnes Signal behaelt seinen normalen, einzelnen Screenshot-Bereich).
+    // Zeit bis Preisziel/3R in Tagen - einmal pro TRADE: Start = fruehestes Signal mit
+    // derselben Trade-ID (egal ob 4H, 1D oder 1W), Ende = eingetragenes Ziel-Datum.
+    // Ohne Trade-ID zaehlt nur das Signal selbst.
+    function wlZielTage(s){
+      const tid = s.tradeId != null ? String(s.tradeId).trim() : '';
+      const gruppe = tid ? alleSignale.filter(x => (x.tradeId != null ? String(x.tradeId).trim() : '') === tid) : [s];
+      const ziel = (gruppe.find(x => x.zielDatum) || {}).zielDatum;
+      if (!ziel) return null;
+      const start = gruppe.map(x => x.date).sort()[0];
+      const tage = Math.round((new Date(ziel+'T00:00:00') - new Date(start+'T00:00:00')) / 86400000);
+      return tage >= 0 ? tage : null;
+    }
+    function wlZielTageText(t){
+      return t === 1 ? '1 Tag' : t + ' Tage';
+    }
     function wlTradeGesamtSignale(signal){
       const tid = signal.tradeId != null ? String(signal.tradeId).trim() : '';
       if (!tid) return [];
@@ -3832,6 +3864,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       // leeres News-Feld soll keinen Platz verbrauchen (Colins Wunsch).
       const gemeinsamerNewsText = zeigeNewsFeld ? ((chronologisch.find(s => (s.news||'').trim()) || {}).news || '') : '';
       const alleIds = verwandte.map(s => s.id).join(',');
+      const gemeinsamesZiel = (chronologisch.find(s => s.zielDatum) || {}).zielDatum || '';
+      const gemeinsameTage = wlZielTage(signal);
 
       el.innerHTML =
         '<div class="wl-trade-gesamt-kopf">📎 Trade-Gesamtansicht – Trade-ID '+esc(tid)+' ('+verwandte.length+' Signale, alle Timeframes auf einen Blick)</div>' +
@@ -3846,6 +3880,10 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
                 '<textarea class="wle-trade-gesamt-news tl-notiz-auto" rows="1" placeholder="Kurze Markt-News zu diesem Trade…">'+esc(gemeinsamerNewsText)+'</textarea>' +
               '</label>' +
             '</div>') +
+          '<label class="wl-detail-kurz" style="width:260px" title="Gilt für den ganzen Trade. Gezählt wird ab dem frühesten Signal dieser Trade-ID ('+esc(wlDatumLabel(chronologisch[0]))+').">⏱ Ziel / 3R erreicht am (ganzer Trade)' +
+            '<input type="date" class="wle-trade-gesamt-zieldatum" value="'+esc(gemeinsamesZiel)+'">' +
+            (gemeinsameTage != null ? '<span class="muted"> = '+wlZielTageText(gemeinsameTage)+' ab erstem Signal</span>' : '') +
+          '</label>' +
           '<div class="wl-detail-aktionen"><button type="button" class="wl-trade-gesamt-save">Speichern</button><span class="te-msg wl-trade-gesamt-msg"></span></div>' +
         '</div>' +
         '<div class="wl-trade-gesamt-tage">' +
@@ -4017,8 +4055,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         const ids = box.dataset.ids.split(',').filter(Boolean);
         const text = feld.value.trim() || null;
         const newsText = newsFeld ? (newsFeld.value.trim() || null) : undefined;
+        const zielFeld = box.querySelector('.wle-trade-gesamt-zieldatum');
+        const zielDatum = zielFeld ? (zielFeld.value || null) : undefined;
         const body = { details: text };
         if (newsText !== undefined) body.news = newsText;
+        if (zielDatum !== undefined) body.zielDatum = zielDatum;
         gesamtSaveBtn.disabled = true; gesamtSaveBtn.textContent = 'Speichert…';
         msg.textContent = ''; msg.className = 'te-msg wl-trade-gesamt-msg';
         try {
@@ -4028,6 +4069,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             if (sigRef) {
               sigRef.details = text;
               if (newsText !== undefined) sigRef.news = newsText;
+              if (zielDatum !== undefined) sigRef.zielDatum = zielDatum;
             }
           });
           msg.textContent = 'Gespeichert ✓'; msg.className = 'te-msg wl-trade-gesamt-msg ok';

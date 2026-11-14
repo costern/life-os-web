@@ -300,6 +300,10 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS spot_kauf_preis TEXT;
 -- Signale desselben Trades geschrieben (siehe wl-trade-gesamt-save in app.js), bislang
 -- nur fuer die Bottom-Events-Seite sichtbar (STRATEGIE === 'double_bottom').
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS news TEXT;
+-- ziel_datum: Tag, an dem das Preisziel bzw. 3R erreicht wurde. Gilt pro TRADE: wie
+-- details/news wird es in alle Signale derselben Trade-ID geschrieben. Die Dauer in Tagen
+-- rechnet das Frontend ab dem fruehesten Signal des Trades (wlZielTage in app.js).
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS ziel_datum DATE;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).

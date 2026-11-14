@@ -117,6 +117,7 @@ function rowOut(r, fng) {
     form: r.form,
     details: r.details,
     news: r.news,
+    zielDatum: r.ziel_datum instanceof Date ? r.ziel_datum.toISOString().slice(0, 10) : (r.ziel_datum || null),
     tradeId: r.trade_id,
     note: r.note,
     marktphase: r.marktphase,
@@ -229,7 +230,7 @@ router.patch('/:id', async (req, res) => {
   for (const [key, col] of [['date','date'],['label','label'],['asset','asset'],['tf','tf'],
                             ['notiz','notiz'],['status','status'],['eventTyp','event_typ'],
                             ['mtf','mtf'],['multiAsset','multi_asset'],['form','form'],['details','details'],
-                            ['news','news'],
+                            ['news','news'],['zielDatum','ziel_datum'],
                             ['tradeId','trade_id'],['note','note'],['marktphase','marktphase'],
                             ['pattern','pattern'],['candles','candles'],
                             ['divLokal','div_lokal'],['divStruktur','div_struktur'],
@@ -264,6 +265,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'kursverlauf') wert = KURSVERLAUF.has(wert) ? wert : null;
     else if (key === 'keinTradeGrund') wert = KEIN_TRADE_GRUND.has(wert) ? wert : null;
     else if (key === 'uhrzeit') wert = zeitOrNull(wert);
+    else if (key === 'zielDatum') wert = /^\d{4}-\d{2}-\d{2}$/.test(String(wert || '')) ? wert : null;
     else if (key === 'regelkonform' || key === 'mtfGleichesLevel' || key === 'limitMoeglich') wert = regelkonformOrNull(wert);
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
