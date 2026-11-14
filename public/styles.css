@@ -202,6 +202,11 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-xh-preis, .wl-xh-datum { position:absolute; background:var(--ink); color:var(--card); font-size:10.5px;
   font-weight:600; padding:2px 5px; border-radius:4px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .wl-xh-preis { left:0; transform:translateY(-50%); }
+.wl-xh-preis-rechts { position:absolute; right:0; transform:translateY(-50%); background:var(--card); border:1px solid var(--line);
+  border-radius:4px; padding:2px 5px; font-size:10.5px; font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.wl-gold-line { fill:none; stroke:#d4a017; stroke-width:1.5; opacity:.9; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.wl-gold-area { fill:#d4a017; opacity:.08; }
+.wl-chart-modus button.wl-gold-aktiv { background:#d4a017; border-color:#d4a017; }
 .wl-xh-datum { bottom:2px; transform:translateX(-50%); }
 .wl-grid { stroke:var(--line); stroke-width:1; }
 .wl-grid-v { stroke:var(--line); stroke-width:1; opacity:.6; }
