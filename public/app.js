@@ -3458,6 +3458,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '</svg>' +
         '<div class="wl-markers">'+markerHtml+'</div>' +
         '<div id="wlTooltip'+SFX+'" class="wl-tooltip" style="display:none"></div>' +
+        '<div class="wl-xh" id="wlXh'+SFX+'" hidden><div class="wl-xh-v"></div><div class="wl-xh-h"></div><div class="wl-xh-preis"></div><div class="wl-xh-datum"></div></div>' +
       '</div>' +
       '<form class="addbar" id="wlAddForm'+SFX+'" autocomplete="off" style="margin-top:16px">' +
         '<div class="addrow">' +
@@ -3581,6 +3582,40 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       ziehStart = null;
     });
     hit.addEventListener('dblclick', () => { domain = [fullMinT, fullMaxT]; render(); });
+
+    // Fadenkreuz wie bei TradingView: senkrechte + waagrechte Linie an der Mausposition,
+    // dazu Preis links an der Skala und Datum unten an der Zeitachse (Colins Wunsch).
+    // Laeuft ueber den ganzen Wrap, damit es auch ueber den Coin-Icons nicht verschwindet.
+    // Als HTML-Overlay statt im SVG, weil das SVG gestreckt wird (preserveAspectRatio=none)
+    // und Text dort verzerrt waere.
+    const xh = document.getElementById('wlXh'+SFX);
+    const xhV = xh.querySelector('.wl-xh-v'), xhH = xh.querySelector('.wl-xh-h');
+    const xhPreis = xh.querySelector('.wl-xh-preis'), xhDatum = xh.querySelector('.wl-xh-datum');
+    function xhPreisText(v){
+      const d = v >= 1000 ? 0 : v >= 10 ? 2 : 4;
+      return v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d }) + ' $';
+    }
+    wrap.addEventListener('pointermove', ev => {
+      const rect = svg.getBoundingClientRect();
+      const px = (ev.clientX - rect.left) / rect.width * B;
+      const py = (ev.clientY - rect.top) / rect.height * H;
+      if (px < PADL || px > B - PADR || py < PADT || py > H - PADB) { xh.hidden = true; return; }
+      xh.hidden = false;
+      const lx = (px / B * 100) + '%';
+      xhV.style.left = lx; xhDatum.style.left = lx;
+      const t = tVonX(px);
+      const spanTageXh = spanne / 86400000;
+      xhDatum.textContent = new Date(t).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }) +
+        (spanTageXh < 4 ? ' ' + new Date(t).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }) : '');
+      // Waagrechte Linie + Preis nur im Kursbereich, nicht in den Icon-Spuren darunter
+      if (py <= LANE_TOP) {
+        const ly = (py / H * 100) + '%';
+        xhH.style.display = ''; xhPreis.style.display = '';
+        xhH.style.top = ly; xhPreis.style.top = ly;
+        xhPreis.textContent = xhPreisText(Math.exp(logMin + (PADT + PLOTP - py) / PLOTP * logSpanne));
+      } else { xhH.style.display = 'none'; xhPreis.style.display = 'none'; }
+    });
+    wrap.addEventListener('pointerleave', () => { xh.hidden = true; });
 
     const resetBtn = document.getElementById('wlZoomReset'+SFX);
     if (resetBtn) resetBtn.addEventListener('click', () => { domain = [fullMinT, fullMaxT]; render(); });

@@ -194,6 +194,15 @@ section.page { display:none; } section.page.active { display:block; }
 .wl-asset-filter-wrap .icon-btn:hover { background:var(--hover-bg); }
 .wl-chart-wrap { position:relative; height:400px; }
 .wl-svg { display:block; width:100%; height:100%; }
+/* Fadenkreuz im Bottom-Events-Chart (Preis links an der Skala, Datum unten) */
+.wl-xh { position:absolute; inset:0; pointer-events:none; z-index:4; }
+.wl-xh[hidden] { display:none; }
+.wl-xh-v { position:absolute; top:0; bottom:0; width:0; border-left:1px dashed var(--muted); opacity:.7; }
+.wl-xh-h { position:absolute; left:0; right:0; height:0; border-top:1px dashed var(--muted); opacity:.7; }
+.wl-xh-preis, .wl-xh-datum { position:absolute; background:var(--ink); color:var(--card); font-size:10.5px;
+  font-weight:600; padding:2px 5px; border-radius:4px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.wl-xh-preis { left:0; transform:translateY(-50%); }
+.wl-xh-datum { bottom:2px; transform:translateX(-50%); }
 .wl-grid { stroke:var(--line); stroke-width:1; }
 .wl-grid-v { stroke:var(--line); stroke-width:1; opacity:.6; }
 .wl-axis-label { font-size:10px; fill:var(--muted); font-family:inherit; }
