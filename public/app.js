@@ -178,19 +178,38 @@ function springeZuDatum(container, ziel, verfuegbareDaten){
   row.classList.add('datum-sprung-highlight');
   setTimeout(() => row.classList.remove('datum-sprung-highlight'), 2000);
 }
+// Roter Pfeil ganz links in der Tabelle an der Stelle, auf die "Zu Datum springen" zeigt:
+// auf der Zeile selbst (Datum vorhanden) oder genau zwischen zwei Zeilen (Datum liegt dazwischen).
+// Bleibt, solange das Datum im Feld steht - wird nach jedem Neuaufbau der Tabelle neu gesetzt.
+function wlSprungPfeilSetzen(container, text, chronologisch, absteigend){
+  if (!container) return;
+  container.querySelectorAll('tr.wl-sprung-auf, tr.wl-sprung-vor, tr.wl-sprung-nach').forEach(r => r.classList.remove('wl-sprung-auf','wl-sprung-vor','wl-sprung-nach'));
+  const d = text ? parseSchlauesDatum(text) : null;
+  if (!d) return;
+  const rows = [...container.querySelectorAll('tr[data-date]')];
+  if (!rows.length) return;
+  const praefix = d.tag != null ? schlauesDatumZuIso(d) : d.monat != null ? d.jahr + '-' + String(d.monat).padStart(2, '0') : String(d.jahr);
+  const treffer = rows.find(r => r.dataset.date.startsWith(praefix));
+  if (treffer) { treffer.classList.add('wl-sprung-auf'); return; }
+  if (!chronologisch) return;
+  const ziel = d.tag != null ? praefix : praefix.length === 7 ? praefix + '-15' : praefix + '-07-01';
+  const danach = rows.find(r => absteigend ? r.dataset.date < ziel : r.dataset.date > ziel);
+  if (danach) danach.classList.add('wl-sprung-vor'); else rows[rows.length - 1].classList.add('wl-sprung-nach');
+}
 // Macht ein "Zu Datum springen"-Feld schlau: erkennt Text beim Verlassen des Feldes/Enter,
 // springt zur passenden (oder naechstgelegenen) Zeile und schreibt das erkannte Datum
 // zurueck ins Feld. container/verfuegbareDaten werden bei jedem Aufruf frisch geholt (per
 // Funktion), da sich die Tabelle nach jedem Rerender neu aufbaut.
-function schlausSprungfeld(input, holeContainer, holeVerfuegbareDaten){
+function schlausSprungfeld(input, holeContainer, holeVerfuegbareDaten, beiAenderung){
   if (!input) return;
   const aktion = () => {
     const wert = input.value.trim();
-    if (!wert) return;
+    if (!wert) { input.classList.remove('datum-feld-ungueltig'); if (beiAenderung) beiAenderung(''); return; }
     const d = parseSchlauesDatum(wert);
     if (!d) { input.classList.add('datum-feld-ungueltig'); return; }
     input.classList.remove('datum-feld-ungueltig');
     input.value = formatSchlauesDatum(d);
+    if (beiAenderung) beiAenderung(input.value);
     springeZuDatum(holeContainer(), d, holeVerfuegbareDaten());
   };
   input.addEventListener('change', aktion);
@@ -2766,6 +2785,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
   let wlSpaltenFilter = {};
   // 'tabelle' | 'auswertung' - Umschalter neben "Nur regelkonforme zaehlen"
   let wlAnsicht = 'tabelle';
+  let wlSprungText = '';
   function wlSpaltenPasst(s){
     const f = wlSpaltenFilter;
     const txt = (v) => String(v||'').toLowerCase();
@@ -3453,7 +3473,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       '</form>' +
       '<div class="tl-jump">' +
         '<label for="wlJumpDate">Zu Datum springen</label>' +
-        '<input type="text" id="wlJumpDate'+SFX+'" placeholder="z.B. 26.03.25, 09/25, 2025 …" autocomplete="off">' +
+        '<input type="text" id="wlJumpDate'+SFX+'" placeholder="z.B. 26.03.25, 09/25, 2025 …" autocomplete="off" value="'+esc(wlSprungText)+'">' +
         (zoomAktiv ? '<span class="muted" style="margin-left:14px" title="Der im Chart markierte Zeitraum filtert die Tabelle - Doppelklick auf den Chart oder Zoom-Reset hebt das auf">🔍 Zoom-Filter: '+tabelleBasis.length+' von '+signaleGefiltert.length+' Signalen</span>' : '') +
         '<button type="button" id="wlFilterAlleLoeschen'+SFX+'" class="btn ghost" style="margin-left:auto"'+(wlAssetFilter||Object.values(wlSpaltenFilter).some(Boolean)?'':' hidden')+'>Alle Filter zurücksetzen ✕</button>' +
         '<label class="wl-check" style="margin-left:14px" title="Signale, die als nicht regelkonform markiert sind, aus Tabelle/Chart/Statistiken ausblenden">' +
@@ -3660,7 +3680,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       wlLiesShots(id).then(shots => { if (tableWrap.contains(imgEl)) renderWlShots(id, shots, imgEl); });
     });
 
-    schlausSprungfeld(document.getElementById('wlJumpDate'+SFX), () => tableWrap, () => signaleGefiltert.map(s => s.date));
+    const wlPfeil = () => wlSprungPfeilSetzen(tableWrap, wlSprungText, sortSpalte === 'date', sortRichtung === 'desc');
+    schlausSprungfeld(document.getElementById('wlJumpDate'+SFX), () => tableWrap, () => signaleGefiltert.map(s => s.date), t => { wlSprungText = t; wlPfeil(); });
+    wlPfeil();
 
     // Maus ueber einer Zeile mit Trade-ID hebt alle Zeilen desselben Trades hervor
     tableWrap.addEventListener('mouseover', ev => {

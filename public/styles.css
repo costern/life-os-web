@@ -948,3 +948,11 @@ a { color:var(--accent); }
 .aus-hm td{text-align:right;font-size:12px}.aus-hm td.aus-hm-kat{text-align:left}
 .aus-filterzeile{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px}
 .aus-kat-sel{max-width:190px}
+
+/* Roter Pfeil: Position des "Zu Datum springen"-Datums in Bottom Events */
+.wl-table tr.wl-sprung-auf > td:first-child, .wl-table tr.wl-sprung-vor > td:first-child, .wl-table tr.wl-sprung-nach > td:first-child { position:relative; }
+.wl-table tr.wl-sprung-auf > td:first-child::before, .wl-table tr.wl-sprung-vor > td:first-child::before, .wl-table tr.wl-sprung-nach > td:first-child::before {
+  content:'▶'; color:#ef4444; position:absolute; left:0; font-size:15px; line-height:1; z-index:3; pointer-events:none; text-shadow:0 0 3px rgba(0,0,0,.6); }
+.wl-table tr.wl-sprung-auf > td:first-child::before { top:50%; transform:translateY(-50%); }
+.wl-table tr.wl-sprung-vor > td:first-child::before { top:0; transform:translateY(-50%); }
+.wl-table tr.wl-sprung-nach > td:first-child::before { bottom:0; transform:translateY(50%); }
