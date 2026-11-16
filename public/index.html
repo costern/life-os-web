@@ -184,7 +184,30 @@
     </div>
 
     <section class="page" id="page-news">
-      <div class="grid">
+      <div class="news-subnav">
+        <span class="wl-ansicht-switch" id="newsSubSwitch">
+          <button type="button" data-sub="uebersicht" class="aktiv">📰 Übersicht</button>
+          <button type="button" data-sub="timeline">₿ BTC-Timeline</button>
+        </span>
+      </div>
+      <div id="newsSub-timeline" hidden>
+        <div class="grid">
+          <div class="card wide">
+            <h2>₿ News &amp; Aussagen auf dem BTC-Chart <span class="sub">oben News · unten Aussagen bekannter Personen</span></h2>
+            <div class="wl-legend">
+              <span class="wl-legend-item"><span class="pf-dot" style="background:var(--green)"></span>positiv</span>
+              <span class="wl-legend-item"><span class="pf-dot" style="background:var(--red)"></span>negativ</span>
+              <span class="wl-legend-item muted">Maus über einen Strich für Details · Ziehen zum Zoomen · Doppelklick zurücksetzen</span>
+            </div>
+            <div id="nevChart"><div class="empty">Lade…</div></div>
+          </div>
+          <div class="card wide">
+            <h2>🎯 Trefferquote der Personen <span class="sub">BTC-Kurs 7 und 30 Tage nach der Aussage</span></h2>
+            <div id="nevPersonen"><div class="empty">Noch keine Aussagen eingetragen</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid" id="newsSub-uebersicht">
         <div class="card wide">
           <h2>🌍 Marktlage</h2>
           <div id="macroFull"><div class="empty">Noch keine Marktlage eingetragen</div></div>

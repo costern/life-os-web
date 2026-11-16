@@ -5495,3 +5495,236 @@ document.querySelectorAll('nav.side button[data-page]').forEach(b =>
 ladeMacro(); ladeKonjunkturzyklus(); ladeNews(); ladeHistorie(); ladeKalender(); ladeOvTrades();
 renderLivePos().then(() => { letzteAktualisierung = Date.now(); });
 setInterval(() => vielleichtAuffrischen(), AKTUALISIERUNG_MS);
+
+/* ---------- News -> BTC-Timeline (zweiter Reiter auf der News-Seite) ----------
+   BTC-Tageskurs (wie bei Bottom Events) mit Strichen: oben News, unten Aussagen bekannter
+   Personen, jeweils gruen = positiv, rot = negativ. Kurztext steht am Strich, Details beim
+   Drueberfahren. Daten: /api/news/events (Tabelle market_events). Darunter die Trefferquote
+   je Person (BTC 7/30 Tage nach der Aussage in die angesagte Richtung?). */
+(function(){
+  const sw = document.getElementById('newsSubSwitch');
+  const el = document.getElementById('nevChart');
+  const personenEl = document.getElementById('nevPersonen');
+  if (!sw || !el) return;
+  const TAG = 86400000;
+  let events = [], btc = [], btcZ = [], geladen = false, domain = null, startDomain = null;
+
+  function zeigeSub(sub){
+    sw.querySelectorAll('button').forEach(b => b.classList.toggle('aktiv', b.dataset.sub === sub));
+    document.getElementById('newsSub-uebersicht').hidden = sub !== 'uebersicht';
+    document.getElementById('newsSub-timeline').hidden = sub !== 'timeline';
+    try { localStorage.setItem('lifeos-news-sub', sub); } catch(e){}
+    if (sub === 'timeline') laden();
+  }
+  sw.querySelectorAll('button').forEach(b => b.addEventListener('click', () => zeigeSub(b.dataset.sub)));
+
+  const tagStr = t => { const d = new Date(t); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  // Schlusskurs des Kalendertags (oder naechster verfuegbarer Tag davor), null wenn ausserhalb der Daten
+  function preisAm(t){
+    if (!btcZ.length || t > btcZ[btcZ.length-1] + TAG) return null;
+    const ziel = new Date(tagStr(t)+'T00:00:00').getTime();
+    let lo = 0, hi = btcZ.length - 1, best = -1;
+    while (lo <= hi) { const m = (lo+hi) >> 1; if (btcZ[m] <= ziel) { best = m; lo = m+1; } else hi = m-1; }
+    return best < 0 ? null : btc[best][1];
+  }
+  function aenderung(ev, tage){
+    const t0 = new Date(ev.ts).getTime(), t1 = t0 + tage * TAG;
+    if (t1 > btcZ[btcZ.length-1] + TAG) return null;
+    const p0 = preisAm(t0), p1 = preisAm(t1);
+    return (p0 && p1) ? (p1 / p0 - 1) * 100 : null;
+  }
+  const pct = v => v == null ? '–' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1).replace('.', ',') + ' %';
+  const pctFarbe = v => v == null ? 'var(--muted)' : v >= 0 ? 'var(--green)' : 'var(--red)';
+  const datumZeit = ts => new Date(ts).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  async function laden(){
+    if (geladen) return;
+    try {
+      const [ev, neu] = await Promise.all([api('/news/events'), api('/watchlist/btc-recent').catch(() => [])]);
+      btc = BTC_DAILY.slice();
+      const letztes = btc[btc.length-1][0];
+      (neu || []).filter(d => d[0] > letztes).forEach(d => btc.push(d));
+      btcZ = btc.map(d => new Date(d[0]+'T00:00:00').getTime());
+      events = ev || [];
+      const jetzt = btcZ[btcZ.length-1];
+      const erstes = events.length ? Math.min(...events.map(e => new Date(e.ts).getTime())) : jetzt;
+      startDomain = [Math.min(erstes - 20*TAG, jetzt - 120*TAG), jetzt + 3*TAG];
+      domain = startDomain.slice();
+      geladen = true;
+      render(); renderPersonen();
+    } catch(e) { el.innerHTML = '<div class="empty">Fehler beim Laden: '+esc(e.message)+'</div>'; }
+  }
+
+  const B = 860, H = 460, PADL = 54, PADR = 16, ROWH = 17, MAXROWS = 4, LABELW = 112;
+  function reihen(liste, x){
+    // Kurztexte gierig auf Zeilen verteilen, damit sie sich nicht ueberdecken
+    const belegt = [];
+    liste.forEach(m => {
+      let r = MAXROWS - 1;
+      for (let k = 0; k < MAXROWS; k++) if (belegt[k] === undefined || m.cx - belegt[k] >= LABELW) { r = k; break; }
+      belegt[r] = m.cx; m.row = r;
+    });
+    return Math.max(1, belegt.length);
+  }
+
+  function render(){
+    const [minT, maxT] = domain, spanne = maxT - minT;
+    const x = t => PADL + (t - minT) / spanne * (B - PADL - PADR);
+    const tVonX = px => minT + (px - PADL) / (B - PADL - PADR) * spanne;
+
+    const sicht = events.map((e, i) => ({ e, i, t: new Date(e.ts).getTime() }))
+      .filter(m => m.t >= minT && m.t <= maxT).sort((a,b) => a.t - b.t);
+    sicht.forEach(m => { m.cx = x(m.t); });
+    const oben = sicht.filter(m => m.e.kind !== 'person'), unten = sicht.filter(m => m.e.kind === 'person');
+    const rO = reihen(oben), rU = reihen(unten);
+    const PADT = 6 + rO * ROWH + 8;
+    const AXIS = 22, PLOT_BOTTOM = H - AXIS - (6 + rU * ROWH + 8);
+
+    let a = btcZ.findIndex(t => t >= minT); if (a < 0) a = btcZ.length - 1; a = Math.max(0, a - 1);
+    let b = btcZ.length - 1; while (b > 0 && btcZ[b] > maxT) b--; b = Math.min(btcZ.length - 1, b + 1);
+    const vis = btc.slice(a, b + 1), visZ = btcZ.slice(a, b + 1);
+    const minP = Math.min(...vis.map(d => d[1])), maxP = Math.max(...vis.map(d => d[1]));
+    const lo = Math.log(minP * 0.96), hi = Math.log(maxP * 1.04), sp = hi - lo;
+    const y = p => PADT + (hi - Math.log(p)) / sp * (PLOT_BOTTOM - PADT);
+
+    const linie = visZ.map((t,k) => (k?'L':'M') + x(t).toFixed(1) + ',' + y(vis[k][1]).toFixed(1)).join(' ');
+    const flaeche = linie + ' L' + x(visZ[visZ.length-1]).toFixed(1) + ',' + PLOT_BOTTOM + ' L' + x(visZ[0]).toFixed(1) + ',' + PLOT_BOTTOM + ' Z';
+
+    const step = niceStepNev((maxP - minP) / 5 || maxP * 0.1);
+    let gitter = '';
+    for (let v = Math.ceil(minP / step) * step; v <= maxP; v += step) {
+      const yy = y(v).toFixed(1);
+      gitter += '<line class="wl-grid" x1="'+PADL+'" y1="'+yy+'" x2="'+(B-PADR)+'" y2="'+yy+'"/>' +
+        '<text class="wl-axis-label-y" x="'+(PADL-8)+'" y="'+(+yy+3)+'" text-anchor="end">'+(v >= 1000 ? Math.round(v/1000)+'k' : Math.round(v))+' $</text>';
+    }
+    const spanTage = spanne / TAG;
+    let tick = new Date(new Date(minT).getFullYear(), new Date(minT).getMonth(), 1);
+    const monatsSchritt = spanTage > 720 ? 6 : spanTage > 300 ? 2 : 1;
+    while (tick.getTime() <= maxT) {
+      const t = tick.getTime();
+      if (t >= minT) {
+        const xx = x(t).toFixed(1);
+        gitter += '<line class="wl-grid-v" x1="'+xx+'" y1="'+PADT+'" x2="'+xx+'" y2="'+(H-AXIS)+'"/>' +
+          '<text class="wl-axis-label" x="'+xx+'" y="'+(H-8)+'">'+tick.toLocaleDateString('de-DE',{month:'short',year:'2-digit'})+'</text>';
+      }
+      tick = new Date(tick.getFullYear(), tick.getMonth() + monatsSchritt, 1);
+    }
+    if (spanTage < 45) {
+      for (let t = new Date(tagStr(minT)+'T00:00:00').getTime(); t <= maxT; t += (spanTage < 15 ? 1 : 7) * TAG) {
+        if (t < minT) continue;
+        const xx = x(t).toFixed(1);
+        gitter += '<line class="wl-grid-v" x1="'+xx+'" y1="'+PADT+'" x2="'+xx+'" y2="'+(H-AXIS)+'" style="opacity:.3"/>' +
+          '<text class="wl-axis-label" x="'+xx+'" y="'+(H-8)+'">'+new Date(t).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</text>';
+      }
+    }
+
+    let striche = '', labels = '';
+    const farbe = m => m.e.sentiment === 'neg' ? 'var(--red)' : 'var(--green)';
+    sicht.forEach(m => {
+      const p = preisAm(m.t);
+      const cy = p ? y(p) : (PADT + PLOT_BOTTOM) / 2;
+      const istOben = m.e.kind !== 'person';
+      const ly = istOben ? 6 + m.row * ROWH + ROWH : H - AXIS - 6 - rU * ROWH + m.row * ROWH;
+      striche += '<line x1="'+m.cx.toFixed(1)+'" y1="'+cy.toFixed(1)+'" x2="'+m.cx.toFixed(1)+'" y2="'+ly.toFixed(1)+'" stroke="'+farbe(m)+'" stroke-width="1.6" vector-effect="non-scaling-stroke" opacity=".85"/>' +
+        '<circle cx="'+m.cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="3.2" fill="'+farbe(m)+'"/>';
+      const text = istOben ? m.e.title : (m.e.person + ': ' + m.e.title);
+      const topPx = istOben ? (6 + m.row * ROWH) : (H - AXIS - 6 - rU * ROWH + m.row * ROWH);
+      labels += '<span class="nev-label" data-i="'+m.i+'" style="left:'+(m.cx/B*100).toFixed(2)+'%;top:'+(topPx/H*100).toFixed(2)+'%;border-color:'+farbe(m)+';color:'+farbe(m)+'">'+esc(text)+'</span>';
+    });
+
+    const zoom = domain[0] !== startDomain[0] || domain[1] !== startDomain[1];
+    el.innerHTML =
+      '<div class="wl-toolbar" style="margin-bottom:6px"><span class="muted">'+sicht.length+' von '+events.length+' Einträgen im Ausschnitt</span>' +
+        '<span style="margin-left:auto;display:flex;gap:6px">' +
+          '<button type="button" class="btn ghost" data-z="90">3 M</button><button type="button" class="btn ghost" data-z="365">1 J</button>' +
+          '<button type="button" class="btn ghost" data-z="alle">Alles</button>' +
+          (zoom ? '<button type="button" class="btn ghost" data-z="reset">Zurücksetzen</button>' : '') + '</span></div>' +
+      '<div class="wl-chart-wrap nev-wrap" id="nevWrap">' +
+        '<svg viewBox="0 0 '+B+' '+H+'" preserveAspectRatio="none" class="wl-svg" id="nevSvg">' + gitter +
+          '<path class="wl-btc-area" d="'+flaeche+'"/><path class="wl-btc-line" d="'+linie+'"/>' + striche +
+          '<rect id="nevSel" class="wl-sel-rect" x="0" y="'+PADT+'" width="0" height="'+(PLOT_BOTTOM-PADT)+'" style="display:none"/>' +
+          '<rect id="nevHit" x="'+PADL+'" y="'+PADT+'" width="'+(B-PADL-PADR)+'" height="'+(PLOT_BOTTOM-PADT)+'" fill="transparent" style="cursor:crosshair"/>' +
+        '</svg>' + labels +
+        '<div class="wl-tooltip nev-tip" id="nevTip" style="display:none"></div>' +
+      '</div>' +
+      (events.length ? '' : '<div class="empty" style="margin-top:8px">Noch keine News/Aussagen eingetragen – sag Claude einfach, was rein soll.</div>');
+
+    el.querySelectorAll('[data-z]').forEach(btn => btn.addEventListener('click', () => {
+      const z = btn.dataset.z, ende = btcZ[btcZ.length-1] + 3*TAG;
+      domain = z === 'reset' ? startDomain.slice() : z === 'alle' ? [btcZ[0], ende] : [ende - (+z)*TAG, ende];
+      render();
+    }));
+
+    const tip = document.getElementById('nevTip');
+    el.querySelectorAll('.nev-label').forEach(lab => {
+      const ev = events[+lab.dataset.i];
+      lab.addEventListener('pointerenter', () => {
+        const p0 = preisAm(new Date(ev.ts).getTime());
+        tip.innerHTML =
+          '<div class="muted" style="font-size:11px">'+datumZeit(ev.ts)+' · '+(ev.kind === 'person' ? 'Aussage' : 'News')+' · <b style="color:'+(ev.sentiment==='neg'?'var(--red)':'var(--green)')+'">'+(ev.sentiment==='neg'?'negativ':'positiv')+'</b></div>' +
+          (ev.kind === 'person' ? '<div style="font-weight:600;margin-top:2px">'+esc(ev.person)+'</div>' : '') +
+          '<div style="font-weight:600;margin-top:2px">'+esc(ev.title)+'</div>' +
+          (ev.details ? '<div style="margin-top:4px">'+esc(ev.details)+'</div>' : '') +
+          (ev.source ? '<div class="muted" style="font-size:11px;margin-top:4px">Quelle: '+esc(ev.source)+'</div>' : '') +
+          '<div style="margin-top:6px;font-size:11.5px">BTC ≈ '+(p0 ? Math.round(p0).toLocaleString('de-DE')+' $' : '–') +
+            ' · 1T <b style="color:'+pctFarbe(aenderung(ev,1))+'">'+pct(aenderung(ev,1))+'</b>' +
+            ' · 7T <b style="color:'+pctFarbe(aenderung(ev,7))+'">'+pct(aenderung(ev,7))+'</b>' +
+            ' · 30T <b style="color:'+pctFarbe(aenderung(ev,30))+'">'+pct(aenderung(ev,30))+'</b></div>';
+        tip.style.display = '';
+        tip.style.left = lab.style.left;
+        const obenHalb = parseFloat(lab.style.top) < 50;
+        tip.style.top = obenHalb ? 'calc('+lab.style.top+' + 22px)' : lab.style.top;
+        tip.style.transform = obenHalb ? 'translate(-50%,0)' : 'translate(-50%,-105%)';
+        lab.classList.add('nev-aktiv');
+      });
+      lab.addEventListener('pointerleave', () => { tip.style.display = 'none'; lab.classList.remove('nev-aktiv'); });
+      if (ev.url) lab.addEventListener('click', () => window.open(ev.url, '_blank', 'noopener'));
+    });
+
+    const svg = document.getElementById('nevSvg'), hit = document.getElementById('nevHit'), sel = document.getElementById('nevSel');
+    let start = null;
+    const px = ev => { const r = svg.getBoundingClientRect(); return Math.min(Math.max((ev.clientX - r.left) / r.width * B, PADL), B - PADR); };
+    hit.addEventListener('pointerdown', ev => { start = px(ev); hit.setPointerCapture(ev.pointerId); sel.style.display = ''; sel.setAttribute('x', start); sel.setAttribute('width', 0); });
+    hit.addEventListener('pointermove', ev => { if (start === null) return; const c = px(ev); sel.setAttribute('x', Math.min(start, c)); sel.setAttribute('width', Math.abs(c - start)); });
+    hit.addEventListener('pointerup', ev => {
+      if (start === null) return;
+      const c = px(ev); sel.style.display = 'none';
+      if (Math.abs(c - start) > 10) { const n0 = tVonX(Math.min(start, c)), n1 = tVonX(Math.max(start, c)); if (n1 - n0 > 2 * TAG) { domain = [n0, n1]; render(); } }
+      start = null;
+    });
+    hit.addEventListener('dblclick', () => { domain = startDomain.slice(); render(); });
+  }
+  function niceStepNev(rough){
+    const e = Math.floor(Math.log10(rough)), f = rough / Math.pow(10, e);
+    return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * Math.pow(10, e);
+  }
+
+  // Trefferquote: lag die Aussage richtig, wenn BTC 7 bzw. 30 Tage spaeter in die angesagte Richtung lief?
+  function renderPersonen(){
+    const aussagen = events.filter(e => e.kind === 'person');
+    if (!aussagen.length) { personenEl.innerHTML = '<div class="empty">Noch keine Aussagen eingetragen</div>'; return; }
+    const proPerson = {};
+    aussagen.forEach(e => (proPerson[e.person] = proPerson[e.person] || []).push(e));
+    const quote = (liste, tage) => {
+      const bewertet = liste.map(e => ({ e, v: aenderung(e, tage) })).filter(o => o.v != null && o.v !== 0);
+      const richtig = bewertet.filter(o => (o.e.sentiment === 'pos') === (o.v > 0)).length;
+      return bewertet.length ? richtig + '/' + bewertet.length + ' <span class="muted">(' + Math.round(richtig / bewertet.length * 100) + ' %)</span>' : '<span class="muted">noch offen</span>';
+    };
+    const zeilen = Object.keys(proPerson).sort().map(name => {
+      const liste = proPerson[name].slice().sort((a,b) => new Date(b.ts) - new Date(a.ts));
+      const details = liste.map(e => {
+        const v7 = aenderung(e, 7), v30 = aenderung(e, 30);
+        return '<div class="nev-aussage"><span class="pf-dot" style="background:'+(e.sentiment==='neg'?'var(--red)':'var(--green)')+'"></span>' +
+          '<span class="muted">'+new Date(e.ts).toLocaleDateString('de-DE')+'</span> '+esc(e.title) +
+          ' <span class="muted">· 7T</span> <b style="color:'+pctFarbe(v7)+'">'+pct(v7)+'</b> <span class="muted">· 30T</span> <b style="color:'+pctFarbe(v30)+'">'+pct(v30)+'</b></div>';
+      }).join('');
+      return '<tr><td><b>'+esc(name)+'</b><div>'+details+'</div></td><td>'+liste.length+'</td><td>'+quote(liste, 7)+'</td><td>'+quote(liste, 30)+'</td></tr>';
+    }).join('');
+    personenEl.innerHTML = '<table class="wl-table nev-tabelle"><thead><tr><th>Person / Aussagen</th><th>Anzahl</th><th>Richtig nach 7 T</th><th>Richtig nach 30 T</th></tr></thead><tbody>'+zeilen+'</tbody></table>' +
+      '<div class="muted" style="margin-top:8px;font-size:12px">Richtig = BTC lief in die angesagte Richtung (positiv → höher, negativ → tiefer). Wird erst bewertet, wenn die 7 bzw. 30 Tage vorbei sind.</div>';
+  }
+
+  let gespeichert = null;
+  try { gespeichert = localStorage.getItem('lifeos-news-sub'); } catch(e){}
+  if (gespeichert === 'timeline') zeigeSub('timeline');
+})();

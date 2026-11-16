@@ -442,3 +442,20 @@ CREATE TABLE IF NOT EXISTS bank_regeln (
   kategorie TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- market_events: News und Aussagen bekannter Personen mit exaktem Zeitpunkt, fuer die
+-- BTC-Timeline auf der News-Seite (zweiter Reiter). kind = 'news' (Marker oben) oder
+-- 'person' (Marker unten); sentiment = 'pos' | 'neg' (gruener/roter Strich). Wird NICHT
+-- wie die news-Tabelle bei jedem Update geleert - die Historie soll bleiben.
+CREATE TABLE IF NOT EXISTS market_events (
+  id SERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'news',
+  person TEXT,
+  title TEXT NOT NULL,
+  details TEXT,
+  sentiment TEXT NOT NULL DEFAULT 'pos',
+  url TEXT,
+  source TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
