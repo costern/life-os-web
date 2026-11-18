@@ -2343,7 +2343,19 @@ const WL_LABEL = { win:'Win', be_win:'BE Win', be_loss:'BE Loss', lose:'Lose',
 const WL_STATUS_HINT = { win:'Win', be_win:'BE Win (2R erreicht)',
   be_loss:'BE Loss (2R nicht erreicht)', lose:'Lose',
   no_entry:'No Entry (kein Einstieg, aber auch nicht gefallen)', '':'Noch nicht bewertet' };
-const WL_FORM_LABEL = { bogen:'Bogen', bogen_unsauber:'Bogen unsauber', kein_bogen:'kein Bogen', '':'' };
+const WL_FORM_LABEL = { bogen:'Bogen', bogen_kerze:'Bogen mit Störkerze', choppy:'Choppy / Konsolidierung',
+  v_boden:'V-Boden', dreieck_absteigend:'Absteigendes Dreieck (EMA50)', keil_fallend:'Fallender Keil',
+  kein_bogen:'kein Bogen', bogen_unsauber:'Bogen unsauber (alt)', '':'' };
+// Auswahl im Formular. bogen_unsauber war der alte Sammelwert (Stoerkerze ODER choppy) und
+// wird nur noch angezeigt, solange ein Signal ihn noch hat - zum Neu-Zuordnen.
+const WL_FORM_OPTIONEN = [['','–'],
+  ['bogen','Bogen (sauber)'],
+  ['bogen_kerze','Bogen mit Störkerze (eine Kerze/Wick dazwischen)'],
+  ['choppy','Choppy / Konsolidierung (unsauber, seitwärts)'],
+  ['v_boden','V-Boden (spitz, schnell rein und raus)'],
+  ['dreieck_absteigend','Absteigendes Dreieck unter EMA50 (gleicher Boden, tiefere Hochs, Ausbruch über EMA50)'],
+  ['keil_fallend','Fallender Keil (tiefere Hochs und Tiefs, läuft zusammen)'],
+  ['kein_bogen','kein Bogen / sonstiges']];
 // boden_typ: nur fuer Bottom Events - basisboden (lange Seitwaerts-Akkumulation auf
 // gleichem Level, typischerweise im 1W/1M-Chart sichtbar) vs. w_pattern (kompakter,
 // scharfer Doppelboden ueber wenige Kerzen, klassisches W).
@@ -3265,7 +3277,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
           '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
           (istEma50Retest ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
-          (istEma50Retest ? '' : '<label>Form'+auswahlHtml('wle-form', [['','–'],['bogen','Bogen (sauber)'],['bogen_unsauber','Bogen unsauber (z.B. nur eine Kerze dazwischen)'],['kein_bogen','kein Bogen']], s.form)+'</label>') +
+          (istEma50Retest ? '' : '<label>Form'+auswahlHtml('wle-form', s.form === 'bogen_unsauber' ? WL_FORM_OPTIONEN.concat([['bogen_unsauber','Bogen unsauber (alt – bitte neu zuordnen)']]) : WL_FORM_OPTIONEN, s.form)+'</label>') +
           (istEma50Retest ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
           '<label>Ergebnis (Detail)'+auswahlHtml('wle-ergebnisdetail', [['','–'],
             ['noch_nicht_bewertet','Noch nicht bewertet'],['target_erreicht','Target erreicht'],
