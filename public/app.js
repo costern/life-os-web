@@ -2336,8 +2336,9 @@ const WL_FARBEN = { win:'var(--green)', be_win:'var(--amber)', be_loss:'var(--or
 // Retests, schoener Bogen dazwischen) = gruen, Single Bottom (kurz, meist 1-2 Kerzen,
 // eher Konsolidierung, nur Bestaetigungssignal statt eigenes Trade-Signal) = orange,
 // Triple Bottom (dritter Tiefpunkt statt der ueblichen zwei - selten) = lila.
-const WL_EVENT_FARBEN = { double:'var(--green)', single:'var(--orange)', triple:'var(--purple)' };
-const WL_EVENT_LABEL = { double:'Double', single:'Quick', triple:'Triple' };
+// Quadruple Bottom (vierter Tiefpunkt) = blau.
+const WL_EVENT_FARBEN = { double:'var(--green)', single:'var(--orange)', triple:'var(--purple)', quadruple:'var(--accent)' };
+const WL_EVENT_LABEL = { double:'Double', single:'Quick', triple:'Triple', quadruple:'Quadruple' };
 const WL_LABEL = { win:'Win', be_win:'BE Win', be_loss:'BE Loss', lose:'Lose',
   no_entry:'No Entry', '':'Noch nicht bewertet' };
 const WL_STATUS_HINT = { win:'Win', be_win:'BE Win (2R erreicht)',
@@ -2432,7 +2433,7 @@ const wlTradeKey = s => (s.tradeId && String(s.tradeId).trim()) ? 't:' + String(
 const WL_AW_MIN = 5;
 function wlAuswertungHtml(signale){
   const rangNote = { 'A++':5, 'A+':4, 'A':3, 'B':2, 'C':1 };
-  const rangEvent = { triple:3, double:2, single:1 };
+  const rangEvent = { quadruple:4, triple:3, double:2, single:1 };
   const mtfRang = { 3:4, 4:3, 2:2, 1:1 };
   const map = new Map();
   signale.slice().sort((a,b) => a.date.localeCompare(b.date)).forEach(s => {
@@ -2836,7 +2837,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     if (f.tf && (s.tf||'') !== f.tf) return false;
     if (f.setup) {
       const m = +s.mtf;
-      const ok = { quick: s.eventTyp==='single', double: s.eventTyp==='double', triple: s.eventTyp==='triple',
+      const ok = { quick: s.eventTyp==='single', double: s.eventTyp==='double', triple: s.eventTyp==='triple', quadruple: s.eventTyp==='quadruple',
         mtf1: m===1, mtf2: m===2, mtf4: m===4, mtf3: m===3, multi: !!s.multiAsset,
         bogen: s.form==='bogen', bottom: s.form==='bottom' }[f.setup];
       if (!ok) return false;
@@ -3164,6 +3165,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // kleineren Timeframes eher haeufiger (und damit unbedeutender) vorkommt als auf groesseren
     // (Colins Wunsch, siehe WL_EVENT_LABEL/WL_EVENT_FARBEN).
     const anzTripleBottom = signaleGefiltert.filter(s => s.eventTyp === 'triple').length;
+    const anzQuadBottom = signaleGefiltert.filter(s => s.eventTyp === 'quadruple').length;
     const assetsAnzahl = new Set(signaleGefiltert.map(s => s.asset)).size;
     // Bewusst von ALLEN Signalen (nicht der gefilterten Liste), da Trade-IDs
     // asset-uebergreifend hochgezaehlt werden - "naechste freie Nummer" muss beim Filtern
@@ -3267,7 +3269,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px">Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
           '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : ''))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
-          (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom']], s.eventTyp)+'</label>') +
+          (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
           '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label class="wl-detail-kurz" style="width:90px" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>' +
           '<label class="wl-detail-kurz" style="width:90px" title="Crypto Fear &amp; Greed Index (0 = extreme Angst, 100 = extreme Gier) am Signal-Tag - wird automatisch eingetragen. Nur ausfüllen, wenn du den Wert überschreiben willst.">Fear &amp; Greed (auto)<input type="number" min="0" max="100" step="1" class="wle-fng" placeholder="'+(s.fearGreed != null ? s.fearGreed : '–')+'" value="'+(s.fearGreedManuell != null ? s.fearGreedManuell : '')+'"></label>' +
@@ -3386,7 +3388,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<th>'+txt('trade',f.trade,'Nr.')+'</th>' +
         '<th><input type="text" class="wl-colfilter" id="wlAssetFilter'+SFX+'" placeholder="z.B. Gold, BTC" autocomplete="off" value="'+esc(wlAssetFilter)+'"></th>' +
         '<th>'+sel('tf',tfs,f.tf)+'</th>' +
-        '<th>'+sel('setup',[['quick','Quick'],['double','Double'],['triple','Triple'],['mtf1','Only 1 TF'],['mtf2','2 TF (12H+1D)'],['mtf4','MTF 2'],['mtf3','MTF 3'],['multi','Multi-Asset'],['bogen','Bogen'],['bottom','Bottom']],f.setup)+'</th>' +
+        '<th>'+sel('setup',[['quick','Quick'],['double','Double'],['triple','Triple'],['quadruple','Quadruple'],['mtf1','Only 1 TF'],['mtf2','2 TF (12H+1D)'],['mtf4','MTF 2'],['mtf3','MTF 3'],['multi','Multi-Asset'],['bogen','Bogen'],['bottom','Bottom']],f.setup)+'</th>' +
         '<th>'+sel('phase',[['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']],f.phase)+'</th>' +
         '<th>'+sel('pattern',[['pattern:clean','clean'],['pattern:valid','valid'],['pattern:choppy','choppy'],['candles:mini','Mini Candles'],['candles:gap','Gap Candles'],['candles:decent','Decent Candles'],['candles:choppy','Choppy Candles'],['pivot:perfekt','Pivot perfekt'],['pivot:nicht_perfekt','Pivot abweichend'],['pivot:zu_weit_abweichend','Pivot zu weit']],f.pattern)+'</th>' +
         '<th>'+sel('div',[['doppelt:','Doppelte Div.'],['lokal:rsi','Lokal RSI'],['lokal:stark','Lokal stark'],['lokal:leicht','Lokal leicht'],['lokal:hidden','Lokal hidden'],['lokal:none','Lokal keine'],['struktur:rsi','Struktur RSI'],['struktur:stark','Struktur stark'],['struktur:leicht','Struktur leicht'],['struktur:hidden','Struktur hidden'],['struktur:none','Struktur keine']],f.div)+'</th>' +
@@ -3513,6 +3515,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         (istEma50Retest ? '' : '<div class="stat"><div class="v" style="color:var(--accent)">'+anzLevelGebrochenGehalten+'</div><div class="l">Level gebrochen, aber gehalten</div></div>') +
         (istEma50Retest ? '' : '<div class="stat"><div class="v" style="color:var(--green)">'+anzGuterSpotKauf+'</div><div class="l">💰 Guter Spot-Kauf</div></div>') +
         '<div class="stat"><div class="v" style="color:var(--purple)">'+anzTripleBottom+'</div><div class="l">🔱 Triple Bottom</div></div>' +
+        '<div class="stat"><div class="v" style="color:var(--accent)">'+anzQuadBottom+'</div><div class="l">4️⃣ Quadruple Bottom</div></div>' +
         (zielTageListe.length ? '<div class="stat" title="Durchschnitt über '+zielTageListe.length+' Trades mit eingetragenem Ziel-Datum (Median: '+zielTageMedian+' Tage)"><div class="v">'+zielTageSchnitt+'</div><div class="l">⏱ Ø Tage bis Ziel/3R</div></div>' : '') +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+tradeIdInfo.naechsteFrei+'</div><div class="l">Nächste Trade-ID</div></div>' +
       '</div>' +

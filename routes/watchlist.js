@@ -11,7 +11,8 @@ const STATI = new Set(['win', 'be_win', 'be_loss', 'lose', 'no_entry']);
 // triple = 3-facher Boden statt des ueblichen Doppel-Bodens (selten) - fuer die spaetere
 // Auswertung, ob das auf kleinen Timeframes eher haeufiger (und damit unbedeutender)
 // vorkommt als auf groesseren (ab Tageschart).
-const EVENT_TYPEN = new Set(['single', 'double', 'triple']);
+// quadruple = 4-facher Boden (noch seltener als triple).
+const EVENT_TYPEN = new Set(['single', 'double', 'triple', 'quadruple']);
 // form (Bodenform): bogen (sauber) | bogen_kerze (Bogen, aber eine Stoer-Kerze/Wick dazwischen)
 // | choppy (unsauberer, seitwaerts konsolidierender Boden) | v_boden (spitz, schnell rein/raus)
 // | dreieck_absteigend (gleicher Boden, tiefere Hochs, vom EMA50 1D runtergedrueckt, Ausbruch
