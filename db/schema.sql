@@ -249,6 +249,9 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 -- ueberhaupt ein Trade, den das System haette generieren sollen".
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS regelkonform BOOLEAN;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS regelkonform_grund TEXT;
+-- regelkonform_klaerung: dritter Zustand "in Klaerung" (noch offen, ob regelkonform).
+-- Dann ist regelkonform NULL - zaehlt also nicht als "nicht regelkonform".
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS regelkonform_klaerung BOOLEAN NOT NULL DEFAULT false;
 -- level_gebrochen_gehalten: das Pivot-Level wurde zwischenzeitlich gebrochen (z.B.
 -- mehrere 3D-Kerzen schlossen darunter), hat am Ende aber trotzdem als Boden gehalten.
 -- Eigene Statistik, um einzuschaetzen, wie oft ein "Bruch" sich im Nachhinein als

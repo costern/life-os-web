@@ -139,6 +139,7 @@ function rowOut(r, fng) {
     uhrzeit: r.uhrzeit ? String(r.uhrzeit).slice(0, 5) : null,
     regelkonform: r.regelkonform === null || r.regelkonform === undefined ? null : !!r.regelkonform,
     regelkonformGrund: r.regelkonform_grund,
+    regelkonformKlaerung: !!r.regelkonform_klaerung,
     levelGebrochenGehalten: !!r.level_gebrochen_gehalten,
     nurBestaetigung: !!r.nur_bestaetigung,
     strategie: r.strategie,
@@ -280,6 +281,8 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'bodenTyp') wert = BODEN_TYPEN.has(wert) ? wert : null;
     else wert = orNull(wert);
     fields.push(`${col} = $${i++}`); vals.push(wert);
+    // 'klaerung' = in Klaerung: regelkonform bleibt NULL, eigenes Flag wird gesetzt
+    if (key === 'regelkonform') { fields.push(`regelkonform_klaerung = $${i++}`); vals.push(b[key] === 'klaerung'); }
   }
   if (!fields.length) return res.status(400).json({ error: 'nichts zu ändern' });
   fields.push(`updated_at = now()`);

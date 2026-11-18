@@ -2857,6 +2857,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     if (f.ergebnis) {
       const e = f.ergebnis;
       if (e === 'regel_nein') { if (s.regelkonform !== false) return false; }
+      else if (e === 'regel_klaerung') { if (!(s.regelkonformKlaerung && s.regelkonform == null)) return false; }
       else if (e === 'bestaetigung') { if (!s.nurBestaetigung) return false; }
       else if (e === 'spot') { if (!s.guterSpotKauf) return false; }
       else if (e === 'offen') { if (wlStatus(s) !== '') return false; }
@@ -3267,7 +3268,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px">Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
           '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
           '<label class="wl-detail-kurz" style="width:100px">Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
-          '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : ''))+'</label>' +
+          '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein'],['klaerung','In Klärung']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : (s.regelkonformKlaerung ? 'klaerung' : '')))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
           (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
           '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
@@ -3393,7 +3394,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<th>'+sel('pattern',[['pattern:clean','clean'],['pattern:valid','valid'],['pattern:choppy','choppy'],['candles:mini','Mini Candles'],['candles:gap','Gap Candles'],['candles:decent','Decent Candles'],['candles:choppy','Choppy Candles'],['pivot:perfekt','Pivot perfekt'],['pivot:nicht_perfekt','Pivot abweichend'],['pivot:zu_weit_abweichend','Pivot zu weit']],f.pattern)+'</th>' +
         '<th>'+sel('div',[['doppelt:','Doppelte Div.'],['lokal:rsi','Lokal RSI'],['lokal:stark','Lokal stark'],['lokal:leicht','Lokal leicht'],['lokal:hidden','Lokal hidden'],['lokal:none','Lokal keine'],['struktur:rsi','Struktur RSI'],['struktur:stark','Struktur stark'],['struktur:leicht','Struktur leicht'],['struktur:hidden','Struktur hidden'],['struktur:none','Struktur keine']],f.div)+'</th>' +
         '<th>'+sel('note',noten,f.note)+'</th>' +
-        '<th>'+sel('ergebnis',[['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry'],['offen','Noch nicht bewertet'],['regel_nein','nicht regelkonform'],['bestaetigung','nur Bestätigung'],['spot','Spot-Kauf']],f.ergebnis)+'</th>' +
+        '<th>'+sel('ergebnis',[['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry'],['offen','Noch nicht bewertet'],['regel_nein','nicht regelkonform'],['regel_klaerung','Regelkonform in Klärung'],['bestaetigung','nur Bestätigung'],['spot','Spot-Kauf']],f.ergebnis)+'</th>' +
         '<th>'+txt('notiz',f.notiz,'Suche')+'</th>' +
         '<th></th></tr>';
     }
@@ -3439,6 +3440,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '</td>' +
         '<td>'+(s.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span>' : '<span class="muted">–</span>')+'</td>' +
         '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span>'+
+          (s.regelkonformKlaerung && s.regelkonform == null ? ' <span class="badge" style="background:transparent;border:1.5px dashed var(--orange);color:var(--orange)" title="Regelkonformität noch in Klärung">in Klärung</span>' : '')+
           (s.regelkonform === false ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund ? 'Nicht regelkonform: '+s.regelkonformGrund : 'Nicht regelkonform')+'">nicht regelkonform</span>' : '')+
           (s.nurBestaetigung ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)" title="Kein eigenstaendiges Setup, nur bestaetigendes Signal">nur Bestätigung</span>' : '')+
           (s.guterSpotKauf ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--green);color:var(--green)" title="'+esc(s.spotKaufPreis ? 'Guter Spot-Einkaufspreis: '+s.spotKaufPreis : 'Guter Spot-Einkaufspreis')+'">💰 Spot</span>' : '')+
@@ -4201,10 +4203,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         gfSaveBtn.disabled = true; gfSaveBtn.textContent = 'Speichert…';
         if (msg) { msg.textContent = ''; msg.className = 'te-msg'; }
         try {
-          await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) });
+          const neu = await api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) });
           const sigRef = alleSignale.find(sg => String(sg.id) === String(id));
           if (sigRef) {
-            Object.assign(sigRef, body);
+            // Serverantwort zuletzt: dort sind z.B. regelkonform ('ja'/'nein'/'klaerung' im
+            // Formular) schon als true/false/null + regelkonformKlaerung umgerechnet.
+            Object.assign(sigRef, body, (neu && typeof neu === 'object') ? neu : {});
             // Haupt-Tabellenzeile dieses Signals (Phase, Divergenz, Note, Ergebnis, Notiz,
             // ...) sonst bleibt sie auf den alten Werten stehen, bis die Seite komplett
             // neu laedt (Colins Bug-Report: "in der Tabelle zeigte es aber trotzdem nichts an").
