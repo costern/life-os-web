@@ -3311,7 +3311,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label>Grund für "Kein Trade"'+auswahlHtml('wle-keintradegrund', [['','–'],
             ['rr_schlecht','Risk-Reward zu schlecht'],['langer_docht','Historischer langer Docht'],
             ['sl_zu_weit','Stop-Loss zu weit entfernt'],['ziel_zu_nah','Ziel zu nah'],
-            ['keine_htf_bestaetigung','Keine höhere Timeframe-Bestätigung'],['pattern_nicht_sauber','Pattern nicht sauber'],
+            ['keine_htf_bestaetigung','Keine andere Timeframe-Bestätigung'],['pattern_nicht_sauber','Pattern nicht sauber'],
             ['divergenz_fehlte','Divergenz/Bestätigung fehlte'],['sonstiger_grund','Sonstiger Grund']], s.keinTradeGrund)+'</label>' +
           '<label class="wl-detail-voll" style="grid-column:span 2">Grund (falls nicht regelkonform)<input type="text" class="wle-regelkonformgrund" value="'+esc(s.regelkonformGrund||'')+'" placeholder="z.B. keine MTF-Konfluenz auf 30m/1h, kein Multi-Asset-Signal"></label>' +
           '<label class="wl-detail-kurz" style="width:88px" title="gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'">Trade-ID' +
