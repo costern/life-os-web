@@ -27,7 +27,8 @@ const CANDLES = new Set(['choppy', 'decent', 'gap', 'mini']);
 const DIVERGENZEN = new Set(['leicht', 'rsi', 'stark', 'none', 'hidden']);
 // pivot_level = trifft das Signal ein bereits bestehendes Pivot-Level exakt (perfekt),
 // oder liegt es minimal hoeher/tiefer (nicht_perfekt)?
-const PIVOT_LEVEL = new Set(['perfekt', 'nicht_perfekt', 'zu_weit_abweichend']);
+// exakt = auf den Pip genau derselbe Preis (noch strenger als perfekt).
+const PIVOT_LEVEL = new Set(['exakt', 'perfekt', 'nicht_perfekt', 'zu_weit_abweichend']);
 // Backtest-Auswertung des theoretischen Trades - separat vom Live-Ergebnis "status".
 const ERGEBNIS_DETAIL = new Set(['noch_nicht_bewertet', 'target_erreicht', 'be_2r', 'stop_loss',
   'kein_entry', 'kein_trade_rr', 'setup_invalidiert', 'verlauf_unklar']);

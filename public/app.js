@@ -2369,8 +2369,8 @@ const WL_DIV_LABEL = { rsi:'RSI Div.', leicht:'Leichte RSI Div.', stark:'Starke 
 const WL_DIV_KURZ = { rsi:'RSI', leicht:'Leicht', stark:'Stark', none:'keine', hidden:'Hidden', '':'–' };
 // Pivot-Level: trifft das Signal ein bereits bestehendes Level exakt, oder liegt es
 // nur minimal hoeher/tiefer (kein perfektes Match)?
-const WL_PIVOT_LABEL = { perfekt:'Perfektes Level', nicht_perfekt:'Leicht abweichendes Level', zu_weit_abweichend:'Zu weit abweichendes Level', '':'–' };
-const WL_PIVOT_KURZ = { perfekt:'Perfekt', nicht_perfekt:'Abweichend', zu_weit_abweichend:'Zu weit', '':'–' };
+const WL_PIVOT_LABEL = { exakt:'Exakt gleiches Level (auf den Pip)', perfekt:'Perfektes Level', nicht_perfekt:'Leicht abweichendes Level', zu_weit_abweichend:'Zu weit abweichendes Level', '':'–' };
+const WL_PIVOT_KURZ = { exakt:'Exakt', perfekt:'Perfekt', nicht_perfekt:'Abweichend', zu_weit_abweichend:'Zu weit', '':'–' };
 // "Doppelte Divergenz": lokale UND strukturelle Divergenz sind beide gesetzt (irgendeine
 // Auspraegung ausser leer/none) - staerkeres Signal, deshalb in der Tabelle mit Haken markiert.
 function wlDoppelteDivergenz(s){
@@ -2536,7 +2536,7 @@ function wlAuswertungHtml(signale){
     ['"Only 1 TF" allein ist schwächer', 'schlecht', t => t.mtf === 1 || t.anzTf === 1],
     ['12H + 1D allein zählt nicht als echte MTF-Confluence', 'schlecht', t => t.mtf === 2],
     ['Multi-Asset-Signal erhöht die Wahrscheinlichkeit', 'gut', t => t.multi],
-    ['Perfektes Pivot-Level (open/close gleiche Höhe)', 'gut', t => t.pivot === 'perfekt'],
+    ['Perfektes Pivot-Level (open/close gleiche Höhe)', 'gut', t => t.pivot === 'perfekt' || t.pivot === 'exakt'],
     ['Zu weit abweichendes Pivot-Level ist ein Warnsignal', 'schlecht', t => t.pivot === 'zu_weit_abweichend'],
     ['Mini Candles (Doji) am Boden sind ein Warnsignal', 'schlecht', t => t.candles === 'mini'],
     ['Choppy Pattern ist schlechter als saubere Struktur', 'schlecht', t => t.pattern === 'choppy'],
@@ -3279,7 +3279,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
           '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
           '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
-          (istEma50Retest ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
+          (istEma50Retest ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['exakt','Exakt gleiches Level (auf den Pip genau)'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
           (istEma50Retest ? '' : '<label>Form'+auswahlHtml('wle-form', s.form === 'bogen_unsauber' ? WL_FORM_OPTIONEN.concat([['bogen_unsauber','Bogen unsauber (alt – bitte neu zuordnen)']]) : WL_FORM_OPTIONEN, s.form)+'</label>') +
           (istEma50Retest ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
           '<label>Ergebnis (Detail)'+auswahlHtml('wle-ergebnisdetail', [['','–'],
@@ -3391,7 +3391,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<th>'+sel('tf',tfs,f.tf)+'</th>' +
         '<th>'+sel('setup',[['quick','Quick'],['double','Double'],['triple','Triple'],['quadruple','Quadruple'],['mtf1','Only 1 TF'],['mtf2','2 TF (12H+1D)'],['mtf4','MTF 2'],['mtf3','MTF 3'],['multi','Multi-Asset'],['bogen','Bogen'],['bottom','Bottom']],f.setup)+'</th>' +
         '<th>'+sel('phase',[['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']],f.phase)+'</th>' +
-        '<th>'+sel('pattern',[['pattern:clean','clean'],['pattern:valid','valid'],['pattern:choppy','choppy'],['candles:mini','Mini Candles'],['candles:gap','Gap Candles'],['candles:decent','Decent Candles'],['candles:choppy','Choppy Candles'],['pivot:perfekt','Pivot perfekt'],['pivot:nicht_perfekt','Pivot abweichend'],['pivot:zu_weit_abweichend','Pivot zu weit']],f.pattern)+'</th>' +
+        '<th>'+sel('pattern',[['pattern:clean','clean'],['pattern:valid','valid'],['pattern:choppy','choppy'],['candles:mini','Mini Candles'],['candles:gap','Gap Candles'],['candles:decent','Decent Candles'],['candles:choppy','Choppy Candles'],['pivot:exakt','Pivot exakt'],['pivot:perfekt','Pivot perfekt'],['pivot:nicht_perfekt','Pivot abweichend'],['pivot:zu_weit_abweichend','Pivot zu weit']],f.pattern)+'</th>' +
         '<th>'+sel('div',[['doppelt:','Doppelte Div.'],['lokal:rsi','Lokal RSI'],['lokal:stark','Lokal stark'],['lokal:leicht','Lokal leicht'],['lokal:hidden','Lokal hidden'],['lokal:none','Lokal keine'],['struktur:rsi','Struktur RSI'],['struktur:stark','Struktur stark'],['struktur:leicht','Struktur leicht'],['struktur:hidden','Struktur hidden'],['struktur:none','Struktur keine']],f.div)+'</th>' +
         '<th>'+sel('note',noten,f.note)+'</th>' +
         '<th>'+sel('ergebnis',[['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry'],['offen','Noch nicht bewertet'],['regel_nein','nicht regelkonform'],['regel_klaerung','Regelkonform in Klärung'],['bestaetigung','nur Bestätigung'],['spot','Spot-Kauf']],f.ergebnis)+'</th>' +
