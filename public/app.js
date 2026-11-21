@@ -3214,7 +3214,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // dann bewusst NICHT mitgeschickt, damit das PATCH die gespeicherten Werte nicht anfasst.
         ...(scope.querySelector('.wle-event') ? { eventTyp: scope.querySelector('.wle-event').value } : {}),
         mtf: scope.querySelector('.wle-mtf').value,
-        mtfGleichesLevel: scope.querySelector('.wle-mtflevel').value,
+        // Nur bei mind. 2 TF sinnvoll - sonst immer leer speichern (auch wenn noch ein alter Wert drinsteht)
+        mtfGleichesLevel: ['', '1'].includes(scope.querySelector('.wle-mtf').value) ? '' : scope.querySelector('.wle-mtflevel').value,
         multiAsset: scope.querySelector('.wle-multiasset').checked,
         ...(scope.querySelector('.wle-form') ? { form: scope.querySelector('.wle-form').value } : {}),
         ...(scope.querySelector('.wle-bodentyp') ? { bodenTyp: scope.querySelector('.wle-bodentyp').value } : {}),
