@@ -2431,6 +2431,53 @@ const wlTradeKey = s => (s.tradeId && String(s.tradeId).trim()) ? 't:' + String(
 // No Entry und noch nicht bewertete Trades zaehlen NICHT mit - sonst waere die Quote
 // verzerrt. Gruppen mit weniger als WL_AW_MIN bewerteten Trades werden als "wenig Daten" markiert.
 const WL_AW_MIN = 5;
+
+// Timing der Signale eines Trades (Colin, 22.11.2026): automatisch aus Datum/Uhrzeit/Timeframe.
+// Zwei aufeinanderfolgende Signale gelten als GLEICHZEITIG, wenn das spaetere innerhalb einer
+// Kerze des groesseren der beiden Timeframes kommt (z.B. 1D + 3D am selben Tag), sonst
+// NACHEINANDER. Ein Signal mit "1D + 3D" im TF-Feld ist in sich gleichzeitig.
+// Liefert null bei nur einem Signal, sonst { art: 'gleichzeitig'|'nacheinander'|'gemischt', tage }.
+function wlTfMinutenGlobal(tf){
+  if (!tf) return 0;
+  return Math.max(0, ...String(tf).split('+').map(t => {
+    const m = t.trim().match(/^(\d+)\s*([mMhHdDwW])/);
+    if (!m) return 0;
+    const e = m[2].toUpperCase();
+    return parseInt(m[1], 10) * (e === 'M' ? 1 : e === 'H' ? 60 : e === 'D' ? 1440 : e === 'W' ? 10080 : 1);
+  }));
+}
+function wlTimingInfo(sigs){
+  const mitZeit = sigs.filter(s => s.date).map(s => ({
+    t: new Date(s.date+'T'+(s.uhrzeit || '02:00')+':00').getTime(), tf: wlTfMinutenGlobal(s.tf),
+    mehrTf: String(s.tf || '').includes('+')
+  })).sort((a,b) => a.t - b.t);
+  if (!mitZeit.length) return null;
+  if (mitZeit.length === 1) return mitZeit[0].mehrTf ? { art: 'gleichzeitig', tage: 0 } : null;
+  let gleich = 0, nach = 0;
+  for (let i = 1; i < mitZeit.length; i++) {
+    const diffMin = (mitZeit[i].t - mitZeit[i-1].t) / 60000;
+    const grenze = Math.max(mitZeit[i].tf, mitZeit[i-1].tf, 240);
+    if (diffMin <= grenze) gleich++; else nach++;
+  }
+  const tage = Math.round((mitZeit[mitZeit.length-1].t - mitZeit[0].t) / 86400000 * 10) / 10;
+  return { art: nach === 0 ? 'gleichzeitig' : gleich === 0 ? 'nacheinander' : 'gemischt', tage };
+}
+function wlTimingBadgeHtml(info){
+  if (!info) return '';
+  const tageTxt = info.tage >= 1 ? ' +' + String(Math.round(info.tage)).replace('.', ',') + ' T' : '';
+  if (info.art === 'gleichzeitig') return '<span class="badge" style="background:transparent;border:1.5px solid var(--green);color:var(--green)" title="Alle Signale innerhalb einer Kerze des größeren Timeframes">⚡ gleichzeitig</span>';
+  if (info.art === 'nacheinander') return '<span class="badge" style="background:transparent;border:1.5px solid var(--accent);color:var(--accent)" title="Signale kamen nacheinander – Abstand erstes bis letztes Signal">⏩ nacheinander'+tageTxt+'</span>';
+  return '<span class="badge" style="background:transparent;border:1.5px dashed var(--accent);color:var(--accent)" title="Teils gleichzeitig, teils nacheinander">⚡⏩ gemischt'+tageTxt+'</span>';
+}
+const WL_ENTRY_LABEL = { direkter_entry:'Direkter Entry', limit_theoretisch_gefuellt:'Limit gefüllt', limit_nicht_gefuellt:'Limit nicht gefüllt',
+  nachkauf_moeglich:'Nur Nachkauf möglich', kein_regelkonformer_entry:'Kein regelkonformer Entry', entry_schlechtes_rr:'R:R zu schlecht (alt)', nicht_eindeutig:'nicht eindeutig (alt)' };
+const WL_KURS_LABEL = { direkt_target:'Direkt zum Target', unter_entry_ueber_pivot_dann_target:'Unter Entry, über Pivot gehalten → Target',
+  unter_entry_unter_pivot_dann_target:'Unter Entry und unter Pivots → Target', unter_entry_dann_target:'Unter Entry → Target (alt)',
+  '2r_dann_zurueck':'2R, dann zurück zum Entry', direkt_stop:'Direkt zum Stop-Loss', laenger_seitwaerts_stop:'Länger seitwärts → Stop-Loss',
+  laenger_seitwaerts_target:'Länger seitwärts → Target', entry_nie_erreicht:'Entry nie erreicht, direkt gestiegen',
+  stop_target_gleiche_kerze:'Stop und Target in derselben Kerze', sonstiger_verlauf:'Sonstiger Verlauf' };
+const WL_ZIEL_LABEL = { measured_move:'Measured Move / Bodenhöhe', ema50:'Daily 50 EMA', doji_level:'Doji-/Kerzenlevel',
+  horizontaler_widerstand:'Horizontaler Widerstand', rr_3r:'3R', manuelles_ziel:'Manuelles Ziel', kein_ziel:'Kein sinnvolles Ziel' };
 function wlAuswertungHtml(signale){
   const rangNote = { 'A++':5, 'A+':4, 'A':3, 'B':2, 'C':1 };
   const rangEvent = { quadruple:4, triple:3, double:2, single:1 };
@@ -2463,7 +2510,9 @@ function wlAuswertungHtml(signale){
       nichtRegel: sg.every(s => s.regelkonform === false),
       nurBest: sg.some(s => s.nurBestaetigung), gebrochen: sg.some(s => s.levelGebrochenGehalten),
       spot: sg.some(s => s.guterSpotKauf), analysiert: sg.every(s => s.analysiert),
-      frueh: sg.some(s => s.fruehEntryMoeglich === true), fruehErg: erstes(t,'fruehEntryErgebnis')
+      frueh: sg.some(s => s.fruehEntryMoeglich === true), fruehErg: erstes(t,'fruehEntryErgebnis'),
+      timing: wlTimingInfo(sg), entry: erstes(t,'entrySimulation'), kurs: erstes(t,'kursverlauf'), ziel: erstes(t,'zielmethode'),
+      gleichesLevel: (sg.find(s => s.mtfGleichesLevel != null) || {}).mtfGleichesLevel ?? null
     });
   });
 
@@ -2513,6 +2562,13 @@ function wlAuswertungHtml(signale){
     nachWert('Anzahl Timeframes gleichzeitig', 'verschiedene TFs, die zu einem Trade gehören', t => t.anzTf ? Math.min(t.anzTf,4) : '', k => k>=4 ? '4 oder mehr TFs' : k+(k===1?' TF':' TFs'), (a,b) => a-b),
     nachWert('Timeframe-Kombinationen', 'nur Kombinationen mit mind. 2 Trades', t => t.anzTf >= 2 ? t.tfKombi : '', null, null, 2),
     nachWert('MTF-Einstufung (Feld im Signal)', '', t => t.mtf || '', k => ({1:'Only 1 TF',2:'2 TF (12H+1D)',4:'MTF 2',3:'MTF 3'}[k]), (a,b) => (mtfRang[b]||0)-(mtfRang[a]||0)),
+    nachDef('Timing der Signale', 'automatisch aus Datum/Uhrzeit: gleichzeitig = innerhalb einer Kerze des größeren TF', [
+      ['⚡ gleichzeitig', t => t.timing && t.timing.art === 'gleichzeitig'], ['⏩ nacheinander', t => t.timing && t.timing.art === 'nacheinander'],
+      ['⚡⏩ gemischt', t => t.timing && t.timing.art === 'gemischt'], ['nur 1 Signal', t => !t.timing]]),
+    nachDef('Abstand erstes → letztes Signal', 'nur Trades mit mehreren Signalen', [
+      ['unter 1 Tag', t => t.timing && t.timing.tage < 1], ['1–2 Tage', t => t.timing && t.timing.tage >= 1 && t.timing.tage <= 2],
+      ['3–7 Tage', t => t.timing && t.timing.tage > 2 && t.timing.tage <= 7], ['mehr als 7 Tage', t => t.timing && t.timing.tage > 7]]),
+    nachDef('Gleiches Pivot-Level über die Timeframes', 'nur Trades mit mind. 2 TF', [['gleiches Level', t => t.gleichesLevel === true], ['unterschiedliche Höhe', t => t.gleichesLevel === false]]),
     nachWert('Event-Typ', '', t => t.ev, k => WL_EVENT_LABEL[k] || k, (a,b) => (rangEvent[b]||0)-(rangEvent[a]||0)),
     nachDef('Multi-Asset', 'Signal auf mehreren Assets gleichzeitig', [['Multi-Asset', t => t.multi], ['nur dieses Asset', t => !t.multi]]),
     nachWert('Marktphase', '', t => t.phase, k => WL_PHASE_LABEL[k]),
@@ -2526,6 +2582,9 @@ function wlAuswertungHtml(signale){
     nachWert('Form', '', t => t.form, k => WL_FORM_LABEL[k]),
     nachWert('Boden-Typ', '', t => t.boden, k => WL_BODENTYP_LABEL[k]),
     nachDef('Regel-Status', '', [['regelkonform / nicht bewertet', t => !t.nichtRegel], ['nicht regelkonform', t => t.nichtRegel], ['nur Bestätigung', t => t.nurBest], ['Level gebrochen, aber gehalten', t => t.gebrochen], ['💰 guter Spot-Kauf', t => t.spot]]),
+    nachWert('Entry', 'wie wäre der Einstieg gelaufen', t => t.entry, k => WL_ENTRY_LABEL[k] || k),
+    nachWert('Kursverlauf', 'was der Kurs nach dem Signal gemacht hat', t => t.kurs, k => WL_KURS_LABEL[k] || k),
+    nachWert('Zielmethode', '', t => t.ziel, k => WL_ZIEL_LABEL[k] || k),
     nachWert('Jahr', '', t => t.jahr, null, (a,b) => a.localeCompare(b)),
     nachWert('Wochentag des ersten Signals', '', t => t.wochentag, k => WT[k], (a,b) => ((a+6)%7)-((b+6)%7)),
     nachWert('Asset', 'nur Assets mit mind. 2 Trades', t => t.asset, null, null, 2)
@@ -2546,6 +2605,8 @@ function wlAuswertungHtml(signale){
     ['Starke Struktur-Divergenz', 'gut', t => t.divS === 'stark'],
     ['Nicht am Swing Bottom (Uptrend/Range) ist ein Warnsignal', 'schlecht', t => t.phase === 'uptrend' || t.phase === 'ranging'],
     ['Bogen-ähnlicher Boden ist High Probability', 'gut', t => t.form === 'bogen'],
+    ['Gleichzeitige Signale (innerhalb einer Kerze) sind stärker als nacheinander', 'gut', t => t.timing && t.timing.art === 'gleichzeitig', t => !!t.timing],
+    ['Gleiches Pivot-Level über mehrere Timeframes', 'gut', t => t.gleichesLevel === true, t => t.gleichesLevel != null],
     ['Setup-Note A++ / A+', 'gut', t => t.note === 'A++' || t.note === 'A+'],
     ['Setup-Note B', 'schlecht', t => t.note === 'B'],
     ['Boden bei extremer Angst (Fear & Greed ≤ 24) wird eher zum echten Boden', 'gut', t => t.fng != null && t.fng <= 24, t => t.fng != null]
@@ -3468,6 +3529,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const st = wlStatus(s);
       const setupRest = wlSetupRestText(s);
       const mtfWarnBadge = wlMtfWarnBadgeHtml(s);
+      const tradeGruppe = wlTradeGesamtSignale(s);
+      const timingBadge = wlTimingBadgeHtml(wlTimingInfo(tradeGruppe.length ? tradeGruppe : [s]));
       const zielTage = wlZielTage(s);
       const tradeAttr = s.tradeId ? ' data-trade="'+esc(String(s.tradeId))+'"' : '';
       return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'" data-date="'+s.date+'"'+tradeAttr+' title="Klick für Details">' +
@@ -3482,7 +3545,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '</td>' +
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+esc(s.tf||'–')+'</td>' +
-        '<td class="wl-setup-cell">'+wlEventBadgeHtml(s)+(mtfWarnBadge ? ' '+mtfWarnBadge : '')+(setupRest ? ' <span class="muted">'+esc(setupRest)+'</span>' : ((s.eventTyp||mtfWarnBadge) ? '' : '<span class="muted">–</span>'))+'</td>' +
+        '<td class="wl-setup-cell">'+wlEventBadgeHtml(s)+(mtfWarnBadge ? ' '+mtfWarnBadge : '')+(timingBadge ? ' '+timingBadge : '')+(setupRest ? ' <span class="muted">'+esc(setupRest)+'</span>' : ((s.eventTyp||mtfWarnBadge) ? '' : '<span class="muted">–</span>'))+'</td>' +
         '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+(s.fearGreed != null ? '<div title="Crypto Fear &amp; Greed Index zum Signal">F&amp;G <b style="color:'+(s.fearGreed<=24?'var(--red)':s.fearGreed<=44?'var(--orange)':s.fearGreed<=55?'var(--muted)':'var(--green)')+'">'+s.fearGreed+'</b></div>' : '')+'</td>' +
         '<td class="muted">'+
           ([s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '', s.pivotLevel ? WL_PIVOT_KURZ[s.pivotLevel] : '']
@@ -4015,7 +4078,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         chronologisch.slice().reverse().find(s => s.status) || chronologisch[chronologisch.length - 1];
 
       el.innerHTML =
-        '<div class="wl-trade-gesamt-kopf">📎 Trade-Gesamtansicht – Trade-ID '+esc(tid)+' ('+verwandte.length+' Signale, alle Timeframes auf einen Blick)</div>' +
+        '<div class="wl-trade-gesamt-kopf">📎 Trade-Gesamtansicht – Trade-ID '+esc(tid)+' ('+verwandte.length+' Signale, alle Timeframes auf einen Blick) '+wlTimingBadgeHtml(wlTimingInfo(verwandte))+'</div>' +
         '<div class="wl-trade-gesamt-details-box" data-ids="'+esc(alleIds)+'">' +
           '<div class="wl-trade-felder-titel"><b>Trade-Felder</b> <span class="muted">– gelten für alle '+verwandte.length+' Signale dieses Trades. Pro Signal (unten bei „Details“) nur noch Chart-Struktur und Rolle.</span></div>' +
           '<div class="wl-detail-grid wl-trade-felder-scope">'+wlTradeFelderHtml(repSignal)+'</div>' +
