@@ -149,6 +149,9 @@ function rowOut(r, fng) {
     limitMoeglich: r.limit_moeglich === null || r.limit_moeglich === undefined ? null : !!r.limit_moeglich,
     guterSpotKauf: !!r.guter_spot_kauf,
     spotKaufPreis: r.spot_kauf_preis,
+    signalRolle: r.signal_rolle || null,
+    fruehEntryMoeglich: r.frueh_entry_moeglich === null || r.frueh_entry_moeglich === undefined ? null : !!r.frueh_entry_moeglich,
+    fruehEntryErgebnis: r.frueh_entry_ergebnis || null,
     // Wirksamer Wert: von Hand eingetragener Wert (Ueberschreiben) sonst automatisch der Index-Wert
     // des Signal-Tages. fearGreedManuell = nur der handschriftliche Wert (fuer das Eingabefeld).
     fearGreed: r.fear_greed !== null && r.fear_greed !== undefined ? Number(r.fear_greed)
@@ -255,7 +258,8 @@ router.patch('/:id', async (req, res) => {
                             ['limitMoeglich','limit_moeglich'],
                             ['guterSpotKauf','guter_spot_kauf'],
                             ['spotKaufPreis','spot_kauf_preis'],
-                            ['fearGreed','fear_greed']]) {
+                            ['fearGreed','fear_greed'],
+                            ['signalRolle','signal_rolle'],['fruehEntryMoeglich','frueh_entry_moeglich'],['fruehEntryErgebnis','frueh_entry_ergebnis']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -272,7 +276,9 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'keinTradeGrund') wert = KEIN_TRADE_GRUND.has(wert) ? wert : null;
     else if (key === 'uhrzeit') wert = zeitOrNull(wert);
     else if (key === 'zielDatum') wert = /^\d{4}-\d{2}-\d{2}$/.test(String(wert || '')) ? wert : null;
-    else if (key === 'regelkonform' || key === 'mtfGleichesLevel' || key === 'limitMoeglich') wert = regelkonformOrNull(wert);
+    else if (key === 'regelkonform' || key === 'mtfGleichesLevel' || key === 'limitMoeglich' || key === 'fruehEntryMoeglich') wert = regelkonformOrNull(wert);
+    else if (key === 'signalRolle') wert = ['vorsignal', 'entry', 'bestaetigung'].includes(wert) ? wert : null;
+    else if (key === 'fruehEntryErgebnis') wert = ['win', 'be_win', 'be_loss', 'lose', 'no_entry'].includes(wert) ? wert : null;
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
     else if (key === 'form') wert = FORMEN.has(wert) ? wert : null;
     else if (key === 'mtf') wert = mtfOrNull(wert);

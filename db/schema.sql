@@ -307,6 +307,16 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS news TEXT;
 -- details/news wird es in alle Signale derselben Trade-ID geschrieben. Die Dauer in Tagen
 -- rechnet das Frontend ab dem fruehesten Signal des Trades (wlZielTage in app.js).
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS ziel_datum DATE;
+-- Umbau 22.11.2026 (Colin): Trade-Felder (Ergebnis, Regelkonform, Note, MTF, Entry, Ausgang,
+-- Zielmethode, Kursverlauf, Frueh-Entry ...) werden in der Trade-Gesamtansicht EINMAL gepflegt
+-- und in alle Signale derselben Trade-ID geschrieben. Pro Signal bleibt nur die Chart-Struktur
+-- plus signal_rolle: vorsignal (vor dem Entry) | entry (Signal, bei dem eingestiegen wird)
+-- | bestaetigung (kam nach dem Entry dazu).
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS signal_rolle TEXT;
+-- Frueh-Entry-Test: waere ein Entry schon moeglich gewesen, als 1 TF bestaetigt und das 2. TF
+-- sichtbar, aber noch unbestaetigt war? + dessen hypothetisches Ergebnis (Vergleich in der Auswertung).
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS frueh_entry_moeglich BOOLEAN;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS frueh_entry_ergebnis TEXT;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).

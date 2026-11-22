@@ -2462,7 +2462,8 @@ function wlAuswertungHtml(signale){
       doppeltDiv: sg.some(s => wlDoppelteDivergenz(s)),
       nichtRegel: sg.every(s => s.regelkonform === false),
       nurBest: sg.some(s => s.nurBestaetigung), gebrochen: sg.some(s => s.levelGebrochenGehalten),
-      spot: sg.some(s => s.guterSpotKauf), analysiert: sg.every(s => s.analysiert)
+      spot: sg.some(s => s.guterSpotKauf), analysiert: sg.every(s => s.analysiert),
+      frueh: sg.some(s => s.fruehEntryMoeglich === true), fruehErg: erstes(t,'fruehEntryErgebnis')
     });
   });
 
@@ -2586,12 +2587,37 @@ function wlAuswertungHtml(signale){
     ['mit Fear & Greed', trades.filter(t => t.fng != null).length]
   ].map(([l, v]) => '<div class="stat"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>').join('');
 
+  // Frueh-Entry-Test (Colin, 22.11.2026): nur Trades, bei denen ein Frueh-Entry moeglich war
+  // (1 TF bestaetigt, 2. TF sichtbar aber unbestaetigt) - gleicher Trade, zwei Varianten.
+  function fruehVergleichHtml(){
+    const ft = trades.filter(t => t.frueh);
+    if (!ft.length) return '';
+    const zeile = (label, ts) => {
+      const c = zaehle(ts);
+      const wenig = c.wertbar < WL_AW_MIN;
+      return '<tr'+(wenig?' class="aw-wenig"':'')+'><td>'+esc(label)+'</td><td>'+c.n+'</td>' +
+        '<td class="pnl-pos">'+(c.win||'')+'</td><td class="pnl-amber">'+(c.be_win||'')+'</td><td class="pnl-orange">'+(c.be_loss||'')+'</td>' +
+        '<td class="pnl-neg">'+(c.lose||'')+'</td><td class="muted">'+(c.no_entry||'')+'</td><td class="muted">'+(c.offen||'')+'</td>' +
+        '<td class="aw-q"><b style="color:'+farbeQ(c.quote,c.wertbar)+'">'+pct(c.quote)+'</b>'+(wenig&&c.wertbar?' <span class="muted">⚠ wenig Daten</span>':'')+'</td></tr>';
+    };
+    const positiv = x => x === 'win' || x === 'be_win';
+    const fruehRettet = ft.filter(t => positiv(t.fruehErg) && (t.status === 'no_entry' || t.status === 'lose' || t.status === 'be_loss')).length;
+    const fruehKostet = ft.filter(t => (t.fruehErg === 'lose' || t.fruehErg === 'be_loss') && positiv(t.status)).length;
+    return '<div class="aw-block"><h3>Früh-Entry vs. Standard-Entry <span class="muted">nur Trades mit „Früh-Entry möglich: Ja“ ('+ft.length+') – gleicher Trade, zwei Einstiegs-Varianten</span></h3>' +
+      '<table class="aw-table">'+kopf+'<tbody>' +
+        zeile('Standard-Entry (nach Bestätigung 2. TF)', ft) +
+        zeile('Früh-Entry (2. TF sichtbar, unbestätigt)', ft.map(t => ({ status: t.fruehErg || '' }))) +
+      '</tbody></table>' +
+      '<div class="muted" style="margin-top:6px">Früh-Entry war besser (Win, wo Standard No Entry/Verlust war): <b>'+fruehRettet+'</b> · Früh-Entry war schlechter (Verlust, wo Standard Win war): <b>'+fruehKostet+'</b></div></div>';
+  }
+
   return '<div class="wl-ausw">' +
     '<div class="muted" style="margin-bottom:10px">Zählt Trades (gleiche Trade-ID = ein Trade) und folgt den Spaltenfiltern oben. <b>Quote</b> = (Win + BE Win) ÷ (Win + BE Win + BE Loss + Lose); No Entry und unbewertete Trades zählen nicht mit. Bei weniger als '+WL_AW_MIN+' bewerteten Trades ist eine Gruppe nur ein Hinweis, kein Beleg.</div>' +
     '<div class="aw-hero"><div class="aw-hero-q" style="color:'+farbeQ(gesamt.quote, gesamt.wertbar)+'">'+pct(gesamt.quote)+'</div><div><b>Gesamt-Quote</b><br><span class="muted">'+(gesamt.win+gesamt.be_win)+' positiv von '+gesamt.wertbar+' bewerteten Trades ('+gesamt.win+' Win · '+gesamt.be_win+' BE Win · '+gesamt.be_loss+' BE Loss · '+gesamt.lose+' Lose)</span></div></div>' +
     '<div class="stats" style="margin:10px 0">'+datenqualitaet+'</div>' +
     ((beste.length || schwaechste.length) ? '<div class="aw-hl"><div><h3 style="color:var(--green)">Stärkste Merkmale</h3><ul>'+(beste.map(hl).join('')||'<li class="muted">noch nichts Auffälliges</li>')+'</ul></div>' +
       '<div><h3 style="color:var(--red)">Schwächste Merkmale</h3><ul>'+(schwaechste.map(hl).join('')||'<li class="muted">noch nichts Auffälliges</li>')+'</ul></div></div>' : '') +
+    fruehVergleichHtml() +
     (regelZeilen ? '<div class="aw-block"><h3>Regel-Check <span class="muted">stimmen deine Regeln aus der Strategie-Notiz mit den bisherigen Daten überein? Quote mit Merkmal vs. ohne (in Klammern: bewertete Trades)</span></h3>' +
       '<table class="aw-table"><thead><tr><th>Regel / Annahme</th><th>Erwartung</th><th>mit Merkmal</th><th>ohne</th><th>Urteil</th></tr></thead><tbody>'+regelZeilen+'</tbody></table></div>' : '') +
     sektionen.join('') +
@@ -3207,15 +3233,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         date,
         asset: scope.querySelector('.wle-asset').value.trim(),
         tf: scope.querySelector('.wle-tf').value.trim() || null,
-        status: scope.querySelector('.wle-status').value,
         // Event-Typ, Pivot-Level, Form und Boden-Typ gibt es auf der 50er-EMA-Retest-Seite
         // nicht mehr (Bottom-spezifische Felder, siehe istEma50Retest weiter oben) - die
         // .wle-*-Elemente fehlen dort im Scope. Wie beim "details"-Feld unten wird der Key
         // dann bewusst NICHT mitgeschickt, damit das PATCH die gespeicherten Werte nicht anfasst.
         ...(scope.querySelector('.wle-event') ? { eventTyp: scope.querySelector('.wle-event').value } : {}),
-        mtf: scope.querySelector('.wle-mtf').value,
-        // Nur bei mind. 2 TF sinnvoll - sonst immer leer speichern (auch wenn noch ein alter Wert drinsteht)
-        mtfGleichesLevel: ['', '1'].includes(scope.querySelector('.wle-mtf').value) ? '' : scope.querySelector('.wle-mtflevel').value,
         multiAsset: scope.querySelector('.wle-multiasset').checked,
         ...(scope.querySelector('.wle-form') ? { form: scope.querySelector('.wle-form').value } : {}),
         ...(scope.querySelector('.wle-bodentyp') ? { bodenTyp: scope.querySelector('.wle-bodentyp').value } : {}),
@@ -3228,7 +3250,6 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         ...(scope.querySelector('.wle-details') ? { details: scope.querySelector('.wle-details').value.trim() || null } : {}),
         ...(scope.querySelector('.wle-zieldatum') ? { zielDatum: scope.querySelector('.wle-zieldatum').value || null } : {}),
         tradeId: scope.querySelector('.wle-tradeid').value.trim() || null,
-        note: scope.querySelector('.wle-note').value,
         marktphase: scope.querySelector('.wle-phase').value,
         ...(scope.querySelector('.wle-fng') ? { fearGreed: scope.querySelector('.wle-fng').value } : {}),
         pattern: scope.querySelector('.wle-pattern').value,
@@ -3236,15 +3257,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         divLokal: scope.querySelector('.wle-divlokal').value,
         divStruktur: scope.querySelector('.wle-divstruktur').value,
         ...(scope.querySelector('.wle-pivot') ? { pivotLevel: scope.querySelector('.wle-pivot').value } : {}),
-        ergebnisDetail: scope.querySelector('.wle-ergebnisdetail').value,
-        zielmethode: scope.querySelector('.wle-zielmethode').value,
-        entrySimulation: scope.querySelector('.wle-entrysim').value,
-        limitMoeglich: scope.querySelector('.wle-limitmoeglich').value,
-        kursverlauf: scope.querySelector('.wle-kursverlauf').value,
-        keinTradeGrund: scope.querySelector('.wle-keintradegrund').value,
         uhrzeit: scope.querySelector('.wle-uhrzeit').value,
-        regelkonform: scope.querySelector('.wle-regelkonform').value,
-        regelkonformGrund: scope.querySelector('.wle-regelkonformgrund').value.trim() || null,
+        // Trade-Felder nur, wenn sie in diesem Scope stehen (Einzel-Signal oder Trade-Gesamtansicht);
+        // im Signal-Formular eines Multi-TF-Trades fehlen sie -> werden dann NICHT mitgeschickt.
+        ...wlTradeFelderAuslesen(scope),
+        ...(scope.querySelector('.wle-rolle') ? { signalRolle: scope.querySelector('.wle-rolle').value } : {}),
         // "Level gebrochen/gehalten" und "Guter Spot-Kauf" (inkl. Preis) gibt es auf der
         // 50er-EMA-Retest-Seite nicht mehr (Colins Wunsch) - gleiches Omit-Pattern wie oben
         // bei Event/Pivot-Level/Form/Boden-Typ.
@@ -3255,50 +3272,62 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       };
     }
 
+    // Liest die Trade-Felder (siehe wlTradeFelderHtml) aus einem Scope - leeres Objekt, wenn sie
+    // dort nicht stehen. Genutzt vom Einzel-Signal-Formular und von der Trade-Gesamtansicht.
+    function wlTradeFelderAuslesen(scope){
+      const q = c => scope.querySelector('.'+c);
+      if (!q('wle-status')) return {};
+      const mtf = q('wle-mtf').value;
+      const status = q('wle-status').value;
+      const frueh = q('wle-fruehmoeglich') ? q('wle-fruehmoeglich').value : '';
+      return {
+        status, mtf,
+        // Nur bei mind. 2 TF sinnvoll - sonst immer leer speichern
+        mtfGleichesLevel: ['', '1'].includes(mtf) ? '' : q('wle-mtflevel').value,
+        note: q('wle-note').value,
+        entrySimulation: q('wle-entrysim').value,
+        // Ausgang gibt es nur mit Entry - bei No Entry leer speichern
+        ergebnisDetail: status === 'no_entry' ? '' : q('wle-ergebnisdetail').value,
+        zielmethode: q('wle-zielmethode').value,
+        kursverlauf: q('wle-kursverlauf').value,
+        keinTradeGrund: q('wle-keintradegrund').value,
+        regelkonform: q('wle-regelkonform').value,
+        regelkonformGrund: q('wle-regelkonformgrund').value.trim() || null,
+        fruehEntryMoeglich: frueh,
+        fruehEntryErgebnis: frueh === 'ja' && q('wle-fruehergebnis') ? q('wle-fruehergebnis').value : ''
+      };
+    }
+
     // Die aufklappbare Detailansicht (Bearbeiten-Panel) eines einzelnen Signals.
     // Nur das Formular (Felder-Grid + Checkboxen + Notiz) eines einzelnen Signals, OHNE
     // Kopf/Screenshots/Details-Textfeld/Speichern-Button drumherum - wird sowohl fuer ein
     // einzelnes (nicht gruppiertes) Signal genutzt als auch, eingeklappt, pro Einzelsignal
     // innerhalb einer aufgeklappten Trade-Gesamtansicht (siehe wlRenderTradeGesamt).
-    function wlFelderGridHtml(s){
+    // Trade-Felder (gelten fuer den ganzen Trade): einmal in der Trade-Gesamtansicht bzw.
+    // bei Einzel-Signalen direkt im Formular. Umbau 22.11.2026 (Colin): vorher pro Signal,
+    // was bei Multi-TF-Trades zu widerspruechlichen Eintraegen fuehrte.
+    function wlTradeFelderHtml(s){
       const st = wlStatus(s);
-      return '<div class="wl-detail-grid">' +
-          '<label class="wl-detail-kurz" style="width:82px">Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
-          '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = 02:00 (Tageschart)">Uhrzeit' +
-            '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
-          '<label class="wl-detail-kurz" style="width:100px">Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
-          '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
+      return '' +
           '<label class="wl-detail-kurz" style="width:100px">Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
           '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein'],['klaerung','In Klärung']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : (s.regelkonformKlaerung ? 'klaerung' : '')))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
-          (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
           '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label class="wl-detail-kurz wl-feld-mtflevel" style="width:90px'+((s.mtf && +s.mtf !== 1) ? '' : ';display:none')+'" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>' +
-          '<label class="wl-detail-kurz" style="width:90px" title="Crypto Fear &amp; Greed Index (0 = extreme Angst, 100 = extreme Gier) am Signal-Tag - wird automatisch eingetragen. Nur ausfüllen, wenn du den Wert überschreiben willst.">Fear &amp; Greed (auto)<input type="number" min="0" max="100" step="1" class="wle-fng" placeholder="'+(s.fearGreed != null ? s.fearGreed : '–')+'" value="'+(s.fearGreedManuell != null ? s.fearGreedManuell : '')+'"></label>' +
-          '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
-          '<label class="wl-detail-kurz" style="width:74px">Pattern (Gesamt)'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
-          '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
-          '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
-          '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
-          (istEma50Retest ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['exakt','Exakt gleiches Level (auf den Pip genau)'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
-          (istEma50Retest ? '' : '<label>Form'+auswahlHtml('wle-form', s.form === 'bogen_unsauber' ? WL_FORM_OPTIONEN.concat([['bogen_unsauber','Bogen unsauber (alt – bitte neu zuordnen)']]) : WL_FORM_OPTIONEN, s.form)+'</label>') +
-          (istEma50Retest ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
-          '<label>Ergebnis (Detail)'+auswahlHtml('wle-ergebnisdetail', [['','–'],
+          '<label title="Wie wäre der Einstieg gelaufen? „Limit nicht gefüllt“ umfasst auch: R:R war direkt zu schlecht, deshalb Limit gesetzt, das nie gefüllt wurde.">Entry'+auswahlHtml('wle-entrysim', [['','–'],
+            ['direkter_entry','Direkter Entry'],['limit_theoretisch_gefuellt','Limit gefüllt'],
+            ['limit_nicht_gefuellt','Limit nicht gefüllt'],
+            ['nachkauf_moeglich','Nur Nachkauf möglich (kein eigenständiger Entry)'],
+            ['kein_regelkonformer_entry','Kein regelkonformer Entry']].concat(['entry_schlechtes_rr','nicht_eindeutig'].includes(s.entrySimulation) ? [[s.entrySimulation, 'alt: '+s.entrySimulation+' – bitte neu zuordnen']] : []), s.entrySimulation)+'</label>' +
+          '<label class="wl-feld-ausgang"'+(st==='no_entry'?' style="display:none"':'')+' title="Nur wenn es einen Entry gab: wie ist der Trade ausgegangen? Bei No Entry steht im Feld Kursverlauf, was der Kurs ohne dich gemacht hat.">Ausgang'+auswahlHtml('wle-ergebnisdetail', [['','–'],
             ['noch_nicht_bewertet','Noch nicht bewertet'],['target_erreicht','Target erreicht'],
             ['be_2r','Break-even nach 2R'],['stop_loss','Stop-Loss erreicht'],
-            ['kein_entry','Kein Entry – Limit nicht gefüllt'],['kein_trade_rr','Kein Trade – R:R zu schlecht'],
-            ['setup_invalidiert','Setup invalidiert'],['verlauf_unklar','Verlauf unklar']], s.ergebnisDetail)+'</label>' +
+            ['setup_invalidiert','Setup invalidiert'],['verlauf_unklar','Verlauf unklar']].concat(['kein_entry','kein_trade_rr'].includes(s.ergebnisDetail) ? [[s.ergebnisDetail, 'alt: '+s.ergebnisDetail+' – bitte über Feld Entry eintragen']] : []), s.ergebnisDetail)+'</label>' +
           '<label>Zielmethode'+auswahlHtml('wle-zielmethode', [['','–'],
             ['measured_move','Measured Move / Bodenhöhe'],['ema50','Daily 50 EMA'],
             ['doji_level','Doji-/Kerzenlevel'],['horizontaler_widerstand','Horizontaler Widerstand'],
             ['rr_3r','3R (Risk:Reward)'],
             ['manuelles_ziel','Manuelles Ziel'],['kein_ziel','Kein sinnvolles Ziel']], s.zielmethode)+'</label>' +
-          '<label title="Preis zum Signal-Zeitpunkt schon so weit vom Pivot-Level weg, dass sich kein eigenstaendiger Entry mit sauberem R:R mehr lohnt - realistisch bleibt nur Nachkauf auf eine bestehende Position (direkt oder nach minimalem Ruecksetzer). Ob ein tieferes Limit trotzdem gefuellt worden waere, separat im Feld „Limit möglich“ eintragen.">Entry-Simulation'+auswahlHtml('wle-entrysim', [['','–'],
-            ['direkter_entry','Direkter Entry möglich'],['limit_theoretisch_gefuellt','Limit theoretisch gefüllt'],
-            ['limit_nicht_gefuellt','Limit nicht gefüllt'],['entry_schlechtes_rr','Entry möglich, aber R:R zu schlecht'],
-            ['nachkauf_moeglich','Nachkauf möglich (kein eigenständiger Entry)'],
-            ['kein_regelkonformer_entry','Kein regelkonformer Entry'],['nicht_eindeutig','Nicht eindeutig']], s.entrySimulation)+'</label>' +
-          '<label class="wl-detail-kurz" style="width:90px" title="Unabhaengig von der Entry-Simulation oben: waere ein Limit deutlich weiter unten/oben trotzdem gefuellt worden? Kann z.B. bei „Nachkauf möglich“ trotzdem Nein sein (Preis ging nur minimal zurück und zog dann schnell weiter).">Limit möglich'+auswahlHtml('wle-limitmoeglich', [['','–'],['ja','Ja'],['nein','Nein']], s.limitMoeglich === true ? 'ja' : (s.limitMoeglich === false ? 'nein' : ''))+'</label>' +
           '<label>Kursverlauf'+auswahlHtml('wle-kursverlauf', [['','–'],
             ['direkt_target','Direkt zum Target'],
             ['unter_entry_ueber_pivot_dann_target','Unter Entry, aber über Pivot gehalten, danach Target'],
@@ -3314,7 +3343,33 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             ['sl_zu_weit','Stop-Loss zu weit entfernt'],['ziel_zu_nah','Ziel zu nah'],
             ['keine_htf_bestaetigung','Keine andere Timeframe-Bestätigung'],['pattern_nicht_sauber','Pattern nicht sauber'],
             ['divergenz_fehlte','Divergenz/Bestätigung fehlte'],['sonstiger_grund','Sonstiger Grund']], s.keinTradeGrund)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:120px" title="Test: Wäre ein Entry schon möglich gewesen, als 1 Timeframe bestätigt und das 2. Timeframe sichtbar, aber noch NICHT bestätigt war (z.B. bei Triple Bottoms)? Zählt nicht für Regelkonform - wird in der Auswertung mit dem Standard-Entry verglichen.">Früh-Entry möglich?'+auswahlHtml('wle-fruehmoeglich', [['','–'],['ja','Ja'],['nein','Nein']], s.fruehEntryMoeglich === true ? 'ja' : (s.fruehEntryMoeglich === false ? 'nein' : ''))+'</label>' +
+          '<label class="wl-detail-kurz wl-feld-fruehergebnis" style="width:120px'+(s.fruehEntryMoeglich === true ? '' : ';display:none')+'" title="Wie wäre der Früh-Entry ausgegangen?">Ergebnis Früh-Entry'+auswahlHtml('wle-fruehergebnis', [['','–'],['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry']], s.fruehEntryErgebnis)+'</label>' +
           '<label class="wl-detail-voll" style="grid-column:span 2">Grund (falls nicht regelkonform)<input type="text" class="wle-regelkonformgrund" value="'+esc(s.regelkonformGrund||'')+'" placeholder="z.B. keine MTF-Konfluenz auf 30m/1h, kein Multi-Asset-Signal"></label>' +
+        '';
+    }
+    // nurSignal = true: Signal innerhalb eines Multi-TF-Trades -> nur Chart-Struktur + Rolle,
+    // die Trade-Felder stehen dann einmal oben in der Trade-Gesamtansicht.
+    function wlFelderGridHtml(s, nurSignal){
+      const st = wlStatus(s);
+      return '<div class="wl-detail-grid">' +
+          '<label class="wl-detail-kurz" style="width:82px">Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
+          '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = 02:00 (Tageschart)">Uhrzeit' +
+            '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
+          '<label class="wl-detail-kurz" style="width:100px">Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
+          '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
+          (nurSignal ? '' : wlTradeFelderHtml(s)) +
+          (nurSignal ? '<label class="wl-detail-kurz" style="width:120px" title="Welche Rolle hatte dieses Signal im Trade? Vorsignal = kam vor dem Entry (Regeln noch nicht erfüllt), Entry-Signal = hier wäre eingestiegen worden, Bestätigung = kam erst nach dem Entry dazu.">Rolle im Trade'+auswahlHtml('wle-rolle', [['','–'],['vorsignal','Vorsignal'],['entry','Entry-Signal'],['bestaetigung','Bestätigung (nach Entry)']], s.signalRolle)+'</label>' : '') +
+          (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
+          '<label class="wl-detail-kurz" style="width:90px" title="Crypto Fear &amp; Greed Index (0 = extreme Angst, 100 = extreme Gier) am Signal-Tag - wird automatisch eingetragen. Nur ausfüllen, wenn du den Wert überschreiben willst.">Fear &amp; Greed (auto)<input type="number" min="0" max="100" step="1" class="wle-fng" placeholder="'+(s.fearGreed != null ? s.fearGreed : '–')+'" value="'+(s.fearGreedManuell != null ? s.fearGreedManuell : '')+'"></label>' +
+          '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:74px">Pattern (Gesamt)'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
+          '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
+          '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
+          '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
+          (istEma50Retest ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['exakt','Exakt gleiches Level (auf den Pip genau)'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
+          (istEma50Retest ? '' : '<label>Form'+auswahlHtml('wle-form', s.form === 'bogen_unsauber' ? WL_FORM_OPTIONEN.concat([['bogen_unsauber','Bogen unsauber (alt – bitte neu zuordnen)']]) : WL_FORM_OPTIONEN, s.form)+'</label>') +
+          (istEma50Retest ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
           '<label class="wl-detail-kurz" style="width:88px" title="gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'">Trade-ID' +
             '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="'+tradeIdInfo.naechsteFrei+'">' +
             '<span class="wl-tradeid-info muted" id="wl-tid-info-'+s.id+'"></span></label>' +
@@ -3348,7 +3403,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // Breite der Gruppe nutzen kann statt zusammengequetscht zu wirken).
     function wlSignalFelderBodyHtml(s){
       return '<div class="wl-signal-felder-body" hidden>' +
-          '<div class="wl-felder-scope" data-felder-id="'+s.id+'">' + wlFelderGridHtml(s) + '</div>' +
+          '<div class="wl-felder-scope" data-felder-id="'+s.id+'">' + wlFelderGridHtml(s, true) + '</div>' +
           '<div class="wl-detail-aktionen"><button type="button" class="wl-signal-felder-save" data-felder-id="'+s.id+'">Speichern</button><span class="te-msg"></span></div>' +
         '</div>';
     }
@@ -3954,10 +4009,16 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const alleIds = verwandte.map(s => s.id).join(',');
       const gemeinsamesZiel = (chronologisch.find(s => s.zielDatum) || {}).zielDatum || '';
       const gemeinsameTage = wlZielTage(signal);
+      // Trade-Felder (Ergebnis, Regelkonform, Entry, ...) einmal fuer den ganzen Trade.
+      // Vorbelegung: Entry-Signal, sonst das juengste Signal mit Ergebnis, sonst das juengste.
+      const repSignal = chronologisch.find(s => s.signalRolle === 'entry') ||
+        chronologisch.slice().reverse().find(s => s.status) || chronologisch[chronologisch.length - 1];
 
       el.innerHTML =
         '<div class="wl-trade-gesamt-kopf">📎 Trade-Gesamtansicht – Trade-ID '+esc(tid)+' ('+verwandte.length+' Signale, alle Timeframes auf einen Blick)</div>' +
         '<div class="wl-trade-gesamt-details-box" data-ids="'+esc(alleIds)+'">' +
+          '<div class="wl-trade-felder-titel"><b>Trade-Felder</b> <span class="muted">– gelten für alle '+verwandte.length+' Signale dieses Trades. Pro Signal (unten bei „Details“) nur noch Chart-Struktur und Rolle.</span></div>' +
+          '<div class="wl-detail-grid wl-trade-felder-scope">'+wlTradeFelderHtml(repSignal)+'</div>' +
           '<label class="wl-detail-voll">Details (gemeinsam für den gesamten Trade)' +
             '<textarea class="wle-trade-gesamt-details tl-notiz-auto" rows="1" placeholder="Ausführliche Analyse für den GESAMTEN Trade über alle Timeframes: Kontext, Divergenzen, Entry/SL-Überlegungen, was gelernt…">'+esc(gemeinsamerText)+'</textarea>' +
           '</label>' +
@@ -4102,9 +4163,15 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // Wunsch) - sonst gibt es nichts zu vergleichen. Beim Umstellen auf "Only 1 TF"/leer
     // wird der Wert geleert, damit kein veralteter Ja/Nein-Wert gespeichert bleibt.
     tableWrap.addEventListener('change', ev => {
+      const scopeVon = elx => elx.closest('.wl-trade-felder-scope') || elx.closest('.wl-felder-scope') || elx.closest('tr');
+      // Ausgang nur mit Entry, Ergebnis Frueh-Entry nur wenn Frueh-Entry moeglich
+      const statusSel = ev.target.closest('.wle-status');
+      if (statusSel) { const f = scopeVon(statusSel).querySelector('.wl-feld-ausgang'); if (f) f.style.display = statusSel.value === 'no_entry' ? 'none' : ''; return; }
+      const fruehSel = ev.target.closest('.wle-fruehmoeglich');
+      if (fruehSel) { const f = scopeVon(fruehSel).querySelector('.wl-feld-fruehergebnis'); if (f) f.style.display = fruehSel.value === 'ja' ? '' : 'none'; return; }
       const mtfSel = ev.target.closest('.wle-mtf');
       if (!mtfSel) return;
-      const scope = mtfSel.closest('.wl-felder-scope') || mtfSel.closest('tr');
+      const scope = scopeVon(mtfSel);
       const feld = scope && scope.querySelector('.wl-feld-mtflevel');
       if (!feld) return;
       const mehrereTf = mtfSel.value !== '' && mtfSel.value !== '1';
@@ -4158,22 +4225,25 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         const newsText = newsFeld ? (newsFeld.value.trim() || null) : undefined;
         const zielFeld = box.querySelector('.wle-trade-gesamt-zieldatum');
         const zielDatum = zielFeld ? (zielFeld.value || null) : undefined;
-        const body = { details: text };
+        const body = Object.assign({ details: text }, wlTradeFelderAuslesen(box));
         if (newsText !== undefined) body.news = newsText;
         if (zielDatum !== undefined) body.zielDatum = zielDatum;
         gesamtSaveBtn.disabled = true; gesamtSaveBtn.textContent = 'Speichert…';
         msg.textContent = ''; msg.className = 'te-msg wl-trade-gesamt-msg';
         try {
-          await Promise.all(ids.map(id => api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) })));
-          ids.forEach(id => {
+          const antworten = await Promise.all(ids.map(id => api('/watchlist/'+id, { method: 'PATCH', body: JSON.stringify(body) })));
+          ids.forEach((id, k) => {
             const sigRef = alleSignale.find(s => String(s.id) === String(id));
             if (sigRef) {
+              if (antworten[k] && typeof antworten[k] === 'object') Object.assign(sigRef, antworten[k]);
               sigRef.details = text;
               if (newsText !== undefined) sigRef.news = newsText;
               if (zielDatum !== undefined) sigRef.zielDatum = zielDatum;
             }
           });
           msg.textContent = 'Gespeichert ✓'; msg.className = 'te-msg wl-trade-gesamt-msg ok';
+          // Tabellenzeilen (Ergebnis-Badges etc.) aller Signale dieses Trades auffrischen
+          ids.forEach(id => { const sg = alleSignale.find(x => String(x.id) === String(id)); if (sg && typeof wlAktualisiereZeile === 'function') wlAktualisiereZeile(sg); });
         } catch(e) {
           msg.textContent = 'Fehler: ' + e.message; msg.className = 'te-msg wl-trade-gesamt-msg bad';
         }
