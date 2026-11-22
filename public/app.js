@@ -2439,7 +2439,7 @@ const WL_AW_MIN = 5;
 // Liefert null bei nur einem Signal, sonst { art: 'gleichzeitig'|'nacheinander'|'gemischt', tage }.
 function wlTfMinutenGlobal(tf){
   if (!tf) return 0;
-  return Math.max(0, ...String(tf).split('+').map(t => {
+  return Math.max(0, ...String(tf).split(/[+,\/&]|\bund\b/i).map(t => {
     const m = t.trim().match(/^(\d+)\s*([mMhHdDwW])/);
     if (!m) return 0;
     const e = m[2].toUpperCase();
@@ -2449,7 +2449,7 @@ function wlTfMinutenGlobal(tf){
 function wlTimingInfo(sigs){
   const mitZeit = sigs.filter(s => s.date).map(s => ({
     t: new Date(s.date+'T'+(s.uhrzeit || '02:00')+':00').getTime(), tf: wlTfMinutenGlobal(s.tf),
-    mehrTf: String(s.tf || '').includes('+')
+    mehrTf: /[+,\/&]|\bund\b/i.test(String(s.tf || ''))
   })).sort((a,b) => a.t - b.t);
   if (!mitZeit.length) return null;
   if (mitZeit.length === 1) return mitZeit[0].mehrTf ? { art: 'gleichzeitig', tage: 0 } : null;
@@ -2461,6 +2461,13 @@ function wlTimingInfo(sigs){
   }
   const tage = Math.round((mitZeit[mitZeit.length-1].t - mitZeit[0].t) / 86400000 * 10) / 10;
   return { art: nach === 0 ? 'gleichzeitig' : gleich === 0 ? 'nacheinander' : 'gemischt', tage };
+}
+// Intraday-Signale (z.B. 4H, 12H) ohne echte Uhrzeit bzw. mit dem Standardwert 02:00 -
+// zum Nacharbeiten markieren (Colin, 22.11.2026), sonst stimmt das Timing nicht.
+function wlUhrzeitPruefen(s){
+  const z = s.uhrzeit ? String(s.uhrzeit).slice(0, 5) : '';
+  if (z && z !== '02:00') return false;
+  return String(s.tf || '').split(/[+,\/&]|\bund\b/i).some(t => { const m = wlTfMinutenGlobal(t); return m > 0 && m < 1440; });
 }
 function wlTimingBadgeHtml(info){
   if (!info) return '';
@@ -2946,6 +2953,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       if (e === 'regel_nein') { if (s.regelkonform !== false) return false; }
       else if (e === 'regel_klaerung') { if (!(s.regelkonformKlaerung && s.regelkonform == null)) return false; }
       else if (e === 'bestaetigung') { if (!s.nurBestaetigung) return false; }
+      else if (e === 'uhrzeit_pruefen') { if (!wlUhrzeitPruefen(s)) return false; }
       else if (e === 'spot') { if (!s.guterSpotKauf) return false; }
       else if (e === 'offen') { if (wlStatus(s) !== '') return false; }
       else if (wlStatus(s) !== e) return false;
@@ -3511,7 +3519,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<th>'+sel('pattern',[['pattern:clean','clean'],['pattern:valid','valid'],['pattern:choppy','choppy'],['candles:mini','Mini Candles'],['candles:gap','Gap Candles'],['candles:decent','Decent Candles'],['candles:choppy','Choppy Candles'],['pivot:exakt','Pivot exakt'],['pivot:perfekt','Pivot perfekt'],['pivot:nicht_perfekt','Pivot abweichend'],['pivot:zu_weit_abweichend','Pivot zu weit']],f.pattern)+'</th>' +
         '<th>'+sel('div',[['doppelt:','Doppelte Div.'],['lokal:rsi','Lokal RSI'],['lokal:stark','Lokal stark'],['lokal:leicht','Lokal leicht'],['lokal:hidden','Lokal hidden'],['lokal:none','Lokal keine'],['struktur:rsi','Struktur RSI'],['struktur:stark','Struktur stark'],['struktur:leicht','Struktur leicht'],['struktur:hidden','Struktur hidden'],['struktur:none','Struktur keine']],f.div)+'</th>' +
         '<th>'+sel('note',noten,f.note)+'</th>' +
-        '<th>'+sel('ergebnis',[['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry'],['offen','Noch nicht bewertet'],['regel_nein','nicht regelkonform'],['regel_klaerung','Regelkonform in Klärung'],['bestaetigung','nur Bestätigung'],['spot','Spot-Kauf']],f.ergebnis)+'</th>' +
+        '<th>'+sel('ergebnis',[['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry'],['offen','Noch nicht bewertet'],['regel_nein','nicht regelkonform'],['uhrzeit_pruefen','⏰ Uhrzeit prüfen'],['regel_klaerung','Regelkonform in Klärung'],['bestaetigung','nur Bestätigung'],['spot','Spot-Kauf']],f.ergebnis)+'</th>' +
         '<th>'+txt('notiz',f.notiz,'Suche')+'</th>' +
         '<th></th></tr>';
     }
@@ -3536,7 +3544,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       return '<tr class="'+klassen.join(' ')+'" data-id="'+s.id+'" data-date="'+s.date+'"'+tradeAttr+' title="Klick für Details">' +
         '<td class="wl-analysiert-cell"><button type="button" class="wl-analysiert-btn'+(s.analysiert?' ist-analysiert':'')+'" title="'+(s.analysiert?'Komplett analysiert – Klick zum Zurücksetzen':'Als komplett analysiert markieren')+'">✓</button></td>' +
         '<td class="muted">'+esc(wlDatumLabel(s)) +
-          (s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') + tagBadge + '</td>' +
+          (s.uhrzeit ? ' <span class="wl-zeit">'+esc(s.uhrzeit)+'</span>' : '') + tagBadge +
+          (wlUhrzeitPruefen(s) ? ' <span class="badge" style="background:transparent;border:1.5px dashed var(--orange);color:var(--orange)" title="Intraday-Signal (z.B. 4H/12H) mit Standard-Uhrzeit 02:00 bzw. ohne Uhrzeit - bitte echte Kerzen-Close-Uhrzeit eintragen">⏰ Uhrzeit prüfen</span>' : '') + '</td>' +
         '<td class="wl-trade-cell">' +
           (s.tradeId
             ? '<span class="wl-trade-bar" style="background:'+wlTradeFarbe(s.tradeId)+'"></span>' +
