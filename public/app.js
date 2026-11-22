@@ -3250,7 +3250,6 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         ...(scope.querySelector('.wle-details') ? { details: scope.querySelector('.wle-details').value.trim() || null } : {}),
         ...(scope.querySelector('.wle-zieldatum') ? { zielDatum: scope.querySelector('.wle-zieldatum').value || null } : {}),
         tradeId: scope.querySelector('.wle-tradeid').value.trim() || null,
-        marktphase: scope.querySelector('.wle-phase').value,
         ...(scope.querySelector('.wle-fng') ? { fearGreed: scope.querySelector('.wle-fng').value } : {}),
         pattern: scope.querySelector('.wle-pattern').value,
         candles: scope.querySelector('.wle-candles').value,
@@ -3285,6 +3284,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // Nur bei mind. 2 TF sinnvoll - sonst immer leer speichern
         mtfGleichesLevel: ['', '1'].includes(mtf) ? '' : q('wle-mtflevel').value,
         note: q('wle-note').value,
+        marktphase: q('wle-phase').value,
         entrySimulation: q('wle-entrysim').value,
         // Ausgang gibt es nur mit Entry - bei No Entry leer speichern
         ergebnisDetail: status === 'no_entry' ? '' : q('wle-ergebnisdetail').value,
@@ -3312,6 +3312,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px">Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
           '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein'],['klaerung','In Klärung']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : (s.regelkonformKlaerung ? 'klaerung' : '')))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
+          '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
           '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label class="wl-detail-kurz wl-feld-mtflevel" style="width:90px'+((s.mtf && +s.mtf !== 1) ? '' : ';display:none')+'" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>' +
           '<label title="Wie wäre der Einstieg gelaufen? „Limit nicht gefüllt“ umfasst auch: R:R war direkt zu schlecht, deshalb Limit gesetzt, das nie gefüllt wurde.">Entry'+auswahlHtml('wle-entrysim', [['','–'],
@@ -3362,7 +3363,6 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           (nurSignal ? '<label class="wl-detail-kurz" style="width:120px" title="Welche Rolle hatte dieses Signal im Trade? Vorsignal = kam vor dem Entry (Regeln noch nicht erfüllt), Entry-Signal = hier wäre eingestiegen worden, Bestätigung = kam erst nach dem Entry dazu.">Rolle im Trade'+auswahlHtml('wle-rolle', [['','–'],['vorsignal','Vorsignal'],['entry','Entry-Signal'],['bestaetigung','Bestätigung (nach Entry)']], s.signalRolle)+'</label>' : '') +
           (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
           '<label class="wl-detail-kurz" style="width:90px" title="Crypto Fear &amp; Greed Index (0 = extreme Angst, 100 = extreme Gier) am Signal-Tag - wird automatisch eingetragen. Nur ausfüllen, wenn du den Wert überschreiben willst.">Fear &amp; Greed (auto)<input type="number" min="0" max="100" step="1" class="wle-fng" placeholder="'+(s.fearGreed != null ? s.fearGreed : '–')+'" value="'+(s.fearGreedManuell != null ? s.fearGreedManuell : '')+'"></label>' +
-          '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
           '<label class="wl-detail-kurz" style="width:74px">Pattern (Gesamt)'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
           '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
