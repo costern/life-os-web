@@ -13,12 +13,12 @@ const STATI = new Set(['win', 'be_win', 'be_loss', 'lose', 'no_entry']);
 // vorkommt als auf groesseren (ab Tageschart).
 // quadruple = 4-facher Boden (noch seltener als triple).
 const EVENT_TYPEN = new Set(['single', 'double', 'triple', 'quadruple']);
-// form (Bodenform): bogen (sauber) | bogen_kerze (Bogen, aber eine Stoer-Kerze/Wick dazwischen)
-// | choppy (unsauberer, seitwaerts konsolidierender Boden) | v_boden (spitz, schnell rein/raus)
-// | dreieck_absteigend (gleicher Boden, tiefere Hochs, vom EMA50 1D runtergedrueckt, Ausbruch
-// ueber EMA50) | keil_fallend (tiefere Hochs UND tiefere Tiefs, zusammenlaufend) | kein_bogen.
-// bogen_unsauber = alter Sammelwert (vor der Aufteilung in bogen_kerze/choppy), bleibt gueltig.
-const FORMEN = new Set(['bogen', 'bogen_kerze', 'choppy', 'v_boden', 'dreieck_absteigend', 'keil_fallend', 'kein_bogen', 'bogen_unsauber']);
+// form (Bodenform): bogen (sauber) | bogen_choppy (Bogen erkennbar, aber choppy) | choppy
+// (choppy Konsolidierung, kein Bogen) | dreieck_absteigend (gleicher Boden, tiefere Hochs, vom
+// EMA50 1D runtergedrueckt, Ausbruch drueber) | bogen_klein_gross / bogen_gross_klein (Triple
+// Bottom: erst kleiner, dann grosser Bogen bzw. umgekehrt) | kein_bogen.
+// bogen_unsauber = alter Sammelwert, bleibt gueltig bis neu zugeordnet.
+const FORMEN = new Set(['bogen', 'bogen_choppy', 'choppy', 'dreieck_absteigend', 'bogen_klein_gross', 'bogen_gross_klein', 'kein_bogen', 'bogen_unsauber']);
 // note = Setup-Qualitaet (bewertet das Signal, nicht den Ausgang des Trades)
 const NOTEN = new Set(['A++', 'A+', 'A', 'B']);
 const MARKTPHASEN = new Set(['uptrend', 'downtrend', 'ranging']);

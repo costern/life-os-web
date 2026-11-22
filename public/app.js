@@ -2344,18 +2344,18 @@ const WL_LABEL = { win:'Win', be_win:'BE Win', be_loss:'BE Loss', lose:'Lose',
 const WL_STATUS_HINT = { win:'Win', be_win:'BE Win (2R erreicht)',
   be_loss:'BE Loss (2R nicht erreicht)', lose:'Lose',
   no_entry:'No Entry (kein Einstieg, aber auch nicht gefallen)', '':'Noch nicht bewertet' };
-const WL_FORM_LABEL = { bogen:'Bogen', bogen_kerze:'Bogen mit Störkerze', choppy:'Choppy / Konsolidierung',
-  v_boden:'V-Boden', dreieck_absteigend:'Absteigendes Dreieck (EMA50)', keil_fallend:'Fallender Keil',
-  kein_bogen:'kein Bogen', bogen_unsauber:'Bogen unsauber (alt)', '':'' };
-// Auswahl im Formular. bogen_unsauber war der alte Sammelwert (Stoerkerze ODER choppy) und
-// wird nur noch angezeigt, solange ein Signal ihn noch hat - zum Neu-Zuordnen.
+const WL_FORM_LABEL = { bogen:'Bogen', bogen_choppy:'Bogen choppy', choppy:'Choppy Konsolidierung',
+  dreieck_absteigend:'Absteigendes Dreieck (EMA50)', bogen_klein_gross:'Kleiner → großer Bogen',
+  bogen_gross_klein:'Großer → kleiner Bogen', kein_bogen:'kein Bogen', bogen_unsauber:'Bogen unsauber (alt)', '':'' };
+// Auswahl im Formular (Colin, 22.11.: nur diese Formen). bogen_unsauber = alter Sammelwert,
+// wird nur angezeigt, solange ein Signal ihn noch hat - zum Neu-Zuordnen.
 const WL_FORM_OPTIONEN = [['','–'],
   ['bogen','Bogen (sauber)'],
-  ['bogen_kerze','Bogen mit Störkerze (eine Kerze/Wick dazwischen)'],
-  ['choppy','Choppy / Konsolidierung (unsauber, seitwärts)'],
-  ['v_boden','V-Boden (spitz, schnell rein und raus)'],
-  ['dreieck_absteigend','Absteigendes Dreieck unter EMA50 (gleicher Boden, tiefere Hochs, Ausbruch über EMA50)'],
-  ['keil_fallend','Fallender Keil (tiefere Hochs und Tiefs, läuft zusammen)'],
+  ['bogen_choppy','Bogen choppy'],
+  ['choppy','Choppy Konsolidierung (kein Bogen)'],
+  ['dreieck_absteigend','Absteigendes Dreieck unter EMA50 (Ausbruch über EMA50)'],
+  ['bogen_klein_gross','Triple: erst kleiner, dann großer Bogen'],
+  ['bogen_gross_klein','Triple: erst großer, dann kleiner Bogen'],
   ['kein_bogen','kein Bogen / sonstiges']];
 // boden_typ: nur fuer Bottom Events - basisboden (lange Seitwaerts-Akkumulation auf
 // gleichem Level, typischerweise im 1W/1M-Chart sichtbar) vs. w_pattern (kompakter,
