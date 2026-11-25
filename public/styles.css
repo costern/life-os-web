@@ -985,8 +985,16 @@ a { color:var(--accent); }
 .wl-trade-felder-titel { margin: 2px 0 6px; font-size: 13px; }
 .wl-trade-felder-scope { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
 
-/* FVG: Timeframe-Signale mit Uhrzeit (25.11.2026) */
-.wl-fvg-sigbox { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; }
-.wl-fvg-sigbox > .muted { flex-basis:100%; }
-.wl-fvg-tf { display:inline-flex; align-items:center; gap:6px; }
-.wl-fvg-tf input[type=time] { width:96px; }
+/* FVG-Panel (25.11.2026): kompakt, links ausgerichtet, ueber dem Feld-Grid */
+.wl-fvg-panel { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; margin-bottom:12px; }
+.wl-fvg-karte { border:1px solid var(--line); border-radius:8px; padding:8px 10px; display:flex; flex-direction:column; gap:4px; }
+.wl-fvg-titel { font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin-bottom:2px; }
+.wl-fvg-zeile { display:grid; grid-template-columns:52px 92px; align-items:center; gap:6px; }
+.wl-fvg-zeile.aus input[type=time] { opacity:.35; }
+.wl-fvg-zeile .wl-check, .wl-fvg-vekt .wl-check { flex-direction:row !important; align-items:center; gap:5px; font-size:12.5px; text-transform:none; letter-spacing:0; color:var(--ink); }
+.wl-fvg-vekt { display:grid; grid-template-columns:repeat(2, auto); gap:4px 14px; }
+.wl-fvg-ablauf { min-width:220px; }
+.wl-fvg-ablauf label { width:220px; }
+.wl-fvg-dauer { font-size:12px; color:var(--muted); margin-top:4px; line-height:1.6; }
+.wl-detail input[type=datetime-local] { font-family:inherit; font-size:12.5px; padding:4px 7px; border:1px solid var(--line);
+  border-radius:6px; background:var(--card); color:var(--ink); width:100%; box-sizing:border-box; }

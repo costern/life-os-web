@@ -3347,38 +3347,49 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
 
     // FVG-Felder (Colin, 25.11.2026): mehrere Timeframe-Signale mit genauer Uhrzeit (Haken + Zeit),
     // Entry-Zeitpunkt und Timeframe der Vektor-Kerze fuer den Stop-Loss.
-    function wlFvgFelderHtml(s){
+    // FVG-Panel (Colin, 25.11.2026): kompakter Block ganz links ueber dem Feld-Grid - Timeframe-
+    // Signale mit Uhrzeit, Vektor-Bruchkerzen, Entry/Exit-Zeitpunkt, SL-Timeframe + berechnete Dauern.
+    function wlFvgPanelHtml(s){
       const sig = Array.isArray(s.fvgSignale) ? s.fvgSignale : [];
-      const zeile = tf => { const e = sig.find(x => x.tf === tf);
-        return '<span class="wl-fvg-tf"><label class="wl-check"><input type="checkbox" class="wle-fvgsig" data-tf="'+tf+'"'+(e ? ' checked' : '')+'> '+tf+'</label>' +
-          '<input type="time" class="wle-fvgzeit" data-tf="'+tf+'" value="'+esc(e && e.zeit ? e.zeit : '')+'" title="Uhrzeit des '+tf+'-Signals"></span>'; };
-      return '<div class="wl-detail-voll wl-fvg-sigbox"><div class="muted" style="font-size:12px;margin-bottom:4px">Signale auf Timeframes (mehrere möglich, mit Uhrzeit)</div>' +
-          WL_FVG_TFS.map(zeile).join('') + '</div>' +
-        '<div class="wl-detail-voll wl-fvg-sigbox"><div class="muted" style="font-size:12px;margin-bottom:4px">Ordentliche Vektor-Bruchkerze auf (mehrere möglich)</div>' +
-          WL_FVG_TFS.map(tf => '<label class="wl-check"><input type="checkbox" class="wle-vektortf" value="'+tf+'"'+((s.vektorTfs||[]).includes(tf) ? ' checked' : '')+'> '+tf+'</label>').join('') + '</div>' +
-        '<label style="width:190px" class="wl-detail-kurz">Entry-Zeitpunkt<input type="datetime-local" class="wle-entryzeit" value="'+esc(s.entryZeit||'')+'"></label>' +
-        '<label class="wl-detail-kurz" style="width:150px" title="Auf welchem Timeframe lag die Vektor-Kerze, nach der der Stop-Loss gesetzt wurde?">SL-Timeframe (Vektor-Kerze)'+auswahlHtml('wle-sltf', [['','–']].concat(WL_FVG_TFS.map(t => [t, t])), s.slTf || '')+'</label>' +
-        '<div class="wl-detail-kurz muted wl-fvg-dauer" style="align-self:end;padding-bottom:6px" title="Automatisch: vom ersten Timeframe-Signal bis zum Entry-Zeitpunkt">⏱ Erstes Signal → Entry: <b>'+(wlFvgDauerText(s) || '–')+'</b></div>';
+      const sigZeilen = WL_FVG_TFS.map(tf => { const e = sig.find(x => x.tf === tf);
+        return '<div class="wl-fvg-zeile'+(e ? '' : ' aus')+'"><label class="wl-check"><input type="checkbox" class="wle-fvgsig" data-tf="'+tf+'"'+(e ? ' checked' : '')+'> '+tf+'</label>' +
+          '<input type="time" class="wle-fvgzeit" data-tf="'+tf+'" value="'+esc(e && e.zeit ? e.zeit : '')+'" title="Uhrzeit des '+tf+'-Signals"></div>'; }).join('');
+      const vekt = WL_FVG_TFS.map(tf => '<label class="wl-check"><input type="checkbox" class="wle-vektortf" value="'+tf+'"'+((s.vektorTfs||[]).includes(tf) ? ' checked' : '')+'> '+tf+'</label>').join('');
+      const d = wlFvgDauern(s);
+      return '<div class="wl-fvg-panel">' +
+        '<div class="wl-fvg-karte"><div class="wl-fvg-titel">Signale (TF + Uhrzeit)</div>'+sigZeilen+'</div>' +
+        '<div class="wl-fvg-karte"><div class="wl-fvg-titel">Vektor-Bruchkerze auf</div><div class="wl-fvg-vekt">'+vekt+'</div></div>' +
+        '<div class="wl-fvg-karte wl-fvg-ablauf">' +
+          '<div class="wl-fvg-titel">Ablauf</div>' +
+          '<label>Entry-Zeitpunkt<input type="datetime-local" class="wle-entryzeit" value="'+esc(s.entryZeit||'')+'"></label>' +
+          '<label title="Wann ist der Trade in Take-Profit, Stop-Loss oder Break-even gelaufen? (Ob TP/SL/BE steht im Feld Ausgang)">Exit-Zeitpunkt (TP / SL / BE)<input type="datetime-local" class="wle-exitzeit" value="'+esc(s.exitZeit||'')+'"></label>' +
+          '<label title="Auf welchem Timeframe lag die Vektor-Kerze, nach der der Stop-Loss gesetzt wurde?">SL-Timeframe (Vektor-Kerze)'+auswahlHtml('wle-sltf', [['','–']].concat(WL_FVG_TFS.map(t => [t, t])), s.slTf || '')+'</label>' +
+          '<div class="wl-fvg-dauer">⏱ Erstes Signal → Entry: <b class="wl-fvg-d1">'+(d.bisEntry || '–')+'</b><br>⏱ Entry → Exit: <b class="wl-fvg-d2">'+(d.tradeDauer || '–')+'</b></div>' +
+        '</div>' +
+      '</div>';
     }
-    // Zeit vom ersten FVG-Timeframe-Signal (Datum + frueheste Uhrzeit) bis zum Entry-Zeitpunkt.
-    function wlFvgMinutenBisEntry(s){
-      const zeiten = (Array.isArray(s.fvgSignale) ? s.fvgSignale : []).filter(x => x.zeit).map(x => x.zeit).sort();
-      if (!zeiten.length || !s.entryZeit || !s.date) return null;
-      const diff = (new Date(s.entryZeit) - new Date(s.date+'T'+zeiten[0])) / 60000;
-      return isFinite(diff) && diff >= 0 ? Math.round(diff) : null;
-    }
-    function wlFvgDauerText(s){
-      const m = wlFvgMinutenBisEntry(s);
+    function wlMinutenText(m){
       if (m == null) return '';
       const t = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), min = m % 60;
       return [t ? t+' T' : '', h ? h+' h' : '', (min || (!t && !h)) ? min+' min' : ''].filter(Boolean).join(' ');
     }
+    // Dauern: erstes Timeframe-Signal (Datum + frueheste Uhrzeit) -> Entry, und Entry -> Exit.
+    function wlFvgDauern(s){
+      const zeiten = (Array.isArray(s.fvgSignale) ? s.fvgSignale : []).filter(x => x.zeit).map(x => x.zeit).sort();
+      const diff = (a, b) => { const m = (new Date(b) - new Date(a)) / 60000; return isFinite(m) && m >= 0 ? Math.round(m) : null; };
+      const m1 = (zeiten.length && s.entryZeit && s.date) ? diff(s.date+'T'+zeiten[0], s.entryZeit) : null;
+      const m2 = (s.entryZeit && s.exitZeit) ? diff(s.entryZeit, s.exitZeit) : null;
+      return { bisEntry: wlMinutenText(m1), tradeDauer: wlMinutenText(m2) };
+    }
+    function wlFvgDauerText(s){ return wlFvgDauern(s).bisEntry; }
     function wlFvgAuslesen(scope){
       if (!scope.querySelector('.wle-fvgsig')) return {};
       const liste = [...scope.querySelectorAll('.wle-fvgsig')].filter(c => c.checked).map(c => ({
         tf: c.dataset.tf, zeit: (scope.querySelector('.wle-fvgzeit[data-tf="'+c.dataset.tf+'"]') || {}).value || null }));
       return { fvgSignale: liste, tf: liste.map(x => x.tf).join(' + ') || null,
-        entryZeit: scope.querySelector('.wle-entryzeit').value || null, slTf: scope.querySelector('.wle-sltf').value,
+        entryZeit: scope.querySelector('.wle-entryzeit').value || null,
+        exitZeit: scope.querySelector('.wle-exitzeit').value || null,
+        slTf: scope.querySelector('.wle-sltf').value,
         vektorTfs: [...scope.querySelectorAll('.wle-vektortf')].filter(c => c.checked).map(c => c.value) };
     }
 
@@ -3473,12 +3484,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // die Trade-Felder stehen dann einmal oben in der Trade-Gesamtansicht.
     function wlFelderGridHtml(s, nurSignal){
       const st = wlStatus(s);
-      return '<div class="wl-detail-grid">' +
+      return (istFvg ? wlFvgPanelHtml(s) : '') + '<div class="wl-detail-grid">' +
           '<label class="wl-detail-kurz" style="width:82px">Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
           '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = 02:00 (Tageschart)">Uhrzeit' +
             '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
           '<label class="wl-detail-kurz" style="width:100px">Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
-          (istFvg ? wlFvgFelderHtml(s)
+          (istFvg ? ''
             : '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>') +
           (nurSignal ? '' : wlTradeFelderHtml(s)) +
           (nurSignal ? '<label class="wl-detail-kurz" style="width:120px" title="Welche Rolle hatte dieses Signal im Trade? Vorsignal = kam vor dem Entry (Regeln noch nicht erfüllt), Entry-Signal = hier wäre eingestiegen worden, Bestätigung = kam erst nach dem Entry dazu.">Rolle im Trade'+auswahlHtml('wle-rolle', [['','–'],['vorsignal','Vorsignal'],['entry','Entry-Signal'],['bestaetigung','Bestätigung (nach Entry)']], s.signalRolle)+'</label>' : '') +
@@ -4294,6 +4305,20 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // "Gleiches Level" nur zeigen, wenn mindestens 2 Timeframes ein Signal haben (Colins
     // Wunsch) - sonst gibt es nichts zu vergleichen. Beim Umstellen auf "Only 1 TF"/leer
     // wird der Wert geleert, damit kein veralteter Ja/Nein-Wert gespeichert bleibt.
+    // FVG: Dauern live mitrechnen + nicht angehakte Timeframes ausgrauen
+    tableWrap.addEventListener('input', ev => {
+      const panel = ev.target.closest('.wl-fvg-panel');
+      if (!panel) return;
+      const scope = panel.parentElement;
+      if (ev.target.classList.contains('wle-fvgzeit') && ev.target.value) { const c = panel.querySelector('.wle-fvgsig[data-tf="'+ev.target.dataset.tf+'"]'); if (c) c.checked = true; }
+      panel.querySelectorAll('.wl-fvg-zeile').forEach(z => z.classList.toggle('aus', !z.querySelector('.wle-fvgsig').checked));
+      const datumFeld = scope.querySelector('.wle-date');
+      const datum = datumFeld ? parseSchlauesDatum(datumFeld.value) : null;
+      const werte = wlFvgAuslesen(panel);
+      const d = wlFvgDauern(Object.assign({ date: datum }, werte));
+      panel.querySelector('.wl-fvg-d1').textContent = d.bisEntry || '–';
+      panel.querySelector('.wl-fvg-d2').textContent = d.tradeDauer || '–';
+    });
     tableWrap.addEventListener('change', ev => {
       const scopeVon = elx => elx.closest('.wl-trade-felder-scope') || elx.closest('.wl-felder-scope') || elx.closest('tr');
       // Ausgang nur mit Entry, Ergebnis Frueh-Entry nur wenn Frueh-Entry moeglich

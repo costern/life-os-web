@@ -329,6 +329,8 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS sl_tf TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS vektor_tfs JSONB;
 -- rr: geplantes Risk:Reward des Trades (FVG: Minimum 3R, z.B. 4 bei gutem TP-Ziel)
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS rr NUMERIC;
+-- exit_zeit: wann der Trade in TP / SL / Break-even gelaufen ist (YYYY-MM-DDTHH:MM)
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS exit_zeit TEXT;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).
