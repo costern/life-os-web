@@ -158,6 +158,7 @@ function rowOut(r, fng) {
     fvgSignale: Array.isArray(r.fvg_signale) ? r.fvg_signale : [],
     entryZeit: r.entry_zeit || null,
     slTf: r.sl_tf || null,
+    vektorTfs: Array.isArray(r.vektor_tfs) ? r.vektor_tfs : [],
     // Wirksamer Wert: von Hand eingetragener Wert (Ueberschreiben) sonst automatisch der Index-Wert
     // des Signal-Tages. fearGreedManuell = nur der handschriftliche Wert (fuer das Eingabefeld).
     fearGreed: r.fear_greed !== null && r.fear_greed !== undefined ? Number(r.fear_greed)
@@ -266,7 +267,7 @@ router.patch('/:id', async (req, res) => {
                             ['spotKaufPreis','spot_kauf_preis'],
                             ['fearGreed','fear_greed'],
                             ['signalRolle','signal_rolle'],['fruehEntryMoeglich','frueh_entry_moeglich'],['fruehEntryErgebnis','frueh_entry_ergebnis'],
-                            ['zielText','ziel_text'],['fvgSignale','fvg_signale'],['entryZeit','entry_zeit'],['slTf','sl_tf']]) {
+                            ['zielText','ziel_text'],['fvgSignale','fvg_signale'],['entryZeit','entry_zeit'],['slTf','sl_tf'],['vektorTfs','vektor_tfs']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -290,6 +291,10 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'fvgSignale') {
       const liste = (Array.isArray(wert) ? wert : []).filter(x => x && FVG_TFS.includes(x.tf))
         .map(x => ({ tf: x.tf, zeit: /^\d{2}:\d{2}$/.test(String(x.zeit || '')) ? x.zeit : null }));
+      wert = liste.length ? JSON.stringify(liste) : null;
+    }
+    else if (key === 'vektorTfs') {
+      const liste = (Array.isArray(wert) ? wert : []).filter(t => FVG_TFS.includes(t));
       wert = liste.length ? JSON.stringify(liste) : null;
     }
     else if (key === 'signalRolle') wert = ['vorsignal', 'entry', 'bestaetigung'].includes(wert) ? wert : null;

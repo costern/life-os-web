@@ -3354,6 +3354,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<input type="time" class="wle-fvgzeit" data-tf="'+tf+'" value="'+esc(e && e.zeit ? e.zeit : '')+'" title="Uhrzeit des '+tf+'-Signals"></span>'; };
       return '<div class="wl-detail-voll wl-fvg-sigbox"><div class="muted" style="font-size:12px;margin-bottom:4px">Signale auf Timeframes (mehrere möglich, mit Uhrzeit)</div>' +
           WL_FVG_TFS.map(zeile).join('') + '</div>' +
+        '<div class="wl-detail-voll wl-fvg-sigbox"><div class="muted" style="font-size:12px;margin-bottom:4px">Ordentliche Vektor-Bruchkerze auf (mehrere möglich)</div>' +
+          WL_FVG_TFS.map(tf => '<label class="wl-check"><input type="checkbox" class="wle-vektortf" value="'+tf+'"'+((s.vektorTfs||[]).includes(tf) ? ' checked' : '')+'> '+tf+'</label>').join('') + '</div>' +
         '<label style="width:190px" class="wl-detail-kurz">Entry-Zeitpunkt<input type="datetime-local" class="wle-entryzeit" value="'+esc(s.entryZeit||'')+'"></label>' +
         '<label class="wl-detail-kurz" style="width:150px" title="Auf welchem Timeframe lag die Vektor-Kerze, nach der der Stop-Loss gesetzt wurde?">SL-Timeframe (Vektor-Kerze)'+auswahlHtml('wle-sltf', [['','–']].concat(WL_FVG_TFS.map(t => [t, t])), s.slTf || '')+'</label>';
     }
