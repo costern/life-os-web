@@ -2784,6 +2784,10 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
   // Feedback: "einige muessen geloescht werden"). Marktphase bleibt unveraendert, auch auf
   // dieser Seite.
   const istEma50Retest = STRATEGIE === 'ema50_retest';
+  // FVG (Colin, 25.11.2026): kurzfristiges Intraday-Setup - ohne Fear & Greed, Spot-Kauf,
+  // "Level gebrochen", Marktphase und Divergenzen; Timeframe als feste Auswahl (5m-4H).
+  const istFvg = STRATEGIE === 'fvg';
+  const WL_FVG_TFS = ['5m', '15m', '30m', '1H', '2H', '4H'];
   // Eigenes, von "Details" getrenntes News-Feld in der Trade-Gesamtansicht - bislang nur
   // fuer Bottom Events (Colins Wunsch, siehe wlRenderTradeGesamt weiter unten).
   const zeigeNewsFeld = STRATEGIE === 'double_bottom';
@@ -3322,8 +3326,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         ...(scope.querySelector('.wle-fng') ? { fearGreed: scope.querySelector('.wle-fng').value } : {}),
         pattern: scope.querySelector('.wle-pattern').value,
         candles: scope.querySelector('.wle-candles').value,
-        divLokal: scope.querySelector('.wle-divlokal').value,
-        divStruktur: scope.querySelector('.wle-divstruktur').value,
+        ...(scope.querySelector('.wle-divlokal') ? { divLokal: scope.querySelector('.wle-divlokal').value } : {}),
+        ...(scope.querySelector('.wle-divstruktur') ? { divStruktur: scope.querySelector('.wle-divstruktur').value } : {}),
         ...(scope.querySelector('.wle-pivot') ? { pivotLevel: scope.querySelector('.wle-pivot').value } : {}),
         uhrzeit: scope.querySelector('.wle-uhrzeit').value,
         // Trade-Felder nur, wenn sie in diesem Scope stehen (Einzel-Signal oder Trade-Gesamtansicht);
@@ -3353,7 +3357,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // Nur bei mind. 2 TF sinnvoll - sonst immer leer speichern
         mtfGleichesLevel: ['', '1'].includes(mtf) ? '' : q('wle-mtflevel').value,
         note: q('wle-note').value,
-        marktphase: q('wle-phase').value,
+        ...(q('wle-phase') ? { marktphase: q('wle-phase').value } : {}),
         entrySimulation: q('wle-entrysim').value,
         // Ausgang gibt es nur mit Entry - bei No Entry leer speichern
         ergebnisDetail: status === 'no_entry' ? '' : q('wle-ergebnisdetail').value,
@@ -3381,7 +3385,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px">Ergebnis<select class="wle-status">'+statusOptionsHtml(st)+'</select></label>' +
           '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein'],['klaerung','In Klärung']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : (s.regelkonformKlaerung ? 'klaerung' : '')))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
-          '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>' +
+          (istFvg ? '' : '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>') +
           '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
           '<label class="wl-detail-kurz wl-feld-mtflevel" style="width:90px'+((s.mtf && +s.mtf !== 1) ? '' : ';display:none')+'" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>' +
           '<label title="Wie wäre der Einstieg gelaufen? „Limit nicht gefüllt“ umfasst auch: R:R war direkt zu schlecht, deshalb Limit gesetzt, das nie gefüllt wurde.">Entry'+auswahlHtml('wle-entrysim', [['','–'],
@@ -3427,15 +3431,17 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = 02:00 (Tageschart)">Uhrzeit' +
             '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
           '<label class="wl-detail-kurz" style="width:100px">Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
-          '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>' +
+          (istFvg
+            ? '<label class="wl-detail-kurz" style="width:80px">Timeframe'+auswahlHtml('wle-tf', [['','–']].concat(WL_FVG_TFS.map(t => [t, t])).concat(s.tf && !WL_FVG_TFS.includes(s.tf) ? [[s.tf, s.tf+' (alt)']] : []), s.tf || '')+'</label>'
+            : '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>') +
           (nurSignal ? '' : wlTradeFelderHtml(s)) +
           (nurSignal ? '<label class="wl-detail-kurz" style="width:120px" title="Welche Rolle hatte dieses Signal im Trade? Vorsignal = kam vor dem Entry (Regeln noch nicht erfüllt), Entry-Signal = hier wäre eingestiegen worden, Bestätigung = kam erst nach dem Entry dazu.">Rolle im Trade'+auswahlHtml('wle-rolle', [['','–'],['vorsignal','Vorsignal'],['entry','Entry-Signal'],['bestaetigung','Bestätigung (nach Entry)']], s.signalRolle)+'</label>' : '') +
           (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
-          '<label class="wl-detail-kurz" style="width:90px" title="Crypto Fear &amp; Greed Index (0 = extreme Angst, 100 = extreme Gier) am Signal-Tag - wird automatisch eingetragen. Nur ausfüllen, wenn du den Wert überschreiben willst.">Fear &amp; Greed (auto)<input type="number" min="0" max="100" step="1" class="wle-fng" placeholder="'+(s.fearGreed != null ? s.fearGreed : '–')+'" value="'+(s.fearGreedManuell != null ? s.fearGreedManuell : '')+'"></label>' +
+          (istFvg ? '' : '<label class="wl-detail-kurz" style="width:90px" title="Crypto Fear &amp; Greed Index (0 = extreme Angst, 100 = extreme Gier) am Signal-Tag - wird automatisch eingetragen. Nur ausfüllen, wenn du den Wert überschreiben willst.">Fear &amp; Greed (auto)<input type="number" min="0" max="100" step="1" class="wle-fng" placeholder="'+(s.fearGreed != null ? s.fearGreed : '–')+'" value="'+(s.fearGreedManuell != null ? s.fearGreedManuell : '')+'"></label>') +
           '<label class="wl-detail-kurz" style="width:74px">Pattern (Gesamt)'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
-          '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>' +
-          '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>' +
+          (istFvg ? '' : '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>') +
+          (istFvg ? '' : '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>') +
           (istEma50Retest ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['exakt','Exakt gleiches Level (auf den Pip genau)'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
           (istEma50Retest ? '' : '<label>Form'+auswahlHtml('wle-form', s.form === 'bogen_unsauber' ? WL_FORM_OPTIONEN.concat([['bogen_unsauber','Bogen unsauber (alt – bitte neu zuordnen)']]) : WL_FORM_OPTIONEN, s.form)+'</label>') +
           (istEma50Retest ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
@@ -3449,12 +3455,12 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // (Colins Feedback: "warum ist da so ein riesiges freies graues Feld").
         '<div class="wl-detail-checks">' +
           '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
-          (istEma50Retest ? '' : '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>') +
+          ((istEma50Retest || istFvg) ? '' : '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>') +
           '<label class="wl-check" title="Kein eigenstaendiges, regelkonformes Setup (z.B. kein eindeutiges Pivot-Level, choppy Candles, Pattern zu kurz - keine/nur eine Kerze zwischen den Tiefpunkten) - bestaetigt nur eine groessere Bewegung. Ergebnis trotzdem eintragen, als haette man nach Standardregeln gehandelt, damit sichtbar bleibt, ob es funktioniert haette."><input type="checkbox" class="wle-nurbestaetigung"'+(s.nurBestaetigung?' checked':'')+'> Nur bestätigendes Signal (kein eigenständiges Setup)</label>' +
-          (istEma50Retest ? '' : '<label class="wl-check" title="Kein valides/regelkonformes MTF-Setup (z.B. nur ein einzelnes 1W/2W-Signal ohne Bestaetigung), war im Nachhinein aber trotzdem ein guter Spot-Einkaufspreis - unabhaengig davon, ob es am Ende der absolute Boden war."><input type="checkbox" class="wle-gutspotkauf"'+(s.guterSpotKauf?' checked':'')+'> 💰 Guter Spot-Einkaufspreis</label>') +
+          ((istEma50Retest || istFvg) ? '' : '<label class="wl-check" title="Kein valides/regelkonformes MTF-Setup (z.B. nur ein einzelnes 1W/2W-Signal ohne Bestaetigung), war im Nachhinein aber trotzdem ein guter Spot-Einkaufspreis - unabhaengig davon, ob es am Ende der absolute Boden war."><input type="checkbox" class="wle-gutspotkauf"'+(s.guterSpotKauf?' checked':'')+'> 💰 Guter Spot-Einkaufspreis</label>') +
         '</div>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
-        (istEma50Retest ? '' : '<label class="wl-detail-voll">Spot-Einkaufspreis (optional)<input type="text" class="wle-spotkaufpreis" value="'+esc(s.spotKaufPreis||'')+'" placeholder="z.B. 82.100 $ oder Preisbereich"></label>');
+        ((istEma50Retest || istFvg) ? '' : '<label class="wl-detail-voll">Spot-Einkaufspreis (optional)<input type="text" class="wle-spotkaufpreis" value="'+esc(s.spotKaufPreis||'')+'" placeholder="z.B. 82.100 $ oder Preisbereich"></label>');
     }
 
     // Eingeklappter Umschalter + Formular fuer EIN Signal innerhalb der Trade-Gesamtansicht
@@ -3479,7 +3485,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
 
     function wlEditRowHtml(s){
       const gruppiert = wlTradeGesamtSignale(s).length > 0;
-      return '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="13"><div class="wl-detail">' +
+      return '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="'+(istFvg ? 11 : 13)+'"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
         '<div class="wl-trade-gesamt-wrap" id="wl-trade-gesamt-'+s.id+'"></div>' +
         // Bei einem gruppierten Multi-Timeframe-Trade stehen die Screenshots UND das
@@ -3515,9 +3521,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<th><input type="text" class="wl-colfilter" id="wlAssetFilter'+SFX+'" placeholder="z.B. Gold, BTC" autocomplete="off" value="'+esc(wlAssetFilter)+'"></th>' +
         '<th>'+sel('tf',tfs,f.tf)+'</th>' +
         '<th>'+sel('setup',[['quick','Quick'],['double','Double'],['triple','Triple'],['quadruple','Quadruple'],['mtf1','Only 1 TF'],['mtf2','2 TF (12H+1D)'],['mtf4','MTF 2'],['mtf3','MTF 3'],['multi','Multi-Asset'],['bogen','Bogen'],['bottom','Bottom']],f.setup)+'</th>' +
-        '<th>'+sel('phase',[['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']],f.phase)+'</th>' +
+        (istFvg ? '' : '<th>'+sel('phase',[['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']],f.phase)+'</th>') +
         '<th>'+sel('pattern',[['pattern:clean','clean'],['pattern:valid','valid'],['pattern:choppy','choppy'],['candles:mini','Mini Candles'],['candles:gap','Gap Candles'],['candles:decent','Decent Candles'],['candles:choppy','Choppy Candles'],['pivot:exakt','Pivot exakt'],['pivot:perfekt','Pivot perfekt'],['pivot:nicht_perfekt','Pivot abweichend'],['pivot:zu_weit_abweichend','Pivot zu weit']],f.pattern)+'</th>' +
-        '<th>'+sel('div',[['doppelt:','Doppelte Div.'],['lokal:rsi','Lokal RSI'],['lokal:stark','Lokal stark'],['lokal:leicht','Lokal leicht'],['lokal:hidden','Lokal hidden'],['lokal:none','Lokal keine'],['struktur:rsi','Struktur RSI'],['struktur:stark','Struktur stark'],['struktur:leicht','Struktur leicht'],['struktur:hidden','Struktur hidden'],['struktur:none','Struktur keine']],f.div)+'</th>' +
+        (istFvg ? '' : '<th>'+sel('div',[['doppelt:','Doppelte Div.'],['lokal:rsi','Lokal RSI'],['lokal:stark','Lokal stark'],['lokal:leicht','Lokal leicht'],['lokal:hidden','Lokal hidden'],['lokal:none','Lokal keine'],['struktur:rsi','Struktur RSI'],['struktur:stark','Struktur stark'],['struktur:leicht','Struktur leicht'],['struktur:hidden','Struktur hidden'],['struktur:none','Struktur keine']],f.div)+'</th>') +
         '<th>'+sel('note',noten,f.note)+'</th>' +
         '<th>'+sel('ergebnis',[['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry'],['offen','Noch nicht bewertet'],['regel_nein','nicht regelkonform'],['uhrzeit_pruefen','⏰ Uhrzeit prüfen'],['regel_klaerung','Regelkonform in Klärung'],['bestaetigung','nur Bestätigung'],['spot','Spot-Kauf']],f.ergebnis)+'</th>' +
         '<th>'+txt('notiz',f.notiz,'Suche')+'</th>' +
@@ -3553,17 +3559,17 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+esc(s.tf||'–')+'</td>' +
         '<td class="wl-setup-cell">'+wlEventBadgeHtml(s)+(mtfWarnBadge ? ' '+mtfWarnBadge : '')+(setupRest ? ' <span class="muted">'+esc(setupRest)+'</span>' : ((s.eventTyp||mtfWarnBadge) ? '' : '<span class="muted">–</span>'))+'</td>' +
-        '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+(s.fearGreed != null ? '<div title="Crypto Fear &amp; Greed Index zum Signal">F&amp;G <b style="color:'+(s.fearGreed<=24?'var(--red)':s.fearGreed<=44?'var(--orange)':s.fearGreed<=55?'var(--muted)':'var(--green)')+'">'+s.fearGreed+'</b></div>' : '')+'</td>' +
+        (istFvg ? '' : '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+(s.fearGreed != null ? '<div title="Crypto Fear &amp; Greed Index zum Signal">F&amp;G <b style="color:'+(s.fearGreed<=24?'var(--red)':s.fearGreed<=44?'var(--orange)':s.fearGreed<=55?'var(--muted)':'var(--green)')+'">'+s.fearGreed+'</b></div>' : '')+'</td>') +
         '<td class="muted">'+
           ([s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '', s.pivotLevel ? WL_PIVOT_KURZ[s.pivotLevel] : '']
             .filter(Boolean).join(' · ') || '–') +
         '</td>' +
-        '<td class="muted">'+
+        (istFvg ? '' : '<td class="muted">'+
           ((s.divLokal || s.divStruktur)
             ? (wlDoppelteDivergenz(s) ? '<span class="wl-div-check" title="Doppelte Divergenz (lokal + strukturell)">✓</span> ' : '') +
               'L: '+WL_DIV_KURZ[s.divLokal || '']+' · S: '+WL_DIV_KURZ[s.divStruktur || '']
             : '–') +
-        '</td>' +
+        '</td>') +
         '<td>'+(s.note ? '<span class="wl-note" style="border-color:'+WL_NOTE_FARBEN[s.note]+';color:'+WL_NOTE_FARBEN[s.note]+'">'+esc(s.note)+'</span>' : '<span class="muted">–</span>')+'</td>' +
         '<td><span class="badge" style="background:transparent;border:1.5px solid '+WL_FARBEN[st]+';color:'+WL_FARBEN[st]+'">'+WL_LABEL[st]+'</span>'+
           (s.regelkonformKlaerung && s.regelkonform == null ? ' <span class="badge" style="background:transparent;border:1.5px dashed var(--orange);color:var(--orange)" title="Regelkonformität noch in Klärung">in Klärung</span>' : '')+
@@ -3613,7 +3619,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const jahr = s.date.slice(0, 4);
       const jahrVorher = idx > 0 ? tabelleSortiert[idx-1].date.slice(0, 4) : null;
       const jahrZeile = (sortSpalte === 'date' && jahr !== jahrVorher)
-        ? '<tr class="wl-year-row"><td colspan="13">'+jahr+'</td></tr>'
+        ? '<tr class="wl-year-row"><td colspan="'+(istFvg ? 11 : 13)+'">'+jahr+'</td></tr>'
         : '';
       return jahrZeile + wlZeileHtml(s, klassen);
     }).join('');
@@ -3640,8 +3646,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<div class="stat"><div class="v pnl-orange">'+anzBeLoss+'</div><div class="l">BE Loss</div></div>' +
         '<div class="stat"><div class="v pnl-neg">'+anzLose+'</div><div class="l">Lose</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+anzNoEntry+'</div><div class="l">No Entry</div></div>' +
-        (istEma50Retest ? '' : '<div class="stat"><div class="v" style="color:var(--accent)">'+anzLevelGebrochenGehalten+'</div><div class="l">Level gebrochen, aber gehalten</div></div>') +
-        (istEma50Retest ? '' : '<div class="stat"><div class="v" style="color:var(--green)">'+anzGuterSpotKauf+'</div><div class="l">💰 Guter Spot-Kauf</div></div>') +
+        ((istEma50Retest || istFvg) ? '' : '<div class="stat"><div class="v" style="color:var(--accent)">'+anzLevelGebrochenGehalten+'</div><div class="l">Level gebrochen, aber gehalten</div></div>') +
+        ((istEma50Retest || istFvg) ? '' : '<div class="stat"><div class="v" style="color:var(--green)">'+anzGuterSpotKauf+'</div><div class="l">💰 Guter Spot-Kauf</div></div>') +
         '<div class="stat"><div class="v" style="color:var(--purple)">'+anzTripleBottom+'</div><div class="l">🔱 Triple Bottom</div></div>' +
         '<div class="stat"><div class="v" style="color:var(--accent)">'+anzQuadBottom+'</div><div class="l">4️⃣ Quadruple Bottom</div></div>' +
         (zielTageListe.length ? '<div class="stat" title="Durchschnitt über '+zielTageListe.length+' Trades mit eingetragenem Ziel-Datum (Median: '+zielTageMedian+' Tage)"><div class="v">'+zielTageSchnitt+'</div><div class="l">⏱ Ø Tage bis Ziel/3R</div></div>' : '') +
@@ -3651,7 +3657,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       '<div class="wl-toolbar">' +
         '<span class="muted">🔍 Ziehen zum Hineinzoomen · Doppelklick zum Zurücksetzen</span>' +
         (zoomAktiv ? '<button type="button" class="btn ghost" id="wlZoomReset'+SFX+'">Zoom zurücksetzen</button>' : '') +
-        '<label class="wl-check wl-fng-toggle" style="margin-left:auto" title="Crypto Fear &amp; Greed Index als farbige Linie (0-100) über den Chart legen"><input type="checkbox" id="wlFngToggle'+SFX+'"'+(wlFngAn?' checked':'')+'> Fear &amp; Greed Index</label>' +
+        '<label class="wl-check wl-fng-toggle" style="margin-left:auto'+(istFvg ? ';visibility:hidden' : '')+'" title="Crypto Fear &amp; Greed Index als farbige Linie (0-100) über den Chart legen"><input type="checkbox" id="wlFngToggle'+SFX+'"'+(wlFngAn?' checked':'')+'> Fear &amp; Greed Index</label>' +
         '<div class="wl-chart-modus" style="margin-left:0">' +
           '<button type="button" class="'+(wlKurveAn.btc?'wl-chart-modus-aktiv':'')+'" data-kurve="btc" title="Ein-/ausblenden – mehrere gleichzeitig möglich">Bitcoin</button>' +
           '<button type="button" class="'+(wlKurveAn.idx?'wl-chart-modus-aktiv':'')+'" data-kurve="idx" title="Ein-/ausblenden – mehrere gleichzeitig möglich">S&P 500 / NASDAQ 100</button>' +
@@ -3686,7 +3692,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<input type="text" id="wlNewDate'+SFX+'" placeholder="TT.MM.JJJJ" required style="max-width:120px">' +
           '<input type="time" id="wlNewZeit'+SFX+'" value="02:00" title="Kerzen-Close – 02:00 ist der Tageschart-Close">' +
           '<input type="text" id="wlNewAsset'+SFX+'" placeholder="Asset (z.B. BTC)" maxlength="20" required style="max-width:110px">' +
-          '<input type="text" id="wlNewTf'+SFX+'" placeholder="TF (z.B. 1D)" maxlength="20" style="max-width:90px">' +
+          (istFvg
+            ? '<select id="wlNewTf'+SFX+'" style="max-width:90px"><option value="">TF</option>'+WL_FVG_TFS.map(t => '<option>'+t+'</option>').join('')+'</select>'
+            : '<input type="text" id="wlNewTf'+SFX+'" placeholder="TF (z.B. 1D)" maxlength="20" style="max-width:90px">') +
           '<select id="wlNewStatus'+SFX+'">'+statusOptionsHtml('')+'</select>' +
           '<input type="text" id="wlNewNotiz'+SFX+'" placeholder="Notiz (optional)" maxlength="200" style="flex:1;min-width:140px">' +
           '<button type="submit">+ Hinzufügen</button>' +
@@ -3713,7 +3721,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             '<th class="wl-sortable" data-sort="date">Datum'+(sortSpalte==='date'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
             '<th>Trade</th>' +
             '<th class="wl-sortable" data-sort="asset">Asset'+(sortSpalte==='asset'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
-            '<th>TF</th><th>Setup</th><th>Phase</th><th>Pattern</th><th>Divergenz</th>' +
+            '<th>TF</th><th>Setup</th>'+(istFvg ? '' : '<th>Phase</th>')+'<th>Pattern</th>'+(istFvg ? '' : '<th>Divergenz</th>') +
             '<th>Note</th><th>Ergebnis</th><th>Notiz</th><th></th>' +
           '</tr>' + wlFilterZeileHtml(alleSignale) + '</thead>' +
           '<tbody>'+tabelle+'</tbody>' +
