@@ -3542,7 +3542,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
 
     function wlEditRowHtml(s){
       const gruppiert = wlTradeGesamtSignale(s).length > 0;
-      return '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="'+(istFvg ? 11 : 13)+'"><div class="wl-detail">' +
+      return '<tr class="wl-edit-row" data-id="'+s.id+'" hidden><td colspan="'+(istFvg ? 10 : 13)+'"><div class="wl-detail">' +
         '<div class="wl-detail-kopf">'+assetIconHtml(s.asset)+' <b>'+esc(s.asset)+'</b> <span class="muted">'+esc(wlDatumLabel(s))+(wlZeitLabel(s)?' · '+esc(wlZeitLabel(s)):'')+'</span></div>' +
         '<div class="wl-trade-gesamt-wrap" id="wl-trade-gesamt-'+s.id+'"></div>' +
         // Bei einem gruppierten Multi-Timeframe-Trade stehen die Screenshots UND das
@@ -3579,7 +3579,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<th>'+sel('tf',tfs,f.tf)+'</th>' +
         '<th>'+sel('setup',[['quick','Quick'],['double','Double'],['triple','Triple'],['quadruple','Quadruple'],['mtf1','Only 1 TF'],['mtf2','2 TF (12H+1D)'],['mtf4','MTF 2'],['mtf3','MTF 3'],['multi','Multi-Asset'],['bogen','Bogen'],['bottom','Bottom']],f.setup)+'</th>' +
         (istFvg ? '' : '<th>'+sel('phase',[['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']],f.phase)+'</th>') +
-        '<th>'+sel('pattern',[['pattern:clean','clean'],['pattern:valid','valid'],['pattern:choppy','choppy'],['candles:mini','Mini Candles'],['candles:gap','Gap Candles'],['candles:decent','Decent Candles'],['candles:choppy','Choppy Candles'],['pivot:exakt','Pivot exakt'],['pivot:perfekt','Pivot perfekt'],['pivot:nicht_perfekt','Pivot abweichend'],['pivot:zu_weit_abweichend','Pivot zu weit']],f.pattern)+'</th>' +
+        (istFvg ? '' : '<th>'+sel('pattern',[['pattern:clean','clean'],['pattern:valid','valid'],['pattern:choppy','choppy'],['candles:mini','Mini Candles'],['candles:gap','Gap Candles'],['candles:decent','Decent Candles'],['candles:choppy','Choppy Candles'],['pivot:exakt','Pivot exakt'],['pivot:perfekt','Pivot perfekt'],['pivot:nicht_perfekt','Pivot abweichend'],['pivot:zu_weit_abweichend','Pivot zu weit']],f.pattern)+'</th>') +
         (istFvg ? '' : '<th>'+sel('div',[['doppelt:','Doppelte Div.'],['lokal:rsi','Lokal RSI'],['lokal:stark','Lokal stark'],['lokal:leicht','Lokal leicht'],['lokal:hidden','Lokal hidden'],['lokal:none','Lokal keine'],['struktur:rsi','Struktur RSI'],['struktur:stark','Struktur stark'],['struktur:leicht','Struktur leicht'],['struktur:hidden','Struktur hidden'],['struktur:none','Struktur keine']],f.div)+'</th>') +
         '<th>'+sel('note',noten,f.note)+'</th>' +
         '<th>'+sel('ergebnis',[['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry'],['offen','Noch nicht bewertet'],['regel_nein','nicht regelkonform'],['uhrzeit_pruefen','⏰ Uhrzeit prüfen'],['regel_klaerung','Regelkonform in Klärung'],['bestaetigung','nur Bestätigung'],['spot','Spot-Kauf']],f.ergebnis)+'</th>' +
@@ -3620,10 +3620,10 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           : esc(s.tf||'–'))+'</td>' +
         '<td class="wl-setup-cell">'+wlEventBadgeHtml(s)+(mtfWarnBadge ? ' '+mtfWarnBadge : '')+(setupRest ? ' <span class="muted">'+esc(setupRest)+'</span>' : ((s.eventTyp||mtfWarnBadge) ? '' : '<span class="muted">–</span>'))+'</td>' +
         (istFvg ? '' : '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+(s.fearGreed != null ? '<div title="Crypto Fear &amp; Greed Index zum Signal">F&amp;G <b style="color:'+(s.fearGreed<=24?'var(--red)':s.fearGreed<=44?'var(--orange)':s.fearGreed<=55?'var(--muted)':'var(--green)')+'">'+s.fearGreed+'</b></div>' : '')+'</td>') +
-        '<td class="muted">'+
+        (istFvg ? '' : '<td class="muted">'+
           ([s.pattern ? WL_PATTERN_LABEL[s.pattern] : '', s.candles ? WL_CANDLE_LABEL[s.candles] : '', s.pivotLevel ? WL_PIVOT_KURZ[s.pivotLevel] : '']
             .filter(Boolean).join(' · ') || '–') +
-        '</td>' +
+        '</td>') +
         (istFvg ? '' : '<td class="muted">'+
           ((s.divLokal || s.divStruktur)
             ? (wlDoppelteDivergenz(s) ? '<span class="wl-div-check" title="Doppelte Divergenz (lokal + strukturell)">✓</span> ' : '') +
@@ -3680,7 +3680,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const jahr = s.date.slice(0, 4);
       const jahrVorher = idx > 0 ? tabelleSortiert[idx-1].date.slice(0, 4) : null;
       const jahrZeile = (sortSpalte === 'date' && jahr !== jahrVorher)
-        ? '<tr class="wl-year-row"><td colspan="'+(istFvg ? 11 : 13)+'">'+jahr+'</td></tr>'
+        ? '<tr class="wl-year-row"><td colspan="'+(istFvg ? 10 : 13)+'">'+jahr+'</td></tr>'
         : '';
       return jahrZeile + wlZeileHtml(s, klassen);
     }).join('');
