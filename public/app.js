@@ -3305,7 +3305,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       return {
         date,
         asset: scope.querySelector('.wle-asset').value.trim(),
-        tf: scope.querySelector('.wle-tf').value.trim() || null,
+        ...(scope.querySelector('.wle-tf') ? { tf: scope.querySelector('.wle-tf').value.trim() || null } : {}),
+        ...wlFvgAuslesen(scope),
         // Event-Typ, Pivot-Level, Form und Boden-Typ gibt es auf der 50er-EMA-Retest-Seite
         // nicht mehr (Bottom-spezifische Felder, siehe istEma50Retest weiter oben) - die
         // .wle-*-Elemente fehlen dort im Scope. Wie beim "details"-Feld unten wird der Key
@@ -3344,6 +3345,26 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       };
     }
 
+    // FVG-Felder (Colin, 25.11.2026): mehrere Timeframe-Signale mit genauer Uhrzeit (Haken + Zeit),
+    // Entry-Zeitpunkt und Timeframe der Vektor-Kerze fuer den Stop-Loss.
+    function wlFvgFelderHtml(s){
+      const sig = Array.isArray(s.fvgSignale) ? s.fvgSignale : [];
+      const zeile = tf => { const e = sig.find(x => x.tf === tf);
+        return '<span class="wl-fvg-tf"><label class="wl-check"><input type="checkbox" class="wle-fvgsig" data-tf="'+tf+'"'+(e ? ' checked' : '')+'> '+tf+'</label>' +
+          '<input type="time" class="wle-fvgzeit" data-tf="'+tf+'" value="'+esc(e && e.zeit ? e.zeit : '')+'" title="Uhrzeit des '+tf+'-Signals"></span>'; };
+      return '<div class="wl-detail-voll wl-fvg-sigbox"><div class="muted" style="font-size:12px;margin-bottom:4px">Signale auf Timeframes (mehrere möglich, mit Uhrzeit)</div>' +
+          WL_FVG_TFS.map(zeile).join('') + '</div>' +
+        '<label style="width:190px" class="wl-detail-kurz">Entry-Zeitpunkt<input type="datetime-local" class="wle-entryzeit" value="'+esc(s.entryZeit||'')+'"></label>' +
+        '<label class="wl-detail-kurz" style="width:150px" title="Auf welchem Timeframe lag die Vektor-Kerze, nach der der Stop-Loss gesetzt wurde?">SL-Timeframe (Vektor-Kerze)'+auswahlHtml('wle-sltf', [['','–']].concat(WL_FVG_TFS.map(t => [t, t])), s.slTf || '')+'</label>';
+    }
+    function wlFvgAuslesen(scope){
+      if (!scope.querySelector('.wle-fvgsig')) return {};
+      const liste = [...scope.querySelectorAll('.wle-fvgsig')].filter(c => c.checked).map(c => ({
+        tf: c.dataset.tf, zeit: (scope.querySelector('.wle-fvgzeit[data-tf="'+c.dataset.tf+'"]') || {}).value || null }));
+      return { fvgSignale: liste, tf: liste.map(x => x.tf).join(' + ') || null,
+        entryZeit: scope.querySelector('.wle-entryzeit').value || null, slTf: scope.querySelector('.wle-sltf').value };
+    }
+
     // Liest die Trade-Felder (siehe wlTradeFelderHtml) aus einem Scope - leeres Objekt, wenn sie
     // dort nicht stehen. Genutzt vom Einzel-Signal-Formular und von der Trade-Gesamtansicht.
     function wlTradeFelderAuslesen(scope){
@@ -3362,6 +3383,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // Ausgang gibt es nur mit Entry - bei No Entry leer speichern
         ergebnisDetail: status === 'no_entry' ? '' : q('wle-ergebnisdetail').value,
         zielmethode: q('wle-zielmethode').value,
+        zielText: q('wle-zielmethode').value === 'manuelles_ziel' && q('wle-zieltext') ? q('wle-zieltext').value : '',
         kursverlauf: q('wle-kursverlauf').value,
         keinTradeGrund: q('wle-keintradegrund').value,
         regelkonform: q('wle-regelkonform').value,
@@ -3402,6 +3424,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             ['doji_level','Doji-/Kerzenlevel'],['horizontaler_widerstand','Horizontaler Widerstand'],
             ['rr_3r','3R (Risk:Reward)'],
             ['manuelles_ziel','Manuelles Ziel'],['kein_ziel','Kein sinnvolles Ziel']], s.zielmethode)+'</label>' +
+          '<label class="wl-feld-zieltext"'+(s.zielmethode === 'manuelles_ziel' ? '' : ' style="display:none"')+' title="Welches Ziel genau? z.B. 64.500 $ / Wochen-Hoch / letztes Swing-High">Manuelles Ziel<input type="text" class="wle-zieltext" value="'+esc(s.zielText||'')+'" placeholder="z.B. 64.500 $ – letztes Swing-High"></label>' +
           '<label>Kursverlauf'+auswahlHtml('wle-kursverlauf', [['','–'],
             ['direkt_target','Direkt zum Target'],
             ['unter_entry_ueber_pivot_dann_target','Unter Entry, aber über Pivot gehalten, danach Target'],
@@ -3417,8 +3440,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             ['sl_zu_weit','Stop-Loss zu weit entfernt'],['ziel_zu_nah','Ziel zu nah'],
             ['keine_htf_bestaetigung','Keine andere Timeframe-Bestätigung'],['pattern_nicht_sauber','Pattern nicht sauber'],
             ['divergenz_fehlte','Divergenz/Bestätigung fehlte'],['sonstiger_grund','Sonstiger Grund']], s.keinTradeGrund)+'</label>' +
+          (istFvg ? '' : ''+
           '<label class="wl-detail-kurz" style="width:120px" title="Test: Wäre ein Entry schon möglich gewesen, als 1 Timeframe bestätigt und das 2. Timeframe sichtbar, aber noch NICHT bestätigt war (z.B. bei Triple Bottoms)? Zählt nicht für Regelkonform - wird in der Auswertung mit dem Standard-Entry verglichen.">Früh-Entry möglich?'+auswahlHtml('wle-fruehmoeglich', [['','–'],['ja','Ja'],['nein','Nein']], s.fruehEntryMoeglich === true ? 'ja' : (s.fruehEntryMoeglich === false ? 'nein' : ''))+'</label>' +
-          '<label class="wl-detail-kurz wl-feld-fruehergebnis" style="width:120px'+(s.fruehEntryMoeglich === true ? '' : ';display:none')+'" title="Wie wäre der Früh-Entry ausgegangen?">Ergebnis Früh-Entry'+auswahlHtml('wle-fruehergebnis', [['','–'],['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry']], s.fruehEntryErgebnis)+'</label>' +
+          '<label class="wl-detail-kurz wl-feld-fruehergebnis" style="width:120px'+(s.fruehEntryMoeglich === true ? '' : ';display:none')+'" title="Wie wäre der Früh-Entry ausgegangen?">Ergebnis Früh-Entry'+auswahlHtml('wle-fruehergebnis', [['','–'],['win','Win'],['be_win','BE Win'],['be_loss','BE Loss'],['lose','Lose'],['no_entry','No Entry']], s.fruehEntryErgebnis)+'</label>') +
           '<label class="wl-detail-voll" style="grid-column:span 2">Grund (falls nicht regelkonform)<input type="text" class="wle-regelkonformgrund" value="'+esc(s.regelkonformGrund||'')+'" placeholder="z.B. keine MTF-Konfluenz auf 30m/1h, kein Multi-Asset-Signal"></label>' +
         '';
     }
@@ -3431,20 +3455,19 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = 02:00 (Tageschart)">Uhrzeit' +
             '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
           '<label class="wl-detail-kurz" style="width:100px">Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
-          (istFvg
-            ? '<label class="wl-detail-kurz" style="width:80px">Timeframe'+auswahlHtml('wle-tf', [['','–']].concat(WL_FVG_TFS.map(t => [t, t])).concat(s.tf && !WL_FVG_TFS.includes(s.tf) ? [[s.tf, s.tf+' (alt)']] : []), s.tf || '')+'</label>'
+          (istFvg ? wlFvgFelderHtml(s)
             : '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>') +
           (nurSignal ? '' : wlTradeFelderHtml(s)) +
           (nurSignal ? '<label class="wl-detail-kurz" style="width:120px" title="Welche Rolle hatte dieses Signal im Trade? Vorsignal = kam vor dem Entry (Regeln noch nicht erfüllt), Entry-Signal = hier wäre eingestiegen worden, Bestätigung = kam erst nach dem Entry dazu.">Rolle im Trade'+auswahlHtml('wle-rolle', [['','–'],['vorsignal','Vorsignal'],['entry','Entry-Signal'],['bestaetigung','Bestätigung (nach Entry)']], s.signalRolle)+'</label>' : '') +
-          (istEma50Retest ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
+          ((istEma50Retest || istFvg) ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
           (istFvg ? '' : '<label class="wl-detail-kurz" style="width:90px" title="Crypto Fear &amp; Greed Index (0 = extreme Angst, 100 = extreme Gier) am Signal-Tag - wird automatisch eingetragen. Nur ausfüllen, wenn du den Wert überschreiben willst.">Fear &amp; Greed (auto)<input type="number" min="0" max="100" step="1" class="wle-fng" placeholder="'+(s.fearGreed != null ? s.fearGreed : '–')+'" value="'+(s.fearGreedManuell != null ? s.fearGreedManuell : '')+'"></label>') +
           '<label class="wl-detail-kurz" style="width:74px">Pattern (Gesamt)'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
           '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
           (istFvg ? '' : '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>') +
           (istFvg ? '' : '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>') +
-          (istEma50Retest ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['exakt','Exakt gleiches Level (auf den Pip genau)'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
-          (istEma50Retest ? '' : '<label>Form'+auswahlHtml('wle-form', s.form === 'bogen_unsauber' ? WL_FORM_OPTIONEN.concat([['bogen_unsauber','Bogen unsauber (alt – bitte neu zuordnen)']]) : WL_FORM_OPTIONEN, s.form)+'</label>') +
-          (istEma50Retest ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
+          ((istEma50Retest || istFvg) ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['exakt','Exakt gleiches Level (auf den Pip genau)'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
+          ((istEma50Retest || istFvg) ? '' : '<label>Form'+auswahlHtml('wle-form', s.form === 'bogen_unsauber' ? WL_FORM_OPTIONEN.concat([['bogen_unsauber','Bogen unsauber (alt – bitte neu zuordnen)']]) : WL_FORM_OPTIONEN, s.form)+'</label>') +
+          ((istEma50Retest || istFvg) ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
           '<label class="wl-detail-kurz" style="width:88px" title="gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'">Trade-ID' +
             '<input type="text" class="wle-tradeid" value="'+esc(s.tradeId||'')+'" placeholder="'+tradeIdInfo.naechsteFrei+'">' +
             '<span class="wl-tradeid-info muted" id="wl-tid-info-'+s.id+'"></span></label>' +
@@ -3557,7 +3580,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             : '<span class="muted">–</span>') +
         '</td>' +
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
-        '<td class="muted">'+esc(s.tf||'–')+'</td>' +
+        '<td class="muted">'+(istFvg && Array.isArray(s.fvgSignale) && s.fvgSignale.length
+          ? s.fvgSignale.map(x => esc(x.tf)+(x.zeit ? ' <span class="wl-zeit">'+esc(x.zeit)+'</span>' : '')).join('<br>')
+          : esc(s.tf||'–'))+'</td>' +
         '<td class="wl-setup-cell">'+wlEventBadgeHtml(s)+(mtfWarnBadge ? ' '+mtfWarnBadge : '')+(setupRest ? ' <span class="muted">'+esc(setupRest)+'</span>' : ((s.eventTyp||mtfWarnBadge) ? '' : '<span class="muted">–</span>'))+'</td>' +
         (istFvg ? '' : '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+(s.fearGreed != null ? '<div title="Crypto Fear &amp; Greed Index zum Signal">F&amp;G <b style="color:'+(s.fearGreed<=24?'var(--red)':s.fearGreed<=44?'var(--orange)':s.fearGreed<=55?'var(--muted)':'var(--green)')+'">'+s.fearGreed+'</b></div>' : '')+'</td>') +
         '<td class="muted">'+
@@ -3911,7 +3936,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       };
       addMsg.textContent = '';
       try {
-        await api('/watchlist', { method: 'POST', body: JSON.stringify(body) });
+        const neu = await api('/watchlist', { method: 'POST', body: JSON.stringify(body) });
+        // FVG: das beim Anlegen gewaehlte TF + Uhrzeit gleich als erstes Timeframe-Signal speichern
+        if (istFvg && body.tf && neu && neu.id) {
+          await api('/watchlist/'+neu.id, { method: 'PATCH', body: JSON.stringify({ fvgSignale: [{ tf: body.tf, zeit: body.uhrzeit }] }) });
+        }
         await ladeUndZeichne();
       } catch(e) { addMsg.textContent = 'Fehler: ' + e.message; }
     });
@@ -4245,6 +4274,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       // Ausgang nur mit Entry, Ergebnis Frueh-Entry nur wenn Frueh-Entry moeglich
       const statusSel = ev.target.closest('.wle-status');
       if (statusSel) { const f = scopeVon(statusSel).querySelector('.wl-feld-ausgang'); if (f) f.style.display = statusSel.value === 'no_entry' ? 'none' : ''; return; }
+      const zielSel = ev.target.closest('.wle-zielmethode');
+      if (zielSel) { const f = scopeVon(zielSel).querySelector('.wl-feld-zieltext'); if (f) f.style.display = zielSel.value === 'manuelles_ziel' ? '' : 'none'; return; }
+      // FVG: Uhrzeit eingetragen -> Haken automatisch setzen
+      const fvgZeit = ev.target.closest('.wle-fvgzeit');
+      if (fvgZeit) { const c = scopeVon(fvgZeit).querySelector('.wle-fvgsig[data-tf="'+fvgZeit.dataset.tf+'"]'); if (c && fvgZeit.value) c.checked = true; return; }
       const fruehSel = ev.target.closest('.wle-fruehmoeglich');
       if (fruehSel) { const f = scopeVon(fruehSel).querySelector('.wl-feld-fruehergebnis'); if (f) f.style.display = fruehSel.value === 'ja' ? '' : 'none'; return; }
       const mtfSel = ev.target.closest('.wle-mtf');

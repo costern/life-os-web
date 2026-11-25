@@ -317,6 +317,14 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS signal_rolle TEXT;
 -- sichtbar, aber noch unbestaetigt war? + dessen hypothetisches Ergebnis (Vergleich in der Auswertung).
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS frueh_entry_moeglich BOOLEAN;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS frueh_entry_ergebnis TEXT;
+-- ziel_text: Freitext fuer Zielmethode "Manuelles Ziel" (welches Ziel genau).
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS ziel_text TEXT;
+-- FVG (25.11.2026): ein FVG-Eintrag buendelt mehrere Timeframe-Signale mit genauer Uhrzeit,
+-- z.B. [{"tf":"15m","zeit":"10:15"},{"tf":"30m","zeit":"10:30"}]; tf enthaelt dann "15m + 30m".
+-- entry_zeit = Entry-Zeitpunkt (YYYY-MM-DDTHH:MM), sl_tf = Timeframe der Vektor-Kerze fuer den Stop-Loss.
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS fvg_signale JSONB;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS entry_zeit TEXT;
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS sl_tf TEXT;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).

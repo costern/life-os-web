@@ -984,3 +984,9 @@ a { color:var(--accent); }
 /* Trade-Felder oben in der Trade-Gesamtansicht (Umbau 22.11.2026) */
 .wl-trade-felder-titel { margin: 2px 0 6px; font-size: 13px; }
 .wl-trade-felder-scope { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--line); }
+
+/* FVG: Timeframe-Signale mit Uhrzeit (25.11.2026) */
+.wl-fvg-sigbox { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; }
+.wl-fvg-sigbox > .muted { flex-basis:100%; }
+.wl-fvg-tf { display:inline-flex; align-items:center; gap:6px; }
+.wl-fvg-tf input[type=time] { width:96px; }

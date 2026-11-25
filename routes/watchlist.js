@@ -12,6 +12,8 @@ const STATI = new Set(['win', 'be_win', 'be_loss', 'lose', 'no_entry']);
 // Auswertung, ob das auf kleinen Timeframes eher haeufiger (und damit unbedeutender)
 // vorkommt als auf groesseren (ab Tageschart).
 // quadruple = 4-facher Boden (noch seltener als triple).
+// Timeframes der FVG-Seite (Auswahl im Formular)
+const FVG_TFS = ['5m', '15m', '30m', '1H', '2H', '4H'];
 const EVENT_TYPEN = new Set(['single', 'double', 'triple', 'quadruple']);
 // form (Bodenform): bogen (sauber) | bogen_choppy (Bogen erkennbar, aber choppy) | choppy
 // (choppy Konsolidierung, kein Bogen) | dreieck_absteigend (gleicher Boden, tiefere Hochs, vom
@@ -152,6 +154,10 @@ function rowOut(r, fng) {
     signalRolle: r.signal_rolle || null,
     fruehEntryMoeglich: r.frueh_entry_moeglich === null || r.frueh_entry_moeglich === undefined ? null : !!r.frueh_entry_moeglich,
     fruehEntryErgebnis: r.frueh_entry_ergebnis || null,
+    zielText: r.ziel_text || null,
+    fvgSignale: Array.isArray(r.fvg_signale) ? r.fvg_signale : [],
+    entryZeit: r.entry_zeit || null,
+    slTf: r.sl_tf || null,
     // Wirksamer Wert: von Hand eingetragener Wert (Ueberschreiben) sonst automatisch der Index-Wert
     // des Signal-Tages. fearGreedManuell = nur der handschriftliche Wert (fuer das Eingabefeld).
     fearGreed: r.fear_greed !== null && r.fear_greed !== undefined ? Number(r.fear_greed)
@@ -259,7 +265,8 @@ router.patch('/:id', async (req, res) => {
                             ['guterSpotKauf','guter_spot_kauf'],
                             ['spotKaufPreis','spot_kauf_preis'],
                             ['fearGreed','fear_greed'],
-                            ['signalRolle','signal_rolle'],['fruehEntryMoeglich','frueh_entry_moeglich'],['fruehEntryErgebnis','frueh_entry_ergebnis']]) {
+                            ['signalRolle','signal_rolle'],['fruehEntryMoeglich','frueh_entry_moeglich'],['fruehEntryErgebnis','frueh_entry_ergebnis'],
+                            ['zielText','ziel_text'],['fvgSignale','fvg_signale'],['entryZeit','entry_zeit'],['slTf','sl_tf']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -277,6 +284,14 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'uhrzeit') wert = zeitOrNull(wert);
     else if (key === 'zielDatum') wert = /^\d{4}-\d{2}-\d{2}$/.test(String(wert || '')) ? wert : null;
     else if (key === 'regelkonform' || key === 'mtfGleichesLevel' || key === 'limitMoeglich' || key === 'fruehEntryMoeglich') wert = regelkonformOrNull(wert);
+    else if (key === 'zielText') wert = String(wert || '').trim().slice(0, 300) || null;
+    else if (key === 'entryZeit') wert = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(wert || '')) ? wert : null;
+    else if (key === 'slTf') wert = FVG_TFS.includes(wert) ? wert : null;
+    else if (key === 'fvgSignale') {
+      const liste = (Array.isArray(wert) ? wert : []).filter(x => x && FVG_TFS.includes(x.tf))
+        .map(x => ({ tf: x.tf, zeit: /^\d{2}:\d{2}$/.test(String(x.zeit || '')) ? x.zeit : null }));
+      wert = liste.length ? JSON.stringify(liste) : null;
+    }
     else if (key === 'signalRolle') wert = ['vorsignal', 'entry', 'bestaetigung'].includes(wert) ? wert : null;
     else if (key === 'fruehEntryErgebnis') wert = ['win', 'be_win', 'be_loss', 'lose', 'no_entry'].includes(wert) ? wert : null;
     else if (key === 'eventTyp') wert = EVENT_TYPEN.has(wert) ? wert : null;
