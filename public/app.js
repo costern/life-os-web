@@ -3312,7 +3312,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // .wle-*-Elemente fehlen dort im Scope. Wie beim "details"-Feld unten wird der Key
         // dann bewusst NICHT mitgeschickt, damit das PATCH die gespeicherten Werte nicht anfasst.
         ...(scope.querySelector('.wle-event') ? { eventTyp: scope.querySelector('.wle-event').value } : {}),
-        multiAsset: scope.querySelector('.wle-multiasset').checked,
+        ...(scope.querySelector('.wle-multiasset') ? { multiAsset: scope.querySelector('.wle-multiasset').checked } : {}),
         ...(scope.querySelector('.wle-form') ? { form: scope.querySelector('.wle-form').value } : {}),
         ...(scope.querySelector('.wle-bodentyp') ? { bodenTyp: scope.querySelector('.wle-bodentyp').value } : {}),
         notiz: scope.querySelector('.wle-notiz').value.trim() || null,
@@ -3325,8 +3325,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         ...(scope.querySelector('.wle-zieldatum') ? { zielDatum: scope.querySelector('.wle-zieldatum').value || null } : {}),
         tradeId: scope.querySelector('.wle-tradeid').value.trim() || null,
         ...(scope.querySelector('.wle-fng') ? { fearGreed: scope.querySelector('.wle-fng').value } : {}),
-        pattern: scope.querySelector('.wle-pattern').value,
-        candles: scope.querySelector('.wle-candles').value,
+        ...(scope.querySelector('.wle-pattern') ? { pattern: scope.querySelector('.wle-pattern').value } : {}),
+        ...(scope.querySelector('.wle-candles') ? { candles: scope.querySelector('.wle-candles').value } : {}),
         ...(scope.querySelector('.wle-divlokal') ? { divLokal: scope.querySelector('.wle-divlokal').value } : {}),
         ...(scope.querySelector('.wle-divstruktur') ? { divStruktur: scope.querySelector('.wle-divstruktur').value } : {}),
         ...(scope.querySelector('.wle-pivot') ? { pivotLevel: scope.querySelector('.wle-pivot').value } : {}),
@@ -3339,7 +3339,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // 50er-EMA-Retest-Seite nicht mehr (Colins Wunsch) - gleiches Omit-Pattern wie oben
         // bei Event/Pivot-Level/Form/Boden-Typ.
         ...(scope.querySelector('.wle-levelgebrochen') ? { levelGebrochenGehalten: scope.querySelector('.wle-levelgebrochen').checked } : {}),
-        nurBestaetigung: scope.querySelector('.wle-nurbestaetigung').checked,
+        ...(scope.querySelector('.wle-nurbestaetigung') ? { nurBestaetigung: scope.querySelector('.wle-nurbestaetigung').checked } : {}),
         ...(scope.querySelector('.wle-gutspotkauf') ? { guterSpotKauf: scope.querySelector('.wle-gutspotkauf').checked } : {}),
         ...(scope.querySelector('.wle-spotkaufpreis') ? { spotKaufPreis: scope.querySelector('.wle-spotkaufpreis').value.trim() || null } : {})
       };
@@ -3495,8 +3495,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           (nurSignal ? '<label class="wl-detail-kurz" style="width:120px" title="Welche Rolle hatte dieses Signal im Trade? Vorsignal = kam vor dem Entry (Regeln noch nicht erfüllt), Entry-Signal = hier wäre eingestiegen worden, Bestätigung = kam erst nach dem Entry dazu.">Rolle im Trade'+auswahlHtml('wle-rolle', [['','–'],['vorsignal','Vorsignal'],['entry','Entry-Signal'],['bestaetigung','Bestätigung (nach Entry)']], s.signalRolle)+'</label>' : '') +
           ((istEma50Retest || istFvg) ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
           (istFvg ? '' : '<label class="wl-detail-kurz" style="width:90px" title="Crypto Fear &amp; Greed Index (0 = extreme Angst, 100 = extreme Gier) am Signal-Tag - wird automatisch eingetragen. Nur ausfüllen, wenn du den Wert überschreiben willst.">Fear &amp; Greed (auto)<input type="number" min="0" max="100" step="1" class="wle-fng" placeholder="'+(s.fearGreed != null ? s.fearGreed : '–')+'" value="'+(s.fearGreedManuell != null ? s.fearGreedManuell : '')+'"></label>') +
-          '<label class="wl-detail-kurz" style="width:74px">Pattern (Gesamt)'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>' +
-          '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>' +
+          (istFvg ? '' : '<label class="wl-detail-kurz" style="width:74px">Pattern (Gesamt)'+auswahlHtml('wle-pattern', [['','–'],['valid','valid'],['clean','clean'],['choppy','choppy']], s.pattern)+'</label>') +
+          (istFvg ? '' : '<label>Kerzen'+auswahlHtml('wle-candles', [['','–'],['choppy','Choppy Candles'],['decent','Decent Candles'],['gap','Gap Candles'],['mini','Mini Candles (Doji/Hammer/Shooting Star)']], s.candles)+'</label>') +
           (istFvg ? '' : '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>') +
           (istFvg ? '' : '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['exakt','Exakt gleiches Level (auf den Pip genau)'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
@@ -3511,9 +3511,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         // Nachbarn im selben Flex/Grid-Row und es blieb oben viel leerer grauer Platz
         // (Colins Feedback: "warum ist da so ein riesiges freies graues Feld").
         '<div class="wl-detail-checks">' +
-          '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>' +
+          (istFvg ? '' : '<label class="wl-check"><input type="checkbox" class="wle-multiasset"'+(s.multiAsset?' checked':'')+'> Multi-Asset (mehrere Assets gleichzeitig)</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label class="wl-check" title="z.B. mehrere 3D-Kerzen unter dem Pivot-Level, am Ende aber doch gehalten - Details bitte im Notiz-/Details-Feld"><input type="checkbox" class="wle-levelgebrochen"'+(s.levelGebrochenGehalten?' checked':'')+'> Level zwischenzeitlich gebrochen, aber gehalten</label>') +
-          '<label class="wl-check" title="Kein eigenstaendiges, regelkonformes Setup (z.B. kein eindeutiges Pivot-Level, choppy Candles, Pattern zu kurz - keine/nur eine Kerze zwischen den Tiefpunkten) - bestaetigt nur eine groessere Bewegung. Ergebnis trotzdem eintragen, als haette man nach Standardregeln gehandelt, damit sichtbar bleibt, ob es funktioniert haette."><input type="checkbox" class="wle-nurbestaetigung"'+(s.nurBestaetigung?' checked':'')+'> Nur bestätigendes Signal (kein eigenständiges Setup)</label>' +
+          (istFvg ? '' : '<label class="wl-check" title="Kein eigenstaendiges, regelkonformes Setup (z.B. kein eindeutiges Pivot-Level, choppy Candles, Pattern zu kurz - keine/nur eine Kerze zwischen den Tiefpunkten) - bestaetigt nur eine groessere Bewegung. Ergebnis trotzdem eintragen, als haette man nach Standardregeln gehandelt, damit sichtbar bleibt, ob es funktioniert haette."><input type="checkbox" class="wle-nurbestaetigung"'+(s.nurBestaetigung?' checked':'')+'> Nur bestätigendes Signal (kein eigenständiges Setup)</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label class="wl-check" title="Kein valides/regelkonformes MTF-Setup (z.B. nur ein einzelnes 1W/2W-Signal ohne Bestaetigung), war im Nachhinein aber trotzdem ein guter Spot-Einkaufspreis - unabhaengig davon, ob es am Ende der absolute Boden war."><input type="checkbox" class="wle-gutspotkauf"'+(s.guterSpotKauf?' checked':'')+'> 💰 Guter Spot-Einkaufspreis</label>') +
         '</div>' +
         '<label class="wl-detail-voll">Notiz (kurz)<input type="text" class="wle-notiz" value="'+esc(s.notiz||'')+'" placeholder="kurze Notiz für die Tabelle"></label>' +
@@ -3782,7 +3782,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             '<th class="wl-sortable" data-sort="date">Datum'+(sortSpalte==='date'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
             '<th>Trade</th>' +
             '<th class="wl-sortable" data-sort="asset">Asset'+(sortSpalte==='asset'?(sortRichtung==='asc'?' ▲':' ▼'):'')+'</th>' +
-            '<th>TF</th><th>Setup</th>'+(istFvg ? '' : '<th>Phase</th>')+'<th>Pattern</th>'+(istFvg ? '' : '<th>Divergenz</th>') +
+            '<th>TF</th><th>Setup</th>'+(istFvg ? '' : '<th>Phase</th><th>Pattern</th>')+(istFvg ? '' : '<th>Divergenz</th>') +
             '<th>Note</th><th>Ergebnis</th><th>Notiz</th><th></th>' +
           '</tr>' + wlFilterZeileHtml(alleSignale) + '</thead>' +
           '<tbody>'+tabelle+'</tbody>' +
