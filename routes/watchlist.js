@@ -288,7 +288,11 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'zielDatum') wert = /^\d{4}-\d{2}-\d{2}$/.test(String(wert || '')) ? wert : null;
     else if (key === 'regelkonform' || key === 'mtfGleichesLevel' || key === 'limitMoeglich' || key === 'fruehEntryMoeglich') wert = regelkonformOrNull(wert);
     else if (key === 'zielText') wert = String(wert || '').trim().slice(0, 300) || null;
-    else if (key === 'entryZeit' || key === 'exitZeit') wert = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(wert || '')) ? wert : null;
+    else if (key === 'entryZeit' || key === 'exitZeit') {
+      // datetime-local liefert "YYYY-MM-DDTHH:MM" - je nach Browser auch mit Sekunden oder Leerzeichen
+      const m = String(wert || '').trim().match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+      wert = m ? m[1] + 'T' + m[2] : null;
+    }
     else if (key === 'slTf') wert = FVG_TFS.includes(wert) ? wert : null;
     else if (key === 'fvgSignale') {
       const liste = (Array.isArray(wert) ? wert : []).filter(x => x && FVG_TFS.includes(x.tf))
