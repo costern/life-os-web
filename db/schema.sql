@@ -327,6 +327,8 @@ ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS entry_zeit TEXT;
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS sl_tf TEXT;
 -- vektor_tfs: Timeframes mit ordentlicher Vektor-Bruchkerze, z.B. ["5m","15m","1H"]
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS vektor_tfs JSONB;
+-- rr: geplantes Risk:Reward des Trades (FVG: Minimum 3R, z.B. 4 bei gutem TP-Ziel)
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS rr NUMERIC;
 
 -- Trading-Log: Verlauf von Entry/SL/TP-Anpassungen je Trade, damit man im Nachhinein
 -- sehen kann, wie eine Position im Zeitverlauf nachjustiert wurde (z.B. SL hochgezogen).

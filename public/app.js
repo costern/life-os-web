@@ -3387,13 +3387,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     function wlTradeFelderAuslesen(scope){
       const q = c => scope.querySelector('.'+c);
       if (!q('wle-status')) return {};
-      const mtf = q('wle-mtf').value;
+      const mtf = q('wle-mtf') ? q('wle-mtf').value : null;
       const status = q('wle-status').value;
       const frueh = q('wle-fruehmoeglich') ? q('wle-fruehmoeglich').value : '';
-      return {
+      const erg = {
         status, mtf,
         // Nur bei mind. 2 TF sinnvoll - sonst immer leer speichern
-        mtfGleichesLevel: ['', '1'].includes(mtf) ? '' : q('wle-mtflevel').value,
+        mtfGleichesLevel: (mtf === null || ['', '1'].includes(mtf)) ? '' : q('wle-mtflevel').value,
         note: q('wle-note').value,
         ...(q('wle-phase') ? { marktphase: q('wle-phase').value } : {}),
         entrySimulation: q('wle-entrysim').value,
@@ -3408,6 +3408,11 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         fruehEntryMoeglich: frueh,
         fruehEntryErgebnis: frueh === 'ja' && q('wle-fruehergebnis') ? q('wle-fruehergebnis').value : ''
       };
+      // Felder, die auf dieser Seite nicht angezeigt werden (z.B. MTF/Frueh-Entry bei FVG), nicht anfassen
+      if (mtf === null) { delete erg.mtf; delete erg.mtfGleichesLevel; }
+      if (!q('wle-fruehmoeglich')) { delete erg.fruehEntryMoeglich; delete erg.fruehEntryErgebnis; }
+      if (q('wle-rr')) erg.rr = q('wle-rr').value;
+      return erg;
     }
 
     // Die aufklappbare Detailansicht (Bearbeiten-Panel) eines einzelnen Signals.
@@ -3425,8 +3430,9 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein'],['klaerung','In Klärung']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : (s.regelkonformKlaerung ? 'klaerung' : '')))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
           (istFvg ? '' : '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>') +
-          '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>' +
-          '<label class="wl-detail-kurz wl-feld-mtflevel" style="width:90px'+((s.mtf && +s.mtf !== 1) ? '' : ';display:none')+'" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>' +
+          (istFvg ? '' : '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>') +
+          (istFvg ? '' : '<label class="wl-detail-kurz wl-feld-mtflevel" style="width:90px'+((s.mtf && +s.mtf !== 1) ? '' : ';display:none')+'" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>') +
+          (istFvg ? '<label class="wl-detail-kurz" style="width:90px" title="Geplantes Risk:Reward – Minimum 3R, z.B. 4 bei gutem Take-Profit-Ziel">R:R'+'<input type="text" inputmode="decimal" class="wle-rr" value="'+(s.rr != null ? String(s.rr).replace('.', ',') : '')+'" placeholder="z.B. 4"'+(s.rr != null && s.rr < 3 ? ' style="border-color:var(--red)" title="Unter 3R – Mindestregel verletzt"' : '')+'></label>' : '') +
           '<label title="Wie wäre der Einstieg gelaufen? „Limit nicht gefüllt“ umfasst auch: R:R war direkt zu schlecht, deshalb Limit gesetzt, das nie gefüllt wurde.">Entry'+auswahlHtml('wle-entrysim', [['','–'],
             ['direkter_entry','Direkter Entry'],['limit_theoretisch_gefuellt','Limit gefüllt'],
             ['limit_nicht_gefuellt','Limit nicht gefüllt'],
@@ -3619,6 +3625,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           (s.regelkonform === false ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--red);color:var(--red)" title="'+esc(s.regelkonformGrund ? 'Nicht regelkonform: '+s.regelkonformGrund : 'Nicht regelkonform')+'">nicht regelkonform</span>' : '')+
           (s.nurBestaetigung ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--amber);color:var(--amber)" title="Kein eigenstaendiges Setup, nur bestaetigendes Signal">nur Bestätigung</span>' : '')+
           (s.guterSpotKauf ? ' <span class="badge" style="background:transparent;border:1.5px solid var(--green);color:var(--green)" title="'+esc(s.spotKaufPreis ? 'Guter Spot-Einkaufspreis: '+s.spotKaufPreis : 'Guter Spot-Einkaufspreis')+'">💰 Spot</span>' : '')+
+          (istFvg && s.rr != null ? '<div style="font-size:11.5px;margin-top:2px;font-weight:600;color:'+(s.rr < 3 ? 'var(--red)' : 'var(--muted)')+'" title="Geplantes Risk:Reward">'+String(s.rr).replace('.', ',')+'R'+(s.rr < 3 ? ' ⚠ unter 3R' : '')+'</div>' : '')+
           (zielTage != null ? '<div class="muted" style="font-size:11.5px;margin-top:2px" title="Zeit bis Preisziel/3R, ab dem ersten Signal des Trades">⏱ '+wlZielTageText(zielTage)+'</div>' : '')+
         '</td>' +
         '<td class="muted">'+esc(s.notiz||'–')+'</td>' +
