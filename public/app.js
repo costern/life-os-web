@@ -3357,14 +3357,29 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '<div class="wl-detail-voll wl-fvg-sigbox"><div class="muted" style="font-size:12px;margin-bottom:4px">Ordentliche Vektor-Bruchkerze auf (mehrere möglich)</div>' +
           WL_FVG_TFS.map(tf => '<label class="wl-check"><input type="checkbox" class="wle-vektortf" value="'+tf+'"'+((s.vektorTfs||[]).includes(tf) ? ' checked' : '')+'> '+tf+'</label>').join('') + '</div>' +
         '<label style="width:190px" class="wl-detail-kurz">Entry-Zeitpunkt<input type="datetime-local" class="wle-entryzeit" value="'+esc(s.entryZeit||'')+'"></label>' +
-        '<label class="wl-detail-kurz" style="width:150px" title="Auf welchem Timeframe lag die Vektor-Kerze, nach der der Stop-Loss gesetzt wurde?">SL-Timeframe (Vektor-Kerze)'+auswahlHtml('wle-sltf', [['','–']].concat(WL_FVG_TFS.map(t => [t, t])), s.slTf || '')+'</label>';
+        '<label class="wl-detail-kurz" style="width:150px" title="Auf welchem Timeframe lag die Vektor-Kerze, nach der der Stop-Loss gesetzt wurde?">SL-Timeframe (Vektor-Kerze)'+auswahlHtml('wle-sltf', [['','–']].concat(WL_FVG_TFS.map(t => [t, t])), s.slTf || '')+'</label>' +
+        '<div class="wl-detail-kurz muted wl-fvg-dauer" style="align-self:end;padding-bottom:6px" title="Automatisch: vom ersten Timeframe-Signal bis zum Entry-Zeitpunkt">⏱ Erstes Signal → Entry: <b>'+(wlFvgDauerText(s) || '–')+'</b></div>';
+    }
+    // Zeit vom ersten FVG-Timeframe-Signal (Datum + frueheste Uhrzeit) bis zum Entry-Zeitpunkt.
+    function wlFvgMinutenBisEntry(s){
+      const zeiten = (Array.isArray(s.fvgSignale) ? s.fvgSignale : []).filter(x => x.zeit).map(x => x.zeit).sort();
+      if (!zeiten.length || !s.entryZeit || !s.date) return null;
+      const diff = (new Date(s.entryZeit) - new Date(s.date+'T'+zeiten[0])) / 60000;
+      return isFinite(diff) && diff >= 0 ? Math.round(diff) : null;
+    }
+    function wlFvgDauerText(s){
+      const m = wlFvgMinutenBisEntry(s);
+      if (m == null) return '';
+      const t = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), min = m % 60;
+      return [t ? t+' T' : '', h ? h+' h' : '', (min || (!t && !h)) ? min+' min' : ''].filter(Boolean).join(' ');
     }
     function wlFvgAuslesen(scope){
       if (!scope.querySelector('.wle-fvgsig')) return {};
       const liste = [...scope.querySelectorAll('.wle-fvgsig')].filter(c => c.checked).map(c => ({
         tf: c.dataset.tf, zeit: (scope.querySelector('.wle-fvgzeit[data-tf="'+c.dataset.tf+'"]') || {}).value || null }));
       return { fvgSignale: liste, tf: liste.map(x => x.tf).join(' + ') || null,
-        entryZeit: scope.querySelector('.wle-entryzeit').value || null, slTf: scope.querySelector('.wle-sltf').value };
+        entryZeit: scope.querySelector('.wle-entryzeit').value || null, slTf: scope.querySelector('.wle-sltf').value,
+        vektorTfs: [...scope.querySelectorAll('.wle-vektortf')].filter(c => c.checked).map(c => c.value) };
     }
 
     // Liest die Trade-Felder (siehe wlTradeFelderHtml) aus einem Scope - leeres Objekt, wenn sie
@@ -3583,7 +3598,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         '</td>' +
         '<td><span class="wl-table-asset">'+assetIconHtml(s.asset)+' '+esc(s.asset)+'</span></td>' +
         '<td class="muted">'+(istFvg && Array.isArray(s.fvgSignale) && s.fvgSignale.length
-          ? s.fvgSignale.map(x => esc(x.tf)+(x.zeit ? ' <span class="wl-zeit">'+esc(x.zeit)+'</span>' : '')).join('<br>')
+          ? s.fvgSignale.map(x => esc(x.tf)+(x.zeit ? ' <span class="wl-zeit">'+esc(x.zeit)+'</span>' : '')).join('<br>') +
+            (wlFvgDauerText(s) ? '<div title="Erstes Signal → Entry">⏱ '+wlFvgDauerText(s)+'</div>' : '')
           : esc(s.tf||'–'))+'</td>' +
         '<td class="wl-setup-cell">'+wlEventBadgeHtml(s)+(mtfWarnBadge ? ' '+mtfWarnBadge : '')+(setupRest ? ' <span class="muted">'+esc(setupRest)+'</span>' : ((s.eventTyp||mtfWarnBadge) ? '' : '<span class="muted">–</span>'))+'</td>' +
         (istFvg ? '' : '<td class="muted">'+WL_PHASE_LABEL[s.marktphase || '']+(s.fearGreed != null ? '<div title="Crypto Fear &amp; Greed Index zum Signal">F&amp;G <b style="color:'+(s.fearGreed<=24?'var(--red)':s.fearGreed<=44?'var(--orange)':s.fearGreed<=55?'var(--muted)':'var(--green)')+'">'+s.fearGreed+'</b></div>' : '')+'</td>') +
