@@ -5718,7 +5718,7 @@ document.querySelectorAll('nav.side button[data-page]').forEach(b =>
   }
   /* Fixkosten "wie sie das Konto zeigt": Durchschnitt je Kategorie ueber die letzten 12 vollen Monate,
      daneben die selbst eingetragenen Fixkosten (monatlich, Jahresposten /12) zum Vergleich. */
-  const IST_MAP = { 'Wohnen':'Miete', 'Versicherungen':'Versicherung', 'Tanken':'Tanken & Auto', 'Amazon':'Online-Shopping',
+  const IST_MAP = { 'Wohnen':'Miete', 'Versicherungen':'Versicherung', 'Tanken':'Auto: Tanken', 'Kfz-Versicherung':'Auto: Reparatur & Versicherung', 'Kfz-Steuer':'Auto: Reparatur & Versicherung', 'Amazon':'Online-Shopping',
     'Kantine':'Essen & Kantine', 'Müller':'Haushalt & Wohnen', 'Spotify':'Abos & Software', 'Apple Cloud Service':'Abos & Software', 'Claude':'Abos & Software' };
   async function renderIst(){
     const box = document.getElementById('ausIstWrap'); if (!box || !daten || !daten.umsaetze.length) return;
