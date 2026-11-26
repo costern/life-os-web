@@ -5679,7 +5679,7 @@ document.querySelectorAll('nav.side button[data-page]').forEach(b =>
     const opts = '<option value="l12"'+(zeitraum==='l12'?' selected':'')+'>Letzte 12 Monate</option><option value="gesamt"'+(zeitraum==='gesamt'?' selected':'')+'>Gesamter Zeitraum</option>' +
       monate.slice().reverse().map(m => '<option value="'+m+'"'+(zeitraum===m?' selected':'')+'>'+monatLabel(m)+'</option>').join('');
     return '<div class="aus-kopf"><label>Zeitraum <select id="ausZeitraum">'+opts+'</select></label>' +
-      '<span class="aus-import"><button type="button" class="btn ghost" id="ausImportBtn">⬆ Kontoauszug importieren (Revolut-CSV)</button><input type="file" id="ausImportFile" accept=".csv,text/csv" hidden><span class="muted" id="ausImportMsg"></span></span></div>';
+      '<span class="aus-import"><button type="button" class="btn ghost" id="ausImportBtn">⬆ Kontoauszug importieren (Revolut CSV/Excel-Export)</button><input type="file" id="ausImportFile" accept=".csv,text/csv" hidden><span class="muted" id="ausImportMsg"></span></span></div>';
   }
   function verdrahten(){
     const z = document.getElementById('ausZeitraum');
