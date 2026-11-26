@@ -3757,6 +3757,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             ? '<select id="wlNewTf'+SFX+'" style="max-width:90px"><option value="">TF</option>'+WL_FVG_TFS.map(t => '<option>'+t+'</option>').join('')+'</select>'
             : '<input type="text" id="wlNewTf'+SFX+'" placeholder="TF (z.B. 1D)" maxlength="20" style="max-width:90px">') +
           '<select id="wlNewStatus'+SFX+'">'+statusOptionsHtml('')+'</select>' +
+          '<input type="text" id="wlNewTradeId'+SFX+'" placeholder="Trade-ID" maxlength="40" title="Gleiche Trade-ID = gehört zum selben Trade" style="max-width:90px">' +
           '<input type="text" id="wlNewNotiz'+SFX+'" placeholder="Notiz (optional)" maxlength="200" style="flex:1;min-width:140px">' +
           '<button type="submit">+ Hinzufügen</button>' +
         '</div>' +
@@ -3968,6 +3969,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         uhrzeit: document.getElementById('wlNewZeit'+SFX).value || null,
         tf: document.getElementById('wlNewTf'+SFX).value.trim() || null,
         status: document.getElementById('wlNewStatus'+SFX).value,
+        tradeId: document.getElementById('wlNewTradeId'+SFX).value.trim() || null,
         notiz: document.getElementById('wlNewNotiz'+SFX).value.trim() || null
       };
       addMsg.textContent = '';
