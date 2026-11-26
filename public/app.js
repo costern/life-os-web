@@ -2519,7 +2519,8 @@ function wlAuswertungHtml(signale){
       spot: sg.some(s => s.guterSpotKauf), analysiert: sg.every(s => s.analysiert),
       frueh: sg.some(s => s.fruehEntryMoeglich === true), fruehErg: erstes(t,'fruehEntryErgebnis'),
       timing: wlTimingInfo(sg), entry: erstes(t,'entrySimulation'), kurs: erstes(t,'kursverlauf'), ziel: erstes(t,'zielmethode'),
-      gleichesLevel: (sg.find(s => s.mtfGleichesLevel != null) || {}).mtfGleichesLevel ?? null
+      gleichesLevel: (sg.find(s => s.mtfGleichesLevel != null) || {}).mtfGleichesLevel ?? null,
+      boden1h: (sg.find(s => s.boden1h) || {}).boden1h || ''
     });
   });
 
@@ -2568,6 +2569,7 @@ function wlAuswertungHtml(signale){
     nachWert('Timeframe', 'ein Trade zählt bei jedem seiner Timeframes', t => [...t.tfs], null, (a,b) => (tfRang[a]||99)-(tfRang[b]||99)),
     nachWert('Anzahl Timeframes gleichzeitig', 'verschiedene TFs, die zu einem Trade gehören', t => t.anzTf ? Math.min(t.anzTf,4) : '', k => k>=4 ? '4 oder mehr TFs' : k+(k===1?' TF':' TFs'), (a,b) => a-b),
     nachWert('Timeframe-Kombinationen', 'nur Kombinationen mit mind. 2 Trades', t => t.anzTf >= 2 ? t.tfKombi : '', null, null, 2),
+    nachWert('4H-Signale: zusätzlich 1H-Boden?', 'nur Trades mit 4H-Signal, bei denen das Feld ausgefüllt ist', t => t.tfs.has('4H') ? t.boden1h : '', k => k === 'ja' ? 'mit 1H-Boden' : 'ohne 1H-Boden', (a,b) => a.localeCompare(b)),
     nachWert('MTF-Einstufung (Feld im Signal)', '', t => t.mtf || '', k => ({1:'Only 1 TF',2:'2 TF (12H+1D)',4:'MTF 2',3:'MTF 3'}[k]), (a,b) => (mtfRang[b]||0)-(mtfRang[a]||0)),
     nachDef('Timing der Signale', 'automatisch aus Datum/Uhrzeit: gleichzeitig = innerhalb einer Kerze des größeren TF', [
       ['⚡ gleichzeitig', t => t.timing && t.timing.art === 'gleichzeitig'], ['⏩ nacheinander', t => t.timing && t.timing.art === 'nacheinander'],
@@ -3306,6 +3308,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         date,
         asset: scope.querySelector('.wle-asset').value.trim(),
         ...(scope.querySelector('.wle-tf') ? { tf: scope.querySelector('.wle-tf').value.trim() || null } : {}),
+        ...(scope.querySelector('.wle-boden1h') ? { boden1h: scope.querySelector('.wle-boden1h').value || null } : {}),
         ...wlFvgAuslesen(scope),
         // Event-Typ, Pivot-Level, Form und Boden-Typ gibt es auf der 50er-EMA-Retest-Seite
         // nicht mehr (Bottom-spezifische Felder, siehe istEma50Retest weiter oben) - die
@@ -3491,6 +3494,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px">Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
           (istFvg ? ''
             : '<label class="wl-detail-kurz" style="width:80px">Timeframe(s)<input type="text" class="wle-tf" value="'+esc(s.tf||'')+'" placeholder="z.B. 1D + 3D"></label>') +
+          (istFvg ? '' : '<label class="wl-detail-kurz wle-boden1h-wrap" style="width:120px"'+(/\b4H\b/i.test(s.tf||'')?'':' hidden')+' title="Nur bei 4H-Signalen: Gab es zusätzlich einen Boden auf dem 1H-Timeframe?">1H-Boden auch?'+auswahlHtml('wle-boden1h', [['','–'],['ja','Ja, 1H-Boden'],['nein','Nein']], s.boden1h)+'</label>') +
           (nurSignal ? '' : wlTradeFelderHtml(s)) +
           (nurSignal ? '<label class="wl-detail-kurz" style="width:120px" title="Welche Rolle hatte dieses Signal im Trade? Vorsignal = kam vor dem Entry (Regeln noch nicht erfüllt), Entry-Signal = hier wäre eingestiegen worden, Bestätigung = kam erst nach dem Entry dazu.">Rolle im Trade'+auswahlHtml('wle-rolle', [['','–'],['vorsignal','Vorsignal'],['entry','Entry-Signal'],['bestaetigung','Bestätigung (nach Entry)']], s.signalRolle)+'</label>' : '') +
           ((istEma50Retest || istFvg) ? '' : '<label class="wl-detail-kurz" style="width:110px">Event'+auswahlHtml('wle-event', [['','–'],['single','Quick Bottom'],['double','Double Bottom'],['triple','Triple Bottom'],['quadruple','Quadruple Bottom']], s.eventTyp)+'</label>') +
@@ -4309,6 +4313,13 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     // wird der Wert geleert, damit kein veralteter Ja/Nein-Wert gespeichert bleibt.
     // FVG: Dauern live mitrechnen + nicht angehakte Timeframes ausgrauen
     tableWrap.addEventListener('input', ev => {
+      // 4H-Signal: Feld "1H-Boden auch?" nur zeigen, wenn im Timeframe-Feld 4H steht
+      if (ev.target.classList.contains('wle-tf')) {
+        const sc = ev.target.closest('.wl-detail-grid');
+        const w = sc && sc.querySelector('.wle-boden1h-wrap');
+        if (w) w.hidden = !/\b4H\b/i.test(ev.target.value);
+        return;
+      }
       const panel = ev.target.closest('.wl-fvg-panel');
       if (!panel) return;
       const scope = panel.parentElement;

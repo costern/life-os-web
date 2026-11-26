@@ -155,6 +155,7 @@ function rowOut(r, fng) {
     fruehEntryMoeglich: r.frueh_entry_moeglich === null || r.frueh_entry_moeglich === undefined ? null : !!r.frueh_entry_moeglich,
     fruehEntryErgebnis: r.frueh_entry_ergebnis || null,
     zielText: r.ziel_text || null,
+    boden1h: r.boden_1h || null,
     fvgSignale: Array.isArray(r.fvg_signale) ? r.fvg_signale : [],
     entryZeit: r.entry_zeit || null,
     exitZeit: r.exit_zeit || null,
@@ -269,7 +270,7 @@ router.patch('/:id', async (req, res) => {
                             ['spotKaufPreis','spot_kauf_preis'],
                             ['fearGreed','fear_greed'],
                             ['signalRolle','signal_rolle'],['fruehEntryMoeglich','frueh_entry_moeglich'],['fruehEntryErgebnis','frueh_entry_ergebnis'],
-                            ['zielText','ziel_text'],['fvgSignale','fvg_signale'],['entryZeit','entry_zeit'],['exitZeit','exit_zeit'],['slTf','sl_tf'],['vektorTfs','vektor_tfs'],['rr','rr']]) {
+                            ['zielText','ziel_text'],['fvgSignale','fvg_signale'],['entryZeit','entry_zeit'],['exitZeit','exit_zeit'],['slTf','sl_tf'],['vektorTfs','vektor_tfs'],['rr','rr'],['boden1h','boden_1h']]) {
     if (b[key] === undefined) continue;
     let wert = b[key];
     if (key === 'status') wert = STATI.has(wert) ? wert : null;
@@ -288,6 +289,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'zielDatum') wert = /^\d{4}-\d{2}-\d{2}$/.test(String(wert || '')) ? wert : null;
     else if (key === 'regelkonform' || key === 'mtfGleichesLevel' || key === 'limitMoeglich' || key === 'fruehEntryMoeglich') wert = regelkonformOrNull(wert);
     else if (key === 'zielText') wert = String(wert || '').trim().slice(0, 300) || null;
+    else if (key === 'boden1h') wert = (wert === 'ja' || wert === 'nein') ? wert : null;
     else if (key === 'entryZeit' || key === 'exitZeit') {
       // datetime-local liefert "YYYY-MM-DDTHH:MM" - je nach Browser auch mit Sekunden oder Leerzeichen
       const m = String(wert || '').trim().match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);

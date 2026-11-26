@@ -486,3 +486,6 @@ CREATE TABLE IF NOT EXISTS market_events (
   source TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- boden_1h: bei 4H-Signalen - gab es zusaetzlich einen Boden auf dem 1H-Timeframe? ('ja'/'nein', NULL = nicht angegeben)
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS boden_1h TEXT;
