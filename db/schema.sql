@@ -489,3 +489,6 @@ CREATE TABLE IF NOT EXISTS market_events (
 
 -- boden_1h: bei 4H-Signalen - gab es zusaetzlich einen Boden auf dem 1H-Timeframe? ('ja'/'nein', NULL = nicht angegeben)
 ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS boden_1h TEXT;
+
+-- level_gruppe: pro Signal A/B/C/D - Signale eines Trades mit gleichem Buchstaben liegen auf demselben Pivot-Level (ersetzt mtf_gleiches_level)
+ALTER TABLE watchlist_signals ADD COLUMN IF NOT EXISTS level_gruppe TEXT;

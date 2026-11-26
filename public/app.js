@@ -2446,6 +2446,24 @@ function wlTfMinutenGlobal(tf){
     return parseInt(m[1], 10) * (e === 'M' ? 1 : e === 'H' ? 60 : e === 'D' ? 1440 : e === 'W' ? 10080 : 1);
   }));
 }
+// Pivot-Level ueber die Timeframes eines Trades: Signale mit gleichem Buchstaben (A/B/C/D)
+// liegen auf demselben Level. Fallback fuer alte Eintraege: Ja/Nein-Feld mtfGleichesLevel.
+function wlLevelInfo(sg){
+  const mit = sg.filter(s => s.levelGruppe);
+  if (mit.length >= 2) {
+    const g = new Map();
+    mit.forEach(s => { if (!g.has(s.levelGruppe)) g.set(s.levelGruppe, new Set()); g.get(s.levelGruppe).add(String(s.tf || '?').toUpperCase()); });
+    const maxGleich = Math.max(...[...g.values()].map(x => x.size));
+    const art = g.size === 1 ? 'alle' : maxGleich >= 2 ? 'teilweise' : 'unterschiedlich';
+    const kombis = [...g.values()].filter(x => x.size >= 2).map(x => [...x].sort().join(' + '));
+    return { levelArt: art, levelKombis: kombis, gleichesLevel: maxGleich >= 2 };
+  }
+  const alt = (sg.find(s => s.mtfGleichesLevel != null) || {}).mtfGleichesLevel;
+  if (alt === true) return { levelArt: 'alle', levelKombis: [], gleichesLevel: true };
+  if (alt === false) return { levelArt: 'nicht_gleich_alt', levelKombis: [], gleichesLevel: false };
+  return { levelArt: '', levelKombis: [], gleichesLevel: null };
+}
+
 function wlTimingInfo(sigs){
   const mitZeit = sigs.filter(s => s.date).map(s => ({
     t: new Date(s.date+'T'+(s.uhrzeit || '02:00')+':00').getTime(), tf: wlTfMinutenGlobal(s.tf),
@@ -2519,7 +2537,7 @@ function wlAuswertungHtml(signale){
       spot: sg.some(s => s.guterSpotKauf), analysiert: sg.every(s => s.analysiert),
       frueh: sg.some(s => s.fruehEntryMoeglich === true), fruehErg: erstes(t,'fruehEntryErgebnis'),
       timing: wlTimingInfo(sg), entry: erstes(t,'entrySimulation'), kurs: erstes(t,'kursverlauf'), ziel: erstes(t,'zielmethode'),
-      gleichesLevel: (sg.find(s => s.mtfGleichesLevel != null) || {}).mtfGleichesLevel ?? null,
+      ...wlLevelInfo(sg),
       boden1h: (sg.find(s => s.boden1h) || {}).boden1h || ''
     });
   });
@@ -2577,7 +2595,8 @@ function wlAuswertungHtml(signale){
     nachDef('Abstand erstes → letztes Signal', 'nur Trades mit mehreren Signalen', [
       ['unter 1 Tag', t => t.timing && t.timing.tage < 1], ['1–2 Tage', t => t.timing && t.timing.tage >= 1 && t.timing.tage <= 2],
       ['3–7 Tage', t => t.timing && t.timing.tage > 2 && t.timing.tage <= 7], ['mehr als 7 Tage', t => t.timing && t.timing.tage > 7]]),
-    nachDef('Gleiches Pivot-Level über die Timeframes', 'nur Trades mit mind. 2 TF', [['gleiches Level', t => t.gleichesLevel === true], ['unterschiedliche Höhe', t => t.gleichesLevel === false]]),
+    nachWert('Pivot-Level über die Timeframes (A/B/C)', 'aus dem Feld „Level“ der Signale – gleicher Buchstabe = gleiches Level', t => t.levelArt, k => ({alle:'alle TFs auf einem Level', teilweise:'teilweise gleich (mind. 2 TFs)', unterschiedlich:'alle auf unterschiedlichem Level', nicht_gleich_alt:'nicht gleich (alter Eintrag)'}[k] || k), (a,b) => ['alle','teilweise','unterschiedlich','nicht_gleich_alt'].indexOf(a) - ['alle','teilweise','unterschiedlich','nicht_gleich_alt'].indexOf(b)),
+    nachWert('Timeframes auf gleichem Level', 'welche TF-Kombinationen teilten sich das Pivot-Level', t => t.levelKombis, null, null),
     nachWert('Event-Typ', '', t => t.ev, k => WL_EVENT_LABEL[k] || k, (a,b) => (rangEvent[b]||0)-(rangEvent[a]||0)),
     nachDef('Multi-Asset', 'Signal auf mehreren Assets gleichzeitig', [['Multi-Asset', t => t.multi], ['nur dieses Asset', t => !t.multi]]),
     nachWert('Marktphase', '', t => t.phase, k => WL_PHASE_LABEL[k]),
@@ -3309,6 +3328,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         asset: scope.querySelector('.wle-asset').value.trim(),
         ...(scope.querySelector('.wle-tf') ? { tf: scope.querySelector('.wle-tf').value.trim() || null } : {}),
         ...(scope.querySelector('.wle-boden1h') ? { boden1h: scope.querySelector('.wle-boden1h').value || null } : {}),
+        ...(scope.querySelector('.wle-levelgruppe') ? { levelGruppe: scope.querySelector('.wle-levelgruppe').value || null } : {}),
         ...wlFvgAuslesen(scope),
         // Event-Typ, Pivot-Level, Form und Boden-Typ gibt es auf der 50er-EMA-Retest-Seite
         // nicht mehr (Bottom-spezifische Felder, siehe istEma50Retest weiter oben) - die
@@ -3406,8 +3426,6 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const frueh = q('wle-fruehmoeglich') ? q('wle-fruehmoeglich').value : '';
       const erg = {
         status, mtf,
-        // Nur bei mind. 2 TF sinnvoll - sonst immer leer speichern
-        mtfGleichesLevel: (mtf === null || ['', '1'].includes(mtf)) ? '' : q('wle-mtflevel').value,
         note: q('wle-note').value,
         ...(q('wle-phase') ? { marktphase: q('wle-phase').value } : {}),
         entrySimulation: q('wle-entrysim').value,
@@ -3445,7 +3463,6 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
           (istFvg ? '' : '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>') +
           (istFvg ? '' : '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>') +
-          (istFvg ? '' : '<label class="wl-detail-kurz wl-feld-mtflevel" style="width:90px'+((s.mtf && +s.mtf !== 1) ? '' : ';display:none')+'" title="Nur relevant bei MTF >= 2: haben die beteiligten Timeframes dasselbe Pivot-Level getroffen, oder weicht es leicht ab (z.B. 12H und 1D schliessen unterschiedlich und bilden dadurch nicht exakt denselben Tiefpunkt)?">Gleiches Level'+auswahlHtml('wle-mtflevel', [['','–'],['ja','Ja'],['nein','Nein']], s.mtfGleichesLevel === true ? 'ja' : (s.mtfGleichesLevel === false ? 'nein' : ''))+'</label>') +
           (istFvg ? '<label class="wl-detail-kurz" style="width:90px" title="Geplantes Risk:Reward – Minimum 3R, z.B. 4 bei gutem Take-Profit-Ziel">R:R'+'<input type="text" inputmode="decimal" class="wle-rr" value="'+(s.rr != null ? String(s.rr).replace('.', ',') : '')+'" placeholder="z.B. 4"'+(s.rr != null && s.rr < 3 ? ' style="border-color:var(--red)" title="Unter 3R – Mindestregel verletzt"' : '')+'></label>' : '') +
           '<label title="Wie wäre der Einstieg gelaufen? „Limit nicht gefüllt“ umfasst auch: R:R war direkt zu schlecht, deshalb Limit gesetzt, das nie gefüllt wurde.">Entry'+auswahlHtml('wle-entrysim', [['','–'],
             ['direkter_entry','Direkter Entry'],['limit_theoretisch_gefuellt','Limit gefüllt'],
@@ -3504,6 +3521,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           (istFvg ? '' : '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>') +
           (istFvg ? '' : '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['exakt','Exakt gleiches Level (auf den Pip genau)'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
+          ((istEma50Retest || istFvg) ? '' : '<label class="wl-detail-kurz" style="width:70px" title="Pivot-Level über die Timeframes: Signale dieses Trades mit dem GLEICHEN Buchstaben liegen auf demselben Level (z.B. 1D = A, 3D = A, 1W = B). Bei nur einem Signal leer lassen.">Level'+auswahlHtml('wle-levelgruppe', [['','–'],['A','A'],['B','B'],['C','C'],['D','D']], s.levelGruppe)+'</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label>Form'+auswahlHtml('wle-form', s.form === 'bogen_unsauber' ? WL_FORM_OPTIONEN.concat([['bogen_unsauber','Bogen unsauber (alt – bitte neu zuordnen)']]) : WL_FORM_OPTIONEN, s.form)+'</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
           '<label class="wl-detail-kurz" style="width:88px" title="gleiche Nummer bei mehreren Signalen = ein Trade · aktuell höchste: '+tradeIdInfo.hoechste+' · nächste freie: '+tradeIdInfo.naechsteFrei+'">Trade-ID' +
