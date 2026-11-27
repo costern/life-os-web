@@ -36,6 +36,11 @@ const ERGEBNIS_DETAIL = new Set(['noch_nicht_bewertet', 'target_erreicht', 'be_2
   'kein_entry', 'kein_trade_rr', 'setup_invalidiert', 'verlauf_unklar']);
 const ZIELMETHODE = new Set(['measured_move', 'ema50', 'doji_level', 'horizontaler_widerstand',
   'rr_3r', 'manuelles_ziel', 'kein_ziel']);
+// Mehrere Zielmethoden moeglich (z.B. Daily 50 EMA + Measured Move): komma-getrennt gespeichert
+function zielmethodenOrNull(v){
+  const liste = [...new Set((Array.isArray(v) ? v : String(v || '').split(',')).map(x => String(x).trim()).filter(x => ZIELMETHODE.has(x)))];
+  return liste.length ? liste.join(',') : null;
+}
 // nachkauf_moeglich: Preis ist vom (z.B. Daily-)Pivot-Level schon so weit weg, dass sich
 // kein eigenstaendiger Entry mit sauberem R:R mehr lohnt - realistisch bleibt nur Nachkauf
 // auf eine bestehende Position (direkt oder nach minimalem Ruecksetzer). Ob ein Limit
@@ -231,7 +236,7 @@ router.post('/', async (req, res) => {
      DIVERGENZEN.has(b.divStruktur) ? b.divStruktur : null,
      PIVOT_LEVEL.has(b.pivotLevel) ? b.pivotLevel : null,
      ERGEBNIS_DETAIL.has(b.ergebnisDetail) ? b.ergebnisDetail : null,
-     ZIELMETHODE.has(b.zielmethode) ? b.zielmethode : null,
+     zielmethodenOrNull(b.zielmethode),
      ENTRY_SIMULATION.has(b.entrySimulation) ? b.entrySimulation : null,
      KURSVERLAUF.has(b.kursverlauf) ? b.kursverlauf : null,
      KEIN_TRADE_GRUND.has(b.keinTradeGrund) ? b.keinTradeGrund : null,
@@ -282,7 +287,7 @@ router.patch('/:id', async (req, res) => {
     else if (key === 'divLokal' || key === 'divStruktur') wert = DIVERGENZEN.has(wert) ? wert : null;
     else if (key === 'pivotLevel') wert = PIVOT_LEVEL.has(wert) ? wert : null;
     else if (key === 'ergebnisDetail') wert = ERGEBNIS_DETAIL.has(wert) ? wert : null;
-    else if (key === 'zielmethode') wert = ZIELMETHODE.has(wert) ? wert : null;
+    else if (key === 'zielmethode') wert = zielmethodenOrNull(wert);
     else if (key === 'entrySimulation') wert = ENTRY_SIMULATION.has(wert) ? wert : null;
     else if (key === 'kursverlauf') wert = KURSVERLAUF.has(wert) ? wert : null;
     else if (key === 'keinTradeGrund') wert = KEIN_TRADE_GRUND.has(wert) ? wert : null;

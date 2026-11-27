@@ -2447,6 +2447,17 @@ function wlTfMinutenGlobal(tf){
   }));
 }
 // Pivot-Level ueber die Timeframes eines Trades: Signale mit gleichem Buchstaben (A/B/C/D)
+// Zielmethode: mehrere auswaehlbar (komma-getrennt gespeichert), als kompaktes Aufklapp-Menue
+function wlZielListe(v){ return String(v || '').split(',').map(x => x.trim()).filter(Boolean); }
+function wlZielMultiHtml(wert){
+  const gew = wlZielListe(wert);
+  const opts = [['measured_move','Measured Move / Bodenhöhe'],['ema50','Daily 50 EMA'],['doji_level','Doji-/Kerzenlevel'],
+    ['horizontaler_widerstand','Horizontaler Widerstand'],['rr_3r','3R (Risk:Reward)'],['manuelles_ziel','Manuelles Ziel'],['kein_ziel','Kein sinnvolles Ziel']];
+  return '<div class="wl-ziel-multi"><span class="wl-ziel-titel">Zielmethode</span><details class="wl-ziel-dd"><summary class="wl-ziel-sum" title="mehrere auswählbar">' +
+    (gew.length ? esc(gew.map(k => WL_ZIEL_LABEL[k] || k).join(' + ')) : '–') + '</summary><div class="wl-ziel-liste">' +
+    opts.map(([k,l]) => '<label class="wl-check"><input type="checkbox" class="wle-zielm" value="'+k+'"'+(gew.includes(k)?' checked':'')+'> '+l+'</label>').join('') +
+    '</div></details></div>';
+}
 // liegen auf demselben Level. Fallback fuer alte Eintraege: Ja/Nein-Feld mtfGleichesLevel.
 function wlLevelInfo(sg){
   const mit = sg.filter(s => s.levelGruppe);
@@ -2536,7 +2547,7 @@ function wlAuswertungHtml(signale){
       nurBest: sg.some(s => s.nurBestaetigung), gebrochen: sg.some(s => s.levelGebrochenGehalten),
       spot: sg.some(s => s.guterSpotKauf), analysiert: sg.every(s => s.analysiert),
       frueh: sg.some(s => s.fruehEntryMoeglich === true), fruehErg: erstes(t,'fruehEntryErgebnis'),
-      timing: wlTimingInfo(sg), entry: erstes(t,'entrySimulation'), kurs: erstes(t,'kursverlauf'), ziel: erstes(t,'zielmethode'),
+      timing: wlTimingInfo(sg), entry: erstes(t,'entrySimulation'), kurs: erstes(t,'kursverlauf'), ziel: [...new Set(sg.flatMap(x => wlZielListe(x.zielmethode)))],
       ...wlLevelInfo(sg),
       boden1h: (sg.find(s => s.boden1h) || {}).boden1h || ''
     });
@@ -2612,7 +2623,8 @@ function wlAuswertungHtml(signale){
     nachDef('Regel-Status', '', [['regelkonform / nicht bewertet', t => !t.nichtRegel], ['nicht regelkonform', t => t.nichtRegel], ['nur Bestätigung', t => t.nurBest], ['Level gebrochen, aber gehalten', t => t.gebrochen], ['💰 guter Spot-Kauf', t => t.spot]]),
     nachWert('Entry', 'wie wäre der Einstieg gelaufen', t => t.entry, k => WL_ENTRY_LABEL[k] || k),
     nachWert('Kursverlauf', 'was der Kurs nach dem Signal gemacht hat', t => t.kurs, k => WL_KURS_LABEL[k] || k),
-    nachWert('Zielmethode', '', t => t.ziel, k => WL_ZIEL_LABEL[k] || k),
+    nachWert('Zielmethode', 'mehrere pro Trade möglich – ein Trade zählt bei jeder seiner Zielmethoden', t => t.ziel, k => WL_ZIEL_LABEL[k] || k),
+    nachWert('Zielmethoden-Kombinationen', 'nur Trades mit mind. 2 Zielmethoden', t => t.ziel.length >= 2 ? t.ziel.map(k => WL_ZIEL_LABEL[k] || k).sort().join(' + ') : '', null, null),
     nachWert('Jahr', '', t => t.jahr, null, (a,b) => a.localeCompare(b)),
     nachWert('Wochentag des ersten Signals', '', t => t.wochentag, k => WT[k], (a,b) => ((a+6)%7)-((b+6)%7)),
     nachWert('Asset', 'nur Assets mit mind. 2 Trades', t => t.asset, null, null, 2)
@@ -3431,8 +3443,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         entrySimulation: q('wle-entrysim').value,
         // Ausgang gibt es nur mit Entry - bei No Entry leer speichern
         ergebnisDetail: status === 'no_entry' ? '' : q('wle-ergebnisdetail').value,
-        zielmethode: q('wle-zielmethode').value,
-        zielText: q('wle-zielmethode').value === 'manuelles_ziel' && q('wle-zieltext') ? q('wle-zieltext').value : '',
+        zielmethode: [...scope.querySelectorAll('.wle-zielm:checked')].map(c => c.value).join(','),
+        zielText: scope.querySelector('.wle-zielm[value="manuelles_ziel"]:checked') && q('wle-zieltext') ? q('wle-zieltext').value : '',
         kursverlauf: q('wle-kursverlauf').value,
         keinTradeGrund: q('wle-keintradegrund').value,
         regelkonform: q('wle-regelkonform').value,
@@ -3473,12 +3485,8 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
             ['noch_nicht_bewertet','Noch nicht bewertet'],['target_erreicht','Target erreicht'],
             ['be_2r','Break-even nach 2R'],['stop_loss','Stop-Loss erreicht'],
             ['setup_invalidiert','Setup invalidiert'],['verlauf_unklar','Verlauf unklar']].concat(['kein_entry','kein_trade_rr'].includes(s.ergebnisDetail) ? [[s.ergebnisDetail, 'alt: '+s.ergebnisDetail+' – bitte über Feld Entry eintragen']] : []), s.ergebnisDetail)+'</label>' +
-          '<label>Zielmethode'+auswahlHtml('wle-zielmethode', [['','–'],
-            ['measured_move','Measured Move / Bodenhöhe'],['ema50','Daily 50 EMA'],
-            ['doji_level','Doji-/Kerzenlevel'],['horizontaler_widerstand','Horizontaler Widerstand'],
-            ['rr_3r','3R (Risk:Reward)'],
-            ['manuelles_ziel','Manuelles Ziel'],['kein_ziel','Kein sinnvolles Ziel']], s.zielmethode)+'</label>' +
-          '<label class="wl-feld-zieltext"'+(s.zielmethode === 'manuelles_ziel' ? '' : ' style="display:none"')+' title="Welches Ziel genau? z.B. 64.500 $ / Wochen-Hoch / letztes Swing-High">Manuelles Ziel<input type="text" class="wle-zieltext" value="'+esc(s.zielText||'')+'" placeholder="z.B. 64.500 $ – letztes Swing-High"></label>' +
+          wlZielMultiHtml(s.zielmethode) +
+          '<label class="wl-feld-zieltext"'+(wlZielListe(s.zielmethode).includes('manuelles_ziel') ? '' : ' style="display:none"')+' title="Welches Ziel genau? z.B. 64.500 $ / Wochen-Hoch / letztes Swing-High">Manuelles Ziel<input type="text" class="wle-zieltext" value="'+esc(s.zielText||'')+'" placeholder="z.B. 64.500 $ – letztes Swing-High"></label>' +
           '<label>Kursverlauf'+auswahlHtml('wle-kursverlauf', [['','–'],
             ['direkt_target','Direkt zum Target'],
             ['unter_entry_ueber_pivot_dann_target','Unter Entry, aber über Pivot gehalten, danach Target'],
@@ -4355,8 +4363,14 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       // Ausgang nur mit Entry, Ergebnis Frueh-Entry nur wenn Frueh-Entry moeglich
       const statusSel = ev.target.closest('.wle-status');
       if (statusSel) { const f = scopeVon(statusSel).querySelector('.wl-feld-ausgang'); if (f) f.style.display = statusSel.value === 'no_entry' ? 'none' : ''; return; }
-      const zielSel = ev.target.closest('.wle-zielmethode');
-      if (zielSel) { const f = scopeVon(zielSel).querySelector('.wl-feld-zieltext'); if (f) f.style.display = zielSel.value === 'manuelles_ziel' ? '' : 'none'; return; }
+      const zielBox = ev.target.closest('.wle-zielm');
+      if (zielBox) {
+        const dd = zielBox.closest('.wl-ziel-multi');
+        const gewaehlt = [...dd.querySelectorAll('.wle-zielm:checked')].map(c => c.value);
+        dd.querySelector('.wl-ziel-sum').textContent = gewaehlt.length ? gewaehlt.map(k => WL_ZIEL_LABEL[k] || k).join(' + ') : '–';
+        const f = scopeVon(zielBox).querySelector('.wl-feld-zieltext'); if (f) f.style.display = gewaehlt.includes('manuelles_ziel') ? '' : 'none';
+        return;
+      }
       // FVG: Uhrzeit eingetragen -> Haken automatisch setzen
       const fvgZeit = ev.target.closest('.wle-fvgzeit');
       if (fvgZeit) { const c = scopeVon(fvgZeit).querySelector('.wle-fvgsig[data-tf="'+fvgZeit.dataset.tf+'"]'); if (c && fvgZeit.value) c.checked = true; return; }
