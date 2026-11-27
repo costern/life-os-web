@@ -2480,11 +2480,13 @@ function wlTagesClose(dateIso){
   const d = /^\d{4}-\d{2}-\d{2}$/.test(String(dateIso || '')) ? new Date(dateIso + 'T00:00:00Z') : new Date();
   return d.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
 }
-// Fruehsignal-Auswertung: Trade mit MTF >= 2 (hoeherer TF erwartet). 12H und 1D zaehlen als
+// Fruehsignal-Auswertung: ERSTES Signal des Trades hat MTF >= 2 (hoeherer TF beim ersten Signal schon erwartet). 12H und 1D zaehlen als
 // EIN Timeframe. Nur ein TF eingetragen -> hoeherer TF kam nie; mehrere TFs nacheinander ->
 // kam spaeter; alle gleichzeitig -> kein Fruehsignal.
-function wlFruehArt(sg, mtf){
-  if (![2,3,4].includes(+mtf)) return '';
+function wlFruehArt(sg){
+  const zeit = x => new Date(x.date+'T'+(x.uhrzeit || wlTagesClose(x.date))+':00').getTime();
+  const erstes = sg.filter(x => x.date).slice().sort((a,b) => zeit(a) - zeit(b) || wlTfMinutenGlobal(a.tf) - wlTfMinutenGlobal(b.tf))[0];
+  if (!erstes || ![2,3,4].includes(+erstes.mtf)) return '';
   const gruppe = tf => { const m = wlTfMinutenGlobal(tf); return m === 720 ? 1440 : m; };
   const gruppen = new Set(sg.map(x => gruppe(x.tf)).filter(m => m > 0));
   if (gruppen.size <= 1) return 'kam_nicht';
@@ -2565,7 +2567,7 @@ function wlAuswertungHtml(signale){
       frueh: sg.some(s => s.fruehEntryMoeglich === true), fruehErg: erstes(t,'fruehEntryErgebnis'),
       timing: wlTimingInfo(sg), entry: erstes(t,'entrySimulation'), kurs: erstes(t,'kursverlauf'), ziel: [...new Set(sg.flatMap(x => wlZielListe(x.zielmethode)))],
       ...wlLevelInfo(sg),
-      fruehArt: wlFruehArt(sg, mtf),
+      fruehArt: wlFruehArt(sg),
       boden1h: (sg.find(s => s.boden1h) || {}).boden1h || ''
     });
   });
@@ -2733,7 +2735,7 @@ function wlAuswertungHtml(signale){
     const ks = trades.filter(t => t.fruehArt === 'kam_spaeter'), kn = trades.filter(t => t.fruehArt === 'kam_nicht');
     if (!ks.length && !kn.length) return '';
     const liste = kn.map(t => esc(t.asset)+' '+new Date(t.date+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})+(t.sigs[0].tradeId ? ' (#'+esc(String(t.sigs[0].tradeId).trim())+')' : '')).join(', ');
-    return '<div class="aw-block"><h3>Frühsignal: lohnt sich der frühe Einstieg? <span class="muted">Trades mit MTF ≥ 2, bei denen der höhere TF beim ersten Signal noch nicht da war (12H + 1D zählen als ein TF) – Quote = Trade-Ergebnis</span></h3>' +
+    return '<div class="aw-block"><h3>Frühsignal: lohnt sich der frühe Einstieg? <span class="muted">Trades, deren ERSTES Signal schon MTF ≥ 2 hatte (höherer TF absehbar, aber noch nicht da) (12H + 1D zählen als ein TF) – Quote = Trade-Ergebnis</span></h3>' +
       '<table class="aw-table">'+kopf+'<tbody>' +
         zeileHtml('Frühsignal', 'Alle Frühsignale zusammen', ks.concat(kn)) +
         zeileHtml('Frühsignal', '… höherer TF kam später', ks) +
@@ -3373,6 +3375,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
         ...(scope.querySelector('.wle-tf') ? { tf: scope.querySelector('.wle-tf').value.trim() || null } : {}),
         ...(scope.querySelector('.wle-boden1h') ? { boden1h: scope.querySelector('.wle-boden1h').value || null } : {}),
         ...(scope.querySelector('.wle-levelgruppe') ? { levelGruppe: scope.querySelector('.wle-levelgruppe').value || null } : {}),
+        ...(scope.querySelector('.wle-mtfsig') ? { mtf: scope.querySelector('.wle-mtfsig').value } : {}),
         ...wlFvgAuslesen(scope),
         // Event-Typ, Pivot-Level, Form und Boden-Typ gibt es auf der 50er-EMA-Retest-Seite
         // nicht mehr (Bottom-spezifische Felder, siehe istEma50Retest weiter oben) - die
@@ -3506,7 +3509,6 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           '<label class="wl-detail-kurz" style="width:100px" title="Unabhaengig vom Ergebnis: hat das Setup zum Zeitpunkt des Signals die eigenen Entry-Kriterien erfuellt (MTF-Konfluenz, Multi-Asset, sauberes Pattern)?">Regelkonform'+auswahlHtml('wle-regelkonform', [['','–'],['ja','Ja'],['nein','Nein'],['klaerung','In Klärung']], s.regelkonform === true ? 'ja' : (s.regelkonform === false ? 'nein' : (s.regelkonformKlaerung ? 'klaerung' : '')))+'</label>' +
           '<label class="wl-detail-kurz" style="width:56px">Note'+auswahlHtml('wle-note', [['','–']].concat(WL_NOTEN.map(n => [n, n])), s.note)+'</label>' +
           (istFvg ? '' : '<label class="wl-detail-kurz" style="width:90px">Marktphase'+auswahlHtml('wle-phase', [['','–'],['uptrend','Uptrend'],['downtrend','Downtrend'],['ranging','Range']], s.marktphase)+'</label>') +
-          (istFvg ? '' : '<label class="wl-detail-kurz" style="width:78px">MTF'+auswahlHtml('wle-mtf', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>') +
           (istFvg ? '<label class="wl-detail-kurz" style="width:90px" title="Geplantes Risk:Reward – Minimum 3R, z.B. 4 bei gutem Take-Profit-Ziel">R:R'+'<input type="text" inputmode="decimal" class="wle-rr" value="'+(s.rr != null ? String(s.rr).replace('.', ',') : '')+'" placeholder="z.B. 4"'+(s.rr != null && s.rr < 3 ? ' style="border-color:var(--red)" title="Unter 3R – Mindestregel verletzt"' : '')+'></label>' : '') +
           '<label title="Wie wäre der Einstieg gelaufen? „Limit nicht gefüllt“ umfasst auch: R:R war direkt zu schlecht, deshalb Limit gesetzt, das nie gefüllt wurde.">Entry'+auswahlHtml('wle-entrysim', [['','–'],
             ['direkter_entry','Direkter Entry'],['limit_theoretisch_gefuellt','Limit gefüllt'],
@@ -3561,6 +3563,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
           (istFvg ? '' : '<label>Divergenz lokal'+auswahlHtml('wle-divlokal', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divLokal)+'</label>') +
           (istFvg ? '' : '<label>Divergenz strukturell'+auswahlHtml('wle-divstruktur', [['','–'],['leicht','Leichte RSI Div.'],['rsi','RSI Div.'],['stark','Starke RSI Div.'],['none','No Div.'],['hidden','RSI Hidden Div.']], s.divStruktur)+'</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label>Pivot-Level'+auswahlHtml('wle-pivot', [['','–'],['exakt','Exakt gleiches Level (auf den Pip genau)'],['perfekt','Perfektes Level'],['nicht_perfekt','Leicht abweichendes Level'],['zu_weit_abweichend','Zu weit abweichendes Level']], s.pivotLevel)+'</label>') +
+          (istFvg ? '' : '<label class="wl-detail-kurz" style="width:78px" title="MTF aus Sicht DIESES Signals: wie viele Timeframes waren zu dem Zeitpunkt bestätigt bzw. schon absehbar? (12H + 1D zählen als einer)">MTF'+auswahlHtml('wle-mtfsig', [['','–'],['1','Only 1 TF'],['2','2 TF (Achtung: 12H, 1D)'],['4','2 TF'],['3','3 TF']], s.mtf ? String(s.mtf) : '')+'</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label class="wl-detail-kurz" style="width:70px" title="Pivot-Level über die Timeframes: Signale dieses Trades mit dem GLEICHEN Buchstaben liegen auf demselben Level (z.B. 1D = A, 3D = A, 1W = B). Bei nur einem Signal leer lassen.">Level'+auswahlHtml('wle-levelgruppe', [['','–'],['A','A'],['B','B'],['C','C'],['D','D']], s.levelGruppe)+'</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label>Form'+auswahlHtml('wle-form', s.form === 'bogen_unsauber' ? WL_FORM_OPTIONEN.concat([['bogen_unsauber','Bogen unsauber (alt – bitte neu zuordnen)']]) : WL_FORM_OPTIONEN, s.form)+'</label>') +
           ((istEma50Retest || istFvg) ? '' : '<label title="Strukturell unterschiedliche Boden-Arten, v.a. im 1W/1M-Chart: Basisboden = lange Seitwaerts-Akkumulation auf gleichem Level ueber viele Wochen/Monate; W-Pattern = kompakter, scharfer Doppelboden ueber wenige Kerzen">Boden-Typ'+auswahlHtml('wle-bodentyp', [['','–'],['basisboden','Basisboden'],['w_pattern','W-Pattern']], s.bodenTyp)+'</label>') +
