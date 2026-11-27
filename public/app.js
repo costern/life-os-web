@@ -2475,9 +2475,25 @@ function wlLevelInfo(sg){
   return { levelArt: '', levelKombis: [], gleichesLevel: null };
 }
 
+// Tages-Close in deutscher Zeit: 00:00 UTC = 01:00 im Winter (MEZ) bzw. 02:00 im Sommer (MESZ)
+function wlTagesClose(dateIso){
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(String(dateIso || '')) ? new Date(dateIso + 'T00:00:00Z') : new Date();
+  return d.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
+}
+// Fruehsignal-Auswertung: Trade mit MTF >= 2 (hoeherer TF erwartet). 12H und 1D zaehlen als
+// EIN Timeframe. Nur ein TF eingetragen -> hoeherer TF kam nie; mehrere TFs nacheinander ->
+// kam spaeter; alle gleichzeitig -> kein Fruehsignal.
+function wlFruehArt(sg, mtf){
+  if (![2,3,4].includes(+mtf)) return '';
+  const gruppe = tf => { const m = wlTfMinutenGlobal(tf); return m === 720 ? 1440 : m; };
+  const gruppen = new Set(sg.map(x => gruppe(x.tf)).filter(m => m > 0));
+  if (gruppen.size <= 1) return 'kam_nicht';
+  const ti = wlTimingInfo(sg);
+  return ti && ti.art === 'gleichzeitig' ? 'gleichzeitig' : 'kam_spaeter';
+}
 function wlTimingInfo(sigs){
   const mitZeit = sigs.filter(s => s.date).map(s => ({
-    t: new Date(s.date+'T'+(s.uhrzeit || '02:00')+':00').getTime(), tf: wlTfMinutenGlobal(s.tf),
+    t: new Date(s.date+'T'+(s.uhrzeit || wlTagesClose(s.date))+':00').getTime(), tf: wlTfMinutenGlobal(s.tf),
     mehrTf: /[+,\/&]|\bund\b/i.test(String(s.tf || ''))
   })).sort((a,b) => a.t - b.t);
   if (!mitZeit.length) return null;
@@ -2549,6 +2565,7 @@ function wlAuswertungHtml(signale){
       frueh: sg.some(s => s.fruehEntryMoeglich === true), fruehErg: erstes(t,'fruehEntryErgebnis'),
       timing: wlTimingInfo(sg), entry: erstes(t,'entrySimulation'), kurs: erstes(t,'kursverlauf'), ziel: [...new Set(sg.flatMap(x => wlZielListe(x.zielmethode)))],
       ...wlLevelInfo(sg),
+      fruehArt: wlFruehArt(sg, mtf),
       boden1h: (sg.find(s => s.boden1h) || {}).boden1h || ''
     });
   });
@@ -2712,12 +2729,27 @@ function wlAuswertungHtml(signale){
       '<div class="muted" style="margin-top:6px">Früh-Entry war besser (Win, wo Standard No Entry/Verlust war): <b>'+fruehRettet+'</b> · Früh-Entry war schlechter (Verlust, wo Standard Win war): <b>'+fruehKostet+'</b></div></div>';
   }
 
+  function fruehSignalHtml(){
+    const ks = trades.filter(t => t.fruehArt === 'kam_spaeter'), kn = trades.filter(t => t.fruehArt === 'kam_nicht');
+    if (!ks.length && !kn.length) return '';
+    const liste = kn.map(t => esc(t.asset)+' '+new Date(t.date+'T00:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})+(t.sigs[0].tradeId ? ' (#'+esc(String(t.sigs[0].tradeId).trim())+')' : '')).join(', ');
+    return '<div class="aw-block"><h3>Frühsignal: lohnt sich der frühe Einstieg? <span class="muted">Trades mit MTF ≥ 2, bei denen der höhere TF beim ersten Signal noch nicht da war (12H + 1D zählen als ein TF) – Quote = Trade-Ergebnis</span></h3>' +
+      '<table class="aw-table">'+kopf+'<tbody>' +
+        zeileHtml('Frühsignal', 'Alle Frühsignale zusammen', ks.concat(kn)) +
+        zeileHtml('Frühsignal', '… höherer TF kam später', ks) +
+        zeileHtml('Frühsignal', '… höherer TF kam nie', kn) +
+      '</tbody></table>' +
+      (kn.length ? '<div class="muted" style="margin-top:6px">Zählen als „kam nie“ (nur ein Timeframe eingetragen – falls später doch ein höheres Signal kam, bitte nachtragen): '+liste+'</div>' : '') +
+    '</div>';
+  }
+
   return '<div class="wl-ausw">' +
     '<div class="muted" style="margin-bottom:10px">Zählt Trades (gleiche Trade-ID = ein Trade) und folgt den Spaltenfiltern oben. <b>Quote</b> = (Win + BE Win) ÷ (Win + BE Win + BE Loss + Lose); No Entry und unbewertete Trades zählen nicht mit. Bei weniger als '+WL_AW_MIN+' bewerteten Trades ist eine Gruppe nur ein Hinweis, kein Beleg.</div>' +
     '<div class="aw-hero"><div class="aw-hero-q" style="color:'+farbeQ(gesamt.quote, gesamt.wertbar)+'">'+pct(gesamt.quote)+'</div><div><b>Gesamt-Quote</b><br><span class="muted">'+(gesamt.win+gesamt.be_win)+' positiv von '+gesamt.wertbar+' bewerteten Trades ('+gesamt.win+' Win · '+gesamt.be_win+' BE Win · '+gesamt.be_loss+' BE Loss · '+gesamt.lose+' Lose)</span></div></div>' +
     '<div class="stats" style="margin:10px 0">'+datenqualitaet+'</div>' +
     ((beste.length || schwaechste.length) ? '<div class="aw-hl"><div><h3 style="color:var(--green)">Stärkste Merkmale</h3><ul>'+(beste.map(hl).join('')||'<li class="muted">noch nichts Auffälliges</li>')+'</ul></div>' +
       '<div><h3 style="color:var(--red)">Schwächste Merkmale</h3><ul>'+(schwaechste.map(hl).join('')||'<li class="muted">noch nichts Auffälliges</li>')+'</ul></div></div>' : '') +
+    fruehSignalHtml() +
     fruehVergleichHtml() +
     (regelZeilen ? '<div class="aw-block"><h3>Regel-Check <span class="muted">stimmen deine Regeln aus der Strategie-Notiz mit den bisherigen Daten überein? Quote mit Merkmal vs. ohne (in Klammern: bewertete Trades)</span></h3>' +
       '<table class="aw-table"><thead><tr><th>Regel / Annahme</th><th>Erwartung</th><th>mit Merkmal</th><th>ohne</th><th>Urteil</th></tr></thead><tbody>'+regelZeilen+'</tbody></table></div>' : '') +
@@ -3092,7 +3124,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const t = new Date(s.date+'T00:00:00').getTime();
       return t >= minT - CLUSTER_GRENZE && t <= maxT + CLUSTER_GRENZE &&
         (chartModus !== 'indices' || istIndexRelevantesAsset(s.asset));
-    }).slice().sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
+    }).slice().sort((a,b) => a.date.localeCompare(b.date) || (a.uhrzeit||wlTagesClose(a.date)).localeCompare(b.uhrzeit||wlTagesClose(b.date)));
 
     const ICON = 22, MAXSPUREN = 5;
     const spurBelegt = [];
@@ -3315,7 +3347,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
     const tabelleSortiert = tabelleBasis.slice().sort((a,b) => {
       let cmp;
       if (sortSpalte === 'asset') cmp = a.asset.localeCompare(b.asset) || a.date.localeCompare(b.date);
-      else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'');
+      else cmp = a.date.localeCompare(b.date) || (a.uhrzeit||wlTagesClose(a.date)).localeCompare(b.uhrzeit||wlTagesClose(b.date));
       return sortRichtung === 'asc' ? cmp : -cmp;
     });
     wlFarbenVergeben(tabelleSortiert);
@@ -3514,7 +3546,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       const st = wlStatus(s);
       return (istFvg ? wlFvgPanelHtml(s) : '') + '<div class="wl-detail-grid">' +
           '<label class="wl-detail-kurz" style="width:82px">Datum<input type="text" class="wle-date" value="'+formatSchlauesDatum(parseSchlauesDatum(s.date))+'" placeholder="TT.MM.JJJJ"></label>' +
-          '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = 02:00 (Tageschart)">Uhrzeit' +
+          '<label class="wl-detail-kurz" style="width:76px" title="Kerzen-Close, leer = Tageschart-Close (automatisch 01:00 im Winter / 02:00 im Sommer)">Uhrzeit' +
             '<input type="time" class="wle-uhrzeit" value="'+esc(s.uhrzeit||'')+'"></label>' +
           '<label class="wl-detail-kurz" style="width:100px">Asset<input type="text" class="wle-asset" value="'+esc(s.asset)+'" placeholder="z.B. BTC"></label>' +
           (istFvg ? ''
@@ -3781,7 +3813,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       '<form class="addbar" id="wlAddForm'+SFX+'" autocomplete="off" style="margin-top:16px">' +
         '<div class="addrow">' +
           '<input type="text" id="wlNewDate'+SFX+'" placeholder="TT.MM.JJJJ" required style="max-width:120px">' +
-          '<input type="time" id="wlNewZeit'+SFX+'" value="02:00" title="Kerzen-Close – 02:00 ist der Tageschart-Close">' +
+          '<input type="time" id="wlNewZeit'+SFX+'" value="'+wlTagesClose()+'" data-standard="'+wlTagesClose()+'" title="Kerzen-Close – unverändert = Tageschart-Close (wird automatisch 01:00 Winter / 02:00 Sommer je nach Datum)">' +
           '<input type="text" id="wlNewAsset'+SFX+'" placeholder="Asset (z.B. BTC)" maxlength="20" required style="max-width:110px">' +
           (istFvg
             ? '<select id="wlNewTf'+SFX+'" style="max-width:90px"><option value="">TF</option>'+WL_FVG_TFS.map(t => '<option>'+t+'</option>').join('')+'</select>'
@@ -3996,7 +4028,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       if (!asset) return;
       const body = {
         date, asset, strategie: STRATEGIE,
-        uhrzeit: document.getElementById('wlNewZeit'+SFX).value || null,
+        uhrzeit: (z => (!z.value || z.value === z.dataset.standard) ? null : z.value)(document.getElementById('wlNewZeit'+SFX)),
         tf: document.getElementById('wlNewTf'+SFX).value.trim() || null,
         status: document.getElementById('wlNewStatus'+SFX).value,
         tradeId: document.getElementById('wlNewTradeId'+SFX).value.trim() || null,
@@ -4166,7 +4198,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       });
       const tage = [...tageMap.keys()].sort();
       tage.forEach(d => tageMap.get(d).sort((a,b) =>
-        wlTfMinuten(a.tf) - wlTfMinuten(b.tf) || (a.uhrzeit||'').localeCompare(b.uhrzeit||'')));
+        wlTfMinuten(a.tf) - wlTfMinuten(b.tf) || (a.uhrzeit||wlTagesClose(a.date)).localeCompare(b.uhrzeit||wlTagesClose(b.date))));
 
       // Gemeinsames Details-Feld fuer den GESAMTEN Trade (alle Signale mit dieser
       // Trade-ID) statt eines eigenen Feldes pro Signal - Colin will den Trade einmal
@@ -4174,7 +4206,7 @@ function wlBaueSeite(STRATEGIE, SFX, PAGEID){
       // frueheste) bereits vorhandene Text unter den zugehoerigen Signalen, falls schon
       // etwas eingetragen war (z.B. von vor der Umstellung).
       const chronologisch = verwandte.slice().sort((a,b) =>
-        a.date.localeCompare(b.date) || (a.uhrzeit||'').localeCompare(b.uhrzeit||''));
+        a.date.localeCompare(b.date) || (a.uhrzeit||wlTagesClose(a.date)).localeCompare(b.uhrzeit||wlTagesClose(b.date)));
       const gemeinsamerText = (chronologisch.find(s => (s.details||'').trim()) || {}).details || '';
       // News, genau wie Details: ein geteiltes Feld fuer den gesamten Trade, vorbelegt mit
       // dem ersten bereits vorhandenen Text. Anders als Details aber nur eingeblendet,
